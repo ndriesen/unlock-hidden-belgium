@@ -5,10 +5,12 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 interface SidebarProps {
-  sidebarOpen: boolean;
+  collapsed: boolean;
 }
 
-export default function Sidebar({ sidebarOpen }: SidebarProps) {
+export default function Sidebar({ collapsed }: SidebarProps) {
+  const [hotspotsOpen, setHotspotsOpen] = useState(false);
+
   const navLinks = [
     { name: "Home", href: "/" },
     {
@@ -24,35 +26,41 @@ export default function Sidebar({ sidebarOpen }: SidebarProps) {
     { name: "Profile", href: "/profile" },
   ];
 
-  const [hotspotsOpen, setHotspotsOpen] = useState(false);
-
   return (
-    <aside
-      className={`fixed top-0 left-0 h-full bg-white shadow-lg z-40 w-64 transition-transform duration-300 ease-in-out ${
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      }`}
-    >
-      <div className="p-4">
-        <h1 className="text-xl font-bold text-green-700 mb-6">Unlock Hidden Belgium</h1>
-        <nav className="flex flex-col space-y-2">
+    <aside className="h-full bg-slate-900 text-white flex flex-col justify-between p-6 transition-all duration-300">
+      <div>
+        {!collapsed && (
+          <h1 className="text-lg font-semibold mb-8">
+            Unlock Hidden Belgium
+          </h1>
+        )}
+
+        <nav className="space-y-2">
           {navLinks.map((link) =>
             link.submenu ? (
               <div key={link.name}>
                 <button
-                  className="flex justify-between items-center w-full px-3 py-2 rounded hover:bg-green-100"
                   onClick={() => setHotspotsOpen(!hotspotsOpen)}
+                  className="flex justify-between items-center w-full px-4 py-2 rounded-xl hover:bg-white/10 transition"
                 >
-                  <span>{link.name}</span>
-                  <ChevronDown
-                    className={`w-4 h-4 transition-transform duration-200 ${
-                      hotspotsOpen ? "rotate-180" : ""
-                    }`}
-                  />
+                  {!collapsed && <span>{link.name}</span>}
+                  {!collapsed && (
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform ${
+                        hotspotsOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  )}
                 </button>
-                {hotspotsOpen && (
-                  <div className="flex flex-col ml-4 mt-1 space-y-1">
+
+                {!collapsed && hotspotsOpen && (
+                  <div className="ml-4 mt-2 space-y-1">
                     {link.submenu.map((s) => (
-                      <Link key={s.name} href={s.href} className="block px-3 py-1 rounded hover:bg-green-50">
+                      <Link
+                        key={s.name}
+                        href={s.href}
+                        className="block px-4 py-1 text-sm rounded-lg hover:bg-white/10 transition"
+                      >
                         {s.name}
                       </Link>
                     ))}
@@ -60,13 +68,26 @@ export default function Sidebar({ sidebarOpen }: SidebarProps) {
                 )}
               </div>
             ) : (
-              <Link key={link.name} href={link.href} className="block px-3 py-2 rounded hover:bg-green-100">
-                {link.name}
+              <Link
+                key={link.name}
+                href={link.href}
+                className="block px-4 py-2 rounded-xl hover:bg-white/10 transition"
+              >
+                {!collapsed && link.name}
               </Link>
             )
           )}
         </nav>
       </div>
+
+      {!collapsed && (
+        <div>
+          <p className="text-sm mb-2">Level 4 Explorer</p>
+          <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+            <div className="h-full bg-brand-emerald w-2/3" />
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

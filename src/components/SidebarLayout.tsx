@@ -1,28 +1,44 @@
 "use client";
 
 import { useState } from "react";
-import Sidebar from "./Sidebar";
 import { Menu } from "lucide-react";
+import Sidebar from "./Sidebar";
 
-export default function SidebarLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+export default function SidebarLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="flex">
+    <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
-      <Sidebar sidebarOpen={sidebarOpen} />
+      <div
+        className={`
+          transition-all duration-300
+          ${collapsed ? "w-20" : "w-64"}
+        `}
+      >
+        <Sidebar collapsed={collapsed} />
+      </div>
 
-      {/* Hamburger & Content */}
-      <div className={`flex-1 transition-all duration-300`} style={{ marginLeft: sidebarOpen ? 256 : 0 }}>
-        {/* Hamburger icon boven content */}
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="fixed top-4 left-4 z-50 p-2 bg-green-700 text-white rounded-md shadow-md"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
+      {/* Main */}
+      <div className="flex-1 flex flex-col bg-brand-background">
+        {/* Topbar */}
+        <div className="h-20 bg-white flex items-center px-6 shadow-soft">
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition"
+          >
+            <Menu size={22} />
+          </button>
+        </div>
 
-        <main className="pt-16">{children}</main>
+        {/* Content */}
+        <div className="flex-1 p-8 overflow-auto">
+          {children}
+        </div>
       </div>
     </div>
   );
