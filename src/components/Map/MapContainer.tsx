@@ -2,17 +2,23 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { fetchHotspots } from "@/lib/services/hotspots";
-import { markVisited } from "@/lib/services/gamification";
-import MapView from "./MapView";
 import { supabase } from "@/lib/Supabase/browser-client";
-import { Hotspot } from "@/app/page";
+import MapView from "./MapView";
+import { markVisited } from "@/lib/services/gamification";
+import { Hotspot } from "@/types/hotspot";
 
-interface Props {
+export interface MapContainerProps {
+  hotspots: Hotspot[];
+  searchQuery?: string;
   categoryFilter?: string;
   provinceFilter?: string;
   viewMode: "markers" | "heatmap";
   mapStyle?: "default" | "satellite";
+  visitedIds: string[];
+  wishlistIds: string[];
+  favoriteIds: string[];
   onSelect: (h: Hotspot) => void;
+  onVisit: (id: string) => void;
   onToast: (msg: string) => void;
 }
 
@@ -20,57 +26,16 @@ export default function MapContainer({
   categoryFilter,
   provinceFilter,
   viewMode,
+  searchQuery,
   mapStyle = "default",
+  visitedIds,
+  wishlistIds,
+  favoriteIds,
   onSelect,
+  onVisit,
   onToast,
-}: Props) {
-
+}: MapContainerProps) {
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
-  const [visitedIds, setVisitedIds] = useState<string[]>([]);
-  const [wishlistIds, setWishlistIds] = useState<string[]>([]);
-  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  /* ========================================================= */
-  /* ================= AUTH + USER HOTSPOTS ================== */
-  /* ========================================================= */
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getSession();
-      const uid = data.session?.user.id ?? null;
-      setUserId(uid);
-
-      if (!uid) return;
-
-      const { data: userHotspots } = await supabase
-        .from("user_hotspots")
-        .select("hotspot_id, status")
-        .eq("user_id", uid);
-
-      if (!userHotspots) return;
-
-      setVisitedIds(
-        userHotspots
-          .filter((d) => d.status === "visited")
-          .map((d) => d.hotspot_id)
-      );
-
-      setWishlistIds(
-        userHotspots
-          .filter((d) => d.status === "wishlist")
-          .map((d) => d.hotspot_id)
-      );
-
-      setFavoriteIds(
-        userHotspots
-          .filter((d) => d.status === "favorite")
-          .map((d) => d.hotspot_id)
-      );
-    };
-
-    getUser();
-  }, []);
 
   /* ========================================================= */
   /* ================= LOAD HOTSPOTS ========================= */
@@ -81,11 +46,7 @@ export default function MapContainer({
     if (!data) return;
 
     const mapped: Hotspot[] = data
-      .filter(
-        (h: any) =>
-          h.latitude != null &&
-          h.longitude != null
-      )
+      .filter((h: any) => h.latitude != null && h.longitude != null)
       .map((h: any) => ({
         id: h.id,
         name: h.name,
@@ -93,6 +54,11 @@ export default function MapContainer({
         longitude: Number(h.longitude),
         category: h.category,
         province: h.province,
+        description: h.description,
+        images: h.images,
+        opening_hours: h.opening_hours,
+        combine_with: h.combine_with,
+        visit_count: h.visit_count,
       }));
 
     setHotspots(mapped);
@@ -103,7 +69,7 @@ export default function MapContainer({
   }, [loadHotspots]);
 
   /* ========================================================= */
-  /* ================= REALTIME SUBSCRIPTIONS ================ */
+  /* ================= REALTIME UPDATES ====================== */
   /* ========================================================= */
 
   useEffect(() => {
@@ -118,6 +84,7 @@ export default function MapContainer({
         },
         () => {
           loadHotspots();
+          onToast("Map updated");
         }
       )
       .subscribe();
@@ -125,82 +92,29 @@ export default function MapContainer({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loadHotspots]);
+  }, [loadHotspots, onToast]);
 
   /* ========================================================= */
   /* ================= FILTERING ============================= */
   /* ========================================================= */
 
   const filtered = useMemo(() => {
-    if (!categoryFilter && !provinceFilter) return hotspots;
+    return hotspots.filter((h) => {
+      const matchesCategory =
+        !categoryFilter || h.category === categoryFilter;
 
-    return hotspots.filter(
-      (h) =>
-        (!categoryFilter || h.category === categoryFilter) &&
-        (!provinceFilter || h.province === provinceFilter)
-    );
-  }, [hotspots, categoryFilter, provinceFilter]);
+      const matchesProvince =
+        !provinceFilter || h.province === provinceFilter;
 
-  /* ========================================================= */
-  /* ================= VISIT HANDLER ========================= */
-  /* ========================================================= */
+      const matchesSearch =
+        !searchQuery ||
+        h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        h.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        h.province.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const handleVisit = async (hotspotId: string) => {
-    if (!userId) {
-      onToast("Login required");
-      return;
-    }
-
-    if (visitedIds.includes(hotspotId)) return;
-
-    await markVisited(userId, hotspotId);
-
-    setVisitedIds((prev) => [...prev, hotspotId]);
-
-    onToast("+10 XP earned!");
-  };
-
-  /* ========================================================= */
-  /* ================= PREDICTIVE ENGINE ===================== */
-  /* ========================================================= */
-
-  const recommendations = useMemo(() => {
-    if (!visitedIds.length) return [];
-
-    const visitedHotspots = hotspots.filter((h) =>
-      visitedIds.includes(h.id)
-    );
-
-    const categoryCount: Record<string, number> = {};
-
-    visitedHotspots.forEach((h) => {
-      categoryCount[h.category] =
-        (categoryCount[h.category] || 0) + 1;
+      return matchesCategory && matchesProvince && matchesSearch;
     });
-
-    const favoriteCategory = Object.keys(categoryCount)
-      .sort((a, b) => categoryCount[b] - categoryCount[a])[0];
-
-    return hotspots.filter(
-      (h) =>
-        h.category === favoriteCategory &&
-        !visitedIds.includes(h.id)
-    );
-  }, [hotspots, visitedIds]);
-
-  /* ========================================================= */
-  /* ================= ACHIEVEMENT CHECK ===================== */
-  /* ========================================================= */
-
-  useEffect(() => {
-    if (visitedIds.length === 10) {
-      onToast("🏆 Explorer Achievement Unlocked!");
-    }
-
-    if (visitedIds.length === 25) {
-      onToast("🏆 Adventurer Achievement Unlocked!");
-    }
-  }, [visitedIds, onToast]);
+  }, [hotspots, categoryFilter, provinceFilter, searchQuery]);
 
   /* ========================================================= */
   /* ================= RENDER ================================ */
@@ -215,7 +129,7 @@ export default function MapContainer({
       viewMode={viewMode}
       mapStyle={mapStyle}
       onSelect={onSelect}
-      onVisit={handleVisit}
+      onVisit={onVisit}
     />
   );
 }

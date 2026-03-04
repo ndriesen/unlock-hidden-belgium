@@ -12,24 +12,36 @@ import "leaflet.heat";
 import {
   useState,
   useEffect,
-  useMemo,
   useCallback,
   useRef,
 } from "react";
 
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
+import { Hotspot } from "@/types/hotspot";
+import type { LeafletEvent } from "leaflet";
+
+
+/* ========================================================= */
+/* ======================= TYPES =========================== */
+/* ========================================================= */
+
+
 
 interface Props {
-  hotspots: any[];
+  hotspots: Hotspot[];
   visitedIds?: string[];
   wishlistIds?: string[];
   favoriteIds?: string[];
   viewMode: "markers" | "heatmap";
   mapStyle: "default" | "satellite";
   onVisit?: (id: string) => void;
-  onSelect?: (h: any) => void;
+  onSelect?: (h: Hotspot) => void;
 }
+
+/* ========================================================= */
+/* ======================= MAP VIEW ======================== */
+/* ========================================================= */
 
 export default function MapView({
   hotspots = [],
@@ -50,8 +62,10 @@ export default function MapView({
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     setIsDark(media.matches);
+
     const listener = () => setIsDark(media.matches);
     media.addEventListener("change", listener);
+
     return () => media.removeEventListener("change", listener);
   }, []);
 
@@ -63,34 +77,17 @@ export default function MapView({
 
   const tileUrl =
     mapStyle === "satellite"
-      ? "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
       : isDark
       ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
-  /* ---------------- ICON FACTORY ---------------- */
-
-  const createIcon = (color: string, size: number) =>
-    new L.DivIcon({
-      className: "",
-      html: `
-        <div style="
-          width:${size}px;
-          height:${size}px;
-          background:${color};
-          border-radius:50%;
-          border:2px solid white;
-          box-shadow:0 4px 12px rgba(0,0,0,0.25);
-        "></div>
-      `,
-      iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2],
-    });
+  
 
   /* ---------------- SMOOTH SELECT ---------------- */
 
   const handleSelect = useCallback(
-    (h: any) => {
+    (h: Hotspot) => {
       setSelectedId(h.id);
       onSelect?.(h);
 
@@ -98,9 +95,11 @@ export default function MapView({
         const lat = h.lat ?? h.latitude;
         const lng = h.lng ?? h.longitude;
 
-        mapRef.current.flyTo([lat, lng], 14, {
-          duration: 0.8,
-        });
+        if (lat && lng) {
+          mapRef.current.flyTo([lat, lng], 14, {
+            duration: 0.8,
+          });
+        }
       }
     },
     [onSelect]
@@ -116,7 +115,11 @@ export default function MapView({
       center={[50.85, 4.35]}
       zoom={8}
       className="w-full h-[75vh]"
-      whenCreated={(map) => (mapRef.current = map)}
+      ref={(mapInstance) => {
+        if (mapInstance) {
+          mapRef.current = mapInstance;
+        }
+      }}
     >
       <TileLayer url={tileUrl} />
 
@@ -124,12 +127,12 @@ export default function MapView({
         <MarkerClusterGroup
           chunkedLoading
           maxClusterRadius={60}
-          iconCreateFunction={(cluster) => {
+          iconCreateFunction={(cluster: any) => {
             const count = cluster.getChildCount();
 
             const size =
-              count < 10 ? 38 :
-              count < 50 ? 46 :
+              count < 10 ? 26 :
+              count < 50 ? 36 :
               54;
 
             return L.divIcon({
@@ -140,7 +143,6 @@ export default function MapView({
                   border-radius:50%;
                   background:rgba(16,185,129,0.65);
                   backdrop-filter: blur(8px);
-                  -webkit-backdrop-filter: blur(8px);
                   display:flex;
                   align-items:center;
                   justify-content:center;
@@ -209,15 +211,16 @@ function ZoomAwareMarkers({
   return (
     <>
       {hotspots.map((h: any) => {
+        const lat = h.lat ?? h.latitude;
+        const lng = h.lng ?? h.longitude;
+        if (!lat || !lng) return null;
+
         let color = "#10b981";
 
         if (selectedId === h.id) color = "#f59e0b";
         else if (visitedIds.includes(h.id)) color = "#9ca3af";
         else if (favoriteIds.includes(h.id)) color = "#a855f7";
         else if (wishlistIds.includes(h.id)) color = "#facc15";
-
-        const lat = h.lat ?? h.latitude;
-        const lng = h.lng ?? h.longitude;
 
         const icon = new L.DivIcon({
           className: "",
@@ -255,22 +258,44 @@ function ZoomAwareMarkers({
 /* ======================= HEATMAP ========================= */
 /* ========================================================= */
 
-function HeatmapLayer({ hotspots }: any) {
+function HeatmapLayer({ hotspots }: { hotspots: Hotspot[] }) {
   const map = useMap();
 
   useEffect(() => {
-    if (viewMode !== "heatmap" || !map) return;
+    if (!map) return;
 
-    const heatPoints = hotspots.map((h) => [
-      h.latitude,
-      h.longitude,
-      0.5,
-    ]) as [number, number, number][];
+    // Get max popularity for normalization
+    const maxPopularity = Math.max(
+      ...hotspots.map((h: any) => h.visit_count || h.likes || 1),
+      1
+    );
+
+    const heatPoints = hotspots
+      .map((h: any) => {
+        const lat = h.lat ?? h.latitude;
+        const lng = h.lng ?? h.longitude;
+        if (!lat || !lng) return null;
+
+        const popularity = h.visit_count || h.likes || 1;
+
+        // Normalize 0 → 1
+        const intensity = popularity / maxPopularity;
+
+        return [lat, lng, intensity] as [number, number, number];
+      })
+      .filter(Boolean) as [number, number, number][];
 
     const heatLayer = (L as any).heatLayer(heatPoints, {
-      radius: 25,
-      blur: 15,
+      radius: 30,
+      blur: 20,
       maxZoom: 17,
+      gradient: {
+        0.3: "#60a5fa",
+        0.5: "#34d399",
+        0.7: "#facc15",
+        0.9: "#f97316",
+        1.0: "#ef4444",
+      },
     });
 
     heatLayer.addTo(map);
@@ -278,7 +303,9 @@ function HeatmapLayer({ hotspots }: any) {
     return () => {
       map.removeLayer(heatLayer);
     };
-}, [viewMode, hotspots, map]);
+  }, [hotspots, map]);
+
+  return null;
 }
 
 /* ========================================================= */
@@ -306,6 +333,7 @@ function UserLocation({ hotspots, onVisit }: any) {
     hotspots.forEach((h: any) => {
       const lat = h.lat ?? h.latitude;
       const lng = h.lng ?? h.longitude;
+      if (!lat || !lng) return;
 
       const distance = map.distance(position, [lat, lng]);
 
@@ -317,10 +345,5 @@ function UserLocation({ hotspots, onVisit }: any) {
 
   if (!position) return null;
 
-  return (
-    <Marker
-      position={position}
-      icon={new L.Icon.Default()}
-    />
-  );
+  return <Marker position={position} />;
 }
