@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase/browser-client";
+import { supabase } from "@/lib/Supabase/browser-client";
 
 interface AuthContextType {
   session: Session | null;

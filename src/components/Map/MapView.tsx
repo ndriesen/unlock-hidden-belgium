@@ -199,7 +199,9 @@ function ZoomAwareMarkers({
   useEffect(() => {
     const handleZoom = () => setZoom(map.getZoom());
     map.on("zoomend", handleZoom);
-    return () => map.off("zoomend", handleZoom);
+    return () => {
+      map.off("zoomend", handleZoom);
+    };
   }, [map]);
 
   const size =

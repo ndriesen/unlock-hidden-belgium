@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
+import { supabase } from "@/lib/Supabase/browser-client";
+import {
+  getLevelFromXp,
+  getProgressPercentage,
+} from "@/lib/services/gamificationLevels";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -10,6 +15,30 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed }: SidebarProps) {
   const [hotspotsOpen, setHotspotsOpen] = useState(false);
+  const [xpPoints, setXpPoints] = useState(0);
+
+  useEffect(() => {
+    const loadXp = async () => {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user;
+      if (!user) return;
+
+      const { data: userData } = await supabase
+        .from("users")
+        .select("xp_points")
+        .eq("id", user.id)
+        .single();
+
+      if (userData) {
+        setXpPoints(userData.xp_points ?? 0);
+      }
+    };
+
+    loadXp();
+  }, []);
+
+  const level = getLevelFromXp(xpPoints);
+  const progress = getProgressPercentage(xpPoints);
 
   const navLinks = [
     { name: "Home", href: "/" },
@@ -82,9 +111,14 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
       {!collapsed && (
         <div>
-          <p className="text-sm mb-2">Level 4 Explorer</p>
+          <p className="text-sm mb-2">
+            Level {level} Explorer
+          </p>
           <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-            <div className="h-full bg-brand-emerald w-2/3" />
+            <div
+              className="h-full bg-emerald-400 transition-all duration-700"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
       )}

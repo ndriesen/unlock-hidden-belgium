@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-import { supabase } from "@/lib/supabase/browser-client";
+import { supabase } from "@/lib/Supabase/browser-client";
 import Notifications, { Notification } from "@/components/Notifications";
 import BadgeCelebration from "@/components/BadgeCelebration";
 

@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/Supabase/browser-client";
+import {
+  getLevelFromXp,
+  getProgressPercentage,
+  xpRequiredForLevel,
+  totalXpForLevel,
+} from "@/lib/services/gamificationLevels";
 
 interface Hotspot {
   id: string;
@@ -22,14 +28,10 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const [xpPoints, setXpPoints] = useState(0);
-  const [explorerLevel, setExplorerLevel] = useState(1);
-
   const [visited, setVisited] = useState<Hotspot[]>([]);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [favoriteCount, setFavoriteCount] = useState(0);
-
-  const [badges, setBadges] = useState<Badge[]>([]);
-  const [editing, setEditing] = useState(false);
+  const [allBadges, setAllBadges] = useState<any[]>([]);
 
   /* ================= LOAD USER ================= */
 
@@ -45,13 +47,12 @@ export default function ProfilePage() {
 
       const { data: userData } = await supabase
         .from("users")
-        .select("xp_points, explorer_level, username")
+        .select("xp_points, username")
         .eq("id", user.id)
         .single();
 
       if (userData) {
         setXpPoints(userData.xp_points ?? 0);
-        setExplorerLevel(userData.explorer_level ?? 1);
         setUsername(userData.username ?? "");
       }
 
@@ -66,9 +67,11 @@ export default function ProfilePage() {
           .map((h: any) => h.hotspots);
 
         setVisited(visitedList);
+
         setWishlistCount(
           userHotspots.filter((h: any) => h.status === "wishlist").length
         );
+
         setFavoriteCount(
           userHotspots.filter((h: any) => h.status === "favorite").length
         );
@@ -79,16 +82,43 @@ export default function ProfilePage() {
         .select("badges(*)")
         .eq("user_id", user.id);
 
-      setBadges(badgeData?.map((b: any) => b.badges) ?? []);
+      setAllBadges(badgeData?.map((b: any) => b.badges) ?? []);
     };
 
     fetchUser();
   }, []);
 
+  /* ================= XP CALCULATIONS ================= */
+
+  const calculatedLevel = getLevelFromXp(xpPoints);
+  const progress = getProgressPercentage(xpPoints);
+
+  const xpForNext = xpRequiredForLevel(calculatedLevel);
+  const xpCurrentLevelBase = totalXpForLevel(calculatedLevel);
+  const xpRemaining =
+    xpForNext - (xpPoints - xpCurrentLevelBase);
+
+  const provincesVisited = new Set(
+    visited.map((v) => v.province)
+  );
+
+  const provinceProgress =
+    (provincesVisited.size / 10) * 100;
+
+  const explorerTitle =
+    calculatedLevel < 5
+      ? "Rookie Explorer"
+      : calculatedLevel < 10
+      ? "Adventurer"
+      : calculatedLevel < 20
+      ? "Master Explorer"
+      : "Legend of Belgium";
+
   /* ================= AVATAR UPLOAD ================= */
 
   const handleAvatarUpload = async (e: any) => {
     if (!userId) return;
+
     const file = e.target.files[0];
     if (!file) return;
 
@@ -113,31 +143,12 @@ export default function ProfilePage() {
     setAvatarUrl(publicUrl);
   };
 
-  /* ================= XP PROGRESS ================= */
-
-  const xpForNextLevel = explorerLevel * 100;
-  const progress =
-    ((xpPoints % xpForNextLevel) / xpForNextLevel) * 100;
-
-  const provincesVisited = new Set(visited.map((v) => v.province));
-  const provinceProgress =
-    (provincesVisited.size / 10) * 100;
-
-  const explorerTitle =
-    explorerLevel < 5
-      ? "Rookie Explorer"
-      : explorerLevel < 10
-      ? "Adventurer"
-      : explorerLevel < 20
-      ? "Master Explorer"
-      : "Legend of Belgium";
-
   if (!userId) return <p className="p-6">Loading Passport...</p>;
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-8">
 
-      {/* PASSPORT HEADER */}
+      {/* HEADER */}
       <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl p-6 text-white text-center space-y-4">
 
         <div className="relative mx-auto w-28 h-28">
@@ -174,19 +185,19 @@ export default function ProfilePage() {
       {/* XP CARD */}
       <div className="bg-white rounded-2xl p-6 shadow space-y-3">
         <div className="flex justify-between font-medium">
-          <span>Level {explorerLevel}</span>
+          <span>Level {calculatedLevel}</span>
           <span>{xpPoints} XP</span>
         </div>
 
         <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
           <div
-            className="h-full bg-emerald-500"
+            className="h-full bg-emerald-500 transition-all duration-700"
             style={{ width: `${progress}%` }}
           />
         </div>
 
         <p className="text-xs text-gray-500">
-          {xpForNextLevel - (xpPoints % xpForNextLevel)} XP to next level
+          {Math.ceil(xpRemaining)} XP to next level
         </p>
       </div>
 
@@ -203,7 +214,7 @@ export default function ProfilePage() {
         <h3 className="font-semibold">Belgium Coverage</h3>
         <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
           <div
-            className="h-full bg-teal-500"
+            className="h-full bg-teal-500 transition-all duration-700"
             style={{ width: `${provinceProgress}%` }}
           />
         </div>
@@ -213,12 +224,12 @@ export default function ProfilePage() {
       <div>
         <h3 className="font-semibold mb-3">Badge Collection</h3>
         <div className="flex flex-wrap gap-3">
-          {badges.length === 0 && (
+          {allBadges.length === 0 && (
             <p className="text-gray-500 text-sm">
               Earn your first badge by exploring!
             </p>
           )}
-          {badges.map((b) => (
+          {allBadges.map((b) => (
             <div
               key={b.id}
               className="bg-yellow-100 px-3 py-2 rounded-full text-sm"

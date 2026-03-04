@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase/browser-client";
+import { supabase } from "@/lib/Supabase/browser-client";
 
 export default function VisitedPage() {
   const { user } = useAuth();
