@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/Supabase/browser-client";
 import {
   getLevelFromXp,
-  getProgressPercentage,
   xpRequiredForLevel,
   totalXpForLevel,
 } from "@/lib/services/gamificationLevels";
@@ -15,10 +14,18 @@ interface Hotspot {
   province: string;
 }
 
+interface UserHotspot {
+  visited: boolean;
+  wishlist: boolean;
+  favorite: boolean;
+  hotspots: Hotspot[] | null;
+}
+
 interface Badge {
   id: string;
   name: string;
   icon: string;
+  unlocked: boolean;
 }
 
 export default function ProfilePage() {
@@ -31,9 +38,7 @@ export default function ProfilePage() {
   const [visited, setVisited] = useState<Hotspot[]>([]);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [favoriteCount, setFavoriteCount] = useState(0);
-  const [allBadges, setAllBadges] = useState<any[]>([]);
-
-  /* ================= LOAD USER ================= */
+  const [allBadges, setAllBadges] = useState<Badge[]>([]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -58,52 +63,85 @@ export default function ProfilePage() {
 
       const { data: userHotspots } = await supabase
         .from("user_hotspots")
-        .select("status, hotspots(id, name, province)")
+        .select(`
+          visited,
+          wishlist,
+          favorite,
+          hotspots(id, name, province)
+        `)
         .eq("user_id", user.id);
 
-      if (userHotspots) {
-        const visitedList = userHotspots
-          .filter((h: any) => h.status === "visited")
-          .map((h: any) => h.hotspots);
+      const normalized = (userHotspots ?? []) as UserHotspot[];
 
-        setVisited(visitedList);
+      // VISITED
+      const visitedList = normalized
+        .filter((h) => h.visited)
+        .flatMap((h) => h.hotspots ?? []);
 
-        setWishlistCount(
-          userHotspots.filter((h: any) => h.status === "wishlist").length
-        );
+      setVisited(visitedList);
 
-        setFavoriteCount(
-          userHotspots.filter((h: any) => h.status === "favorite").length
-        );
-      }
+      // WISHLIST
+      setWishlistCount(
+        normalized.filter((h) => h.wishlist).length
+      );
 
-      const { data: badgeData } = await supabase
+      // FAVORITES
+      setFavoriteCount(
+        normalized.filter((h) => h.favorite).length
+      );
+
+      // FETCH ALL BADGES
+      const { data: allBadgesData } = await supabase
+        .from("badges")
+        .select("*");
+
+      // FETCH USER OWNED BADGES
+      const { data: userBadgesData } = await supabase
         .from("user_badges")
-        .select("badges(*)")
+        .select("badge_id")
         .eq("user_id", user.id);
 
-      setAllBadges(badgeData?.map((b: any) => b.badges) ?? []);
+      const ownedIds = new Set(
+        userBadgesData?.map((b: any) => b.badge_id)
+      );
+
+      const mergedBadges =
+        allBadgesData?.map((badge: any) => ({
+          ...badge,
+          unlocked: ownedIds.has(badge.id),
+        })) ?? [];
+      console.log("merged badges: " + mergedBadges)
+      setAllBadges(mergedBadges);
     };
 
     fetchUser();
   }, []);
 
+  console.log("All badges" + allBadges)
+
+
   /* ================= XP CALCULATIONS ================= */
 
   const calculatedLevel = getLevelFromXp(xpPoints);
-  const progress = getProgressPercentage(xpPoints);
+  const xpForNextLevel = xpRequiredForLevel(calculatedLevel);
+  const xpAtStartOfLevel = totalXpForLevel(calculatedLevel);
 
-  const xpForNext = xpRequiredForLevel(calculatedLevel);
-  const xpCurrentLevelBase = totalXpForLevel(calculatedLevel);
-  const xpRemaining =
-    xpForNext - (xpPoints - xpCurrentLevelBase);
+  const xpIntoLevel = xpPoints - xpAtStartOfLevel;
+  const xpRemaining = xpForNextLevel - xpIntoLevel;
+
+  const progressPercentage =
+    xpForNextLevel > 0
+      ? (xpIntoLevel / xpForNextLevel) * 100
+      : 0;
 
   const provincesVisited = new Set(
     visited.map((v) => v.province)
   );
 
   const provinceProgress =
-    (provincesVisited.size / 10) * 100;
+    visited.length > 0
+      ? (provincesVisited.size / 10) * 100
+      : 0;
 
   const explorerTitle =
     calculatedLevel < 5
@@ -113,8 +151,6 @@ export default function ProfilePage() {
       : calculatedLevel < 20
       ? "Master Explorer"
       : "Legend of Belgium";
-
-  /* ================= AVATAR UPLOAD ================= */
 
   const handleAvatarUpload = async (e: any) => {
     if (!userId) return;
@@ -183,21 +219,27 @@ export default function ProfilePage() {
       </div>
 
       {/* XP CARD */}
-      <div className="bg-white rounded-2xl p-6 shadow space-y-3">
-        <div className="flex justify-between font-medium">
-          <span>Level {calculatedLevel}</span>
-          <span>{xpPoints} XP</span>
+      <div className="bg-white rounded-2xl p-6 shadow space-y-4">
+        <p className="text-lg font-semibold">
+          Level {calculatedLevel} — {explorerTitle}
+        </p>
+
+        <div className="flex justify-between text-sm text-gray-500">
+          <span>Progress to Level {calculatedLevel + 1}</span>
+          <span>
+            {xpIntoLevel} / {xpForNextLevel} XP
+          </span>
         </div>
 
         <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
           <div
             className="h-full bg-emerald-500 transition-all duration-700"
-            style={{ width: `${progress}%` }}
+            style={{ width: `${progressPercentage}%` }}
           />
         </div>
 
-        <p className="text-xs text-gray-500">
-          {Math.ceil(xpRemaining)} XP to next level
+        <p className="text-xs text-gray-400 text-right">
+          {xpRemaining} XP remaining
         </p>
       </div>
 
@@ -223,18 +265,24 @@ export default function ProfilePage() {
       {/* BADGES */}
       <div>
         <h3 className="font-semibold mb-3">Badge Collection</h3>
+
         <div className="flex flex-wrap gap-3">
           {allBadges.length === 0 && (
             <p className="text-gray-500 text-sm">
-              Earn your first badge by exploring!
+              No badges found.
             </p>
           )}
+
           {allBadges.map((b) => (
             <div
               key={b.id}
-              className="bg-yellow-100 px-3 py-2 rounded-full text-sm"
+              className={`px-3 py-2 rounded-full text-sm ${
+                b.unlocked
+                  ? "bg-yellow-100"
+                  : "bg-gray-200 opacity-50"
+              }`}
             >
-              {b.name}
+              {b.icon} {b.name}
             </div>
           ))}
         </div>
@@ -254,7 +302,6 @@ export default function ProfilePage() {
           ))}
         </div>
       </div>
-
     </div>
   );
 }

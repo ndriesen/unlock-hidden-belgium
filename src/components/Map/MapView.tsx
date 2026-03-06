@@ -30,6 +30,7 @@ import type { LeafletEvent } from "leaflet";
 
 interface Props {
   hotspots: Hotspot[];
+  loading: boolean;
   visitedIds?: string[];
   wishlistIds?: string[];
   favoriteIds?: string[];

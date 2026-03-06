@@ -8,11 +8,12 @@ import { useState, useEffect } from "react";
 import HotspotPanel from "@/components/HotspotPanel";
 import HotspotSheet from "@/components/HotspotSheet";
 import Toast from "@/components/Toast";
-import { markVisited } from "@/lib/services/gamification";
+import { markVisited, toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
 import SidebarLayout from "@/components/SidebarLayout";
 import { useSearch } from "@/context/SearchContext";
 import type { MapContainerProps } from "@/components/Map/MapContainer";
 import { Hotspot } from "@/types/hotspot";
+import BadgeCelebration from "@/components/BadgeCelebration";
 
 
 
@@ -40,14 +41,47 @@ export default function Home() {
   const [visitedIds, setVisitedIds] = useState<string[]>([]);
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
-  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+  const [userDataLoaded, setUserDataLoaded] = useState(false);
+  const [badgeCelebration, setBadgeCelebration] = useState(false);
 
   const handleWishlist = async (id: string) => {
-     // call supabase update
+    if (!user) {
+      setToast("Login required");
+      return;
+    }
+
+    await toggleWishlist(user.id, id);
+    
+    // Update local state - toggle behavior
+    setWishlistIds((prev) => {
+      if (prev.includes(id)) {
+        setToast("Removed from wishlist");
+        return prev.filter((item) => item !== id);
+      } else {
+        setToast("Added to wishlist! ❤️");
+        return [...prev, id];
+      }
+    });
   };
 
   const handleFavorite = async (id: string) => {
-    // call supabase update
+    if (!user) {
+      setToast("Login required");
+      return;
+    }
+
+    await toggleFavorite(user.id, id);
+    
+    // Update local state - toggle behavior
+    setFavoriteIds((prev) => {
+      if (prev.includes(id)) {
+        setToast("Removed from favorites");
+        return prev.filter((item) => item !== id);
+      } else {
+        setToast("Added to favorites! ⭐");
+        return [...prev, id];
+      }
+    });
   };
 
 
@@ -83,36 +117,60 @@ export default function Home() {
 
   useEffect(() => {
     const loadUserHotspots = async () => {
-      if (!user) return;
+      // Wait for auth to be fully ready
+      if (!user || loading) {
+        return;
+      }
 
-      const { data } = await supabase
+      // Verify session is valid before making authenticated query
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        console.log("No valid session, skipping user hotspots load");
+        setUserDataLoaded(true);
+        return;
+      }
+
+      const { data, error } = await supabase
         .from("user_hotspots")
-        .select("hotspot_id, status")
+        .select("hotspot_id, visited, wishlist, favorite")
         .eq("user_id", user.id);
 
-      if (!data) return;
+      if (error) {
+        console.error("Error loading user hotspots:", error.message, error.details);
+        setUserDataLoaded(true);
+        return;
+      }
 
-      setVisitedIds(
-        data.filter((d) => d.status === "visited").map((d) => d.hotspot_id)
-      );
+      if (!data) {
+        setUserDataLoaded(true);
+        return;
+      }
 
-      setWishlistIds(
-        data.filter((d) => d.status === "wishlist").map((d) => d.hotspot_id)
-      );
+      const visited = data.filter((d) => d.visited).map((d) => d.hotspot_id);
+      const wishlist = data.filter((d) => d.wishlist).map((d) => d.hotspot_id);
+      const favorites = data.filter((d) => d.favorite).map((d) => d.hotspot_id);
 
-      setFavoriteIds(
-        data.filter((d) => d.status === "favorite").map((d) => d.hotspot_id)
-      );
+      setVisitedIds(visited);
+      setWishlistIds(wishlist);
+      setFavoriteIds(favorites);
+
+      setUserDataLoaded(true);
     };
 
-    loadUserHotspots();
-  }, [user]);
+    // Add a small delay to ensure auth is fully initialized
+    const timer = setTimeout(() => {
+      loadUserHotspots();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [user, loading]);
 
   /* ========================================================= */
   /* ================= VISIT HANDLER ========================= */
   /* ========================================================= */
 
   const handleVisit = async (hotspotId: string) => {
+
     if (!user) {
       setToast("Login required");
       return;
@@ -120,13 +178,21 @@ export default function Home() {
 
     if (visitedIds.includes(hotspotId)) return;
 
-    await markVisited(user.id, hotspotId);
+    const unlockedBadges = await markVisited(user.id, hotspotId);
 
     setVisitedIds((prev) => [...prev, hotspotId]);
 
     setToast("+50 XP earned!");
 
-    // 🏆 Simple achievements
+    /* ================= BADGE UI ================= */
+
+    if (unlockedBadges?.length > 0) {
+      setBadgeCelebration(true);
+      setToast(`🏆 Badge unlocked: ${unlockedBadges[0].name}`);
+    }
+
+    /* ================= ACHIEVEMENTS ================= */
+
     if (visitedIds.length + 1 === 10) {
       setToast("🏆 Explorer Achievement Unlocked!");
     }
@@ -134,9 +200,21 @@ export default function Home() {
     if (visitedIds.length + 1 === 25) {
       setToast("🏆 Adventurer Achievement Unlocked!");
     }
+
   };
 
+
+
   if (loading) return null;
+
+  // Show loading while fetching user data (only if user is logged in)
+  if (user && !userDataLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-emerald-600 text-xl font-semibold">Loading...</div>
+      </div>
+    );
+  }
 
 return (
   <div className="flex flex-col h-full space-y-6">
@@ -194,7 +272,6 @@ return (
     {/* MAP */}
     <div className="flex-1 rounded-3xl overflow-hidden shadow-2xl border border-white/40">
       <MapContainer
-        hotspots = {hotspots}
         viewMode={viewMode}
         mapStyle={mapStyle}
         searchQuery={searchQuery}
@@ -235,6 +312,10 @@ return (
     />
 
     {toast && <Toast message={toast} />}
+    <BadgeCelebration
+      trigger={badgeCelebration}
+      onComplete={() => setBadgeCelebration(false)}
+    />
   </div>
 );
 }
