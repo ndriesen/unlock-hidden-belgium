@@ -2,75 +2,79 @@ import { supabase } from "@/lib/Supabase/browser-client";
 import { evaluateBadges } from "./badgeEngine";
 import { addXp } from "./xpEngine";
 
-export async function markVisited(
+async function upsertBooleanFlag(
   userId: string,
-  hotspotId: string
+  hotspotId: string,
+  field: "favorite" | "wishlist",
+  value: boolean
 ) {
-  // 1️⃣ Mark as visited with timestamp
-  const { error } = await supabase
-    .from("user_hotspots")
-    .upsert(
-      {
-        user_id: userId,
-        hotspot_id: hotspotId,
-        visited: true,
-        visited_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,hotspot_id" }
-    );
+  const { error } = await supabase.from("user_hotspots").upsert(
+    {
+      user_id: userId,
+      hotspot_id: hotspotId,
+      [field]: value,
+    },
+    { onConflict: "user_id,hotspot_id" }
+  );
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
+}
 
-  // 2️⃣ Add XP
+export async function markVisited(userId: string, hotspotId: string) {
+  const { error } = await supabase.from("user_hotspots").upsert(
+    {
+      user_id: userId,
+      hotspot_id: hotspotId,
+      visited: true,
+      visited_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,hotspot_id" }
+  );
+
+  if (error) {
+    throw error;
+  }
+
   await addXp(userId, 50);
 
-  // 3️⃣ Evaluate badges
-  const unlockedBadges =
-    await evaluateBadges(userId);
-
+  const unlockedBadges = await evaluateBadges(userId);
   return unlockedBadges;
 }
 
 export async function toggleFavorite(userId: string, hotspotId: string) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("user_hotspots")
     .select("favorite")
     .eq("user_id", userId)
     .eq("hotspot_id", hotspotId)
-    .single();
+    .maybeSingle();
 
-  const newValue = !data?.favorite;
+  if (error) {
+    throw error;
+  }
 
-  await supabase.from("user_hotspots").upsert(
-    {
-      user_id: userId,
-      hotspot_id: hotspotId,
-      favorite: newValue,
-    },
-    { onConflict: "user_id,hotspot_id" }
-  );
+  const newValue = !Boolean(data?.favorite);
+  await upsertBooleanFlag(userId, hotspotId, "favorite", newValue);
 
   return newValue;
 }
 
 export async function toggleWishlist(userId: string, hotspotId: string) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("user_hotspots")
     .select("wishlist")
     .eq("user_id", userId)
     .eq("hotspot_id", hotspotId)
-    .single();
+    .maybeSingle();
 
-  const newValue = !data?.wishlist;
+  if (error) {
+    throw error;
+  }
 
-  await supabase.from("user_hotspots").upsert(
-    {
-      user_id: userId,
-      hotspot_id: hotspotId,
-      wishlist: newValue,
-    },
-    { onConflict: "user_id,hotspot_id" }
-  );
+  const newValue = !Boolean(data?.wishlist);
+  await upsertBooleanFlag(userId, hotspotId, "wishlist", newValue);
 
   return newValue;
 }

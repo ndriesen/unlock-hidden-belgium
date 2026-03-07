@@ -1,15 +1,17 @@
 import { supabase } from "@/lib/Supabase/browser-client";
 
-/* ========================================================= */
-/* ======================= TYPES ============================ */
-/* ========================================================= */
-
 interface Hotspot {
   id: string;
   province: string;
   category?: string;
   country?: string;
   is_hidden?: boolean;
+}
+
+interface RawVisitRow {
+  hotspot_id: string;
+  visited_at: string;
+  hotspots: Hotspot | Hotspot[] | null;
 }
 
 interface UserHotspot {
@@ -23,7 +25,10 @@ export interface Badge {
   name: string;
   condition_type: string;
   condition_value: number;
-  condition_meta?: any;
+  condition_meta?: {
+    category?: string;
+    country?: string;
+  };
   xp_reward?: number;
 }
 
@@ -36,45 +41,41 @@ interface UserStats {
   hiddenVisits: number;
 }
 
-/* ========================================================= */
-/* ================= BADGE ENGINE =========================== */
-/* ========================================================= */
+function normalizeHotspot(joinedHotspot: RawVisitRow["hotspots"]): Hotspot | undefined {
+  if (!joinedHotspot) return undefined;
+  return Array.isArray(joinedHotspot) ? joinedHotspot[0] : joinedHotspot;
+}
 
-export async function evaluateBadges(
-  userId: string
-): Promise<Badge[]> {
+export async function evaluateBadges(userId: string): Promise<Badge[]> {
+  const { data: badges, error: badgeError } = await supabase
+    .from("badges")
+    .select("*");
 
-  /* ---------- LOAD BADGES ---------- */
-
-  const { data: badges, error: badgeError } =
-    await supabase.from("badges").select("*");
-
-  if (badgeError) {
-    console.error("Badge load error", badgeError);
+  if (badgeError || !badges) {
+    if (badgeError) {
+      console.error("Badge load error", badgeError);
+    }
     return [];
   }
 
-  if (!badges) return [];
-
-
-  /* ---------- LOAD OWNED BADGES ---------- */
-
-  const { data: owned } = await supabase
+  const { data: owned, error: ownedError } = await supabase
     .from("user_badges")
     .select("badge_id")
     .eq("user_id", userId);
 
+  if (ownedError) {
+    console.error("Owned badge load error", ownedError);
+    return [];
+  }
+
   const ownedIds = new Set(
-    owned?.map((b: any) => b.badge_id)
+    (owned ?? []).map((entry: { badge_id: string }) => entry.badge_id)
   );
 
-
-  /* ---------- LOAD VISITS ---------- */
-
-  const { data: visits, error: visitError } =
-    await supabase
-      .from("user_hotspots")
-      .select(`
+  const { data: visits, error: visitError } = await supabase
+    .from("user_hotspots")
+    .select(
+      `
         hotspot_id,
         visited_at,
         hotspots (
@@ -84,68 +85,59 @@ export async function evaluateBadges(
           country,
           is_hidden
         )
-      `)
-      .eq("user_id", userId)
-      .eq("visited", true);   // ✅ FIXED
+      `
+    )
+    .eq("user_id", userId)
+    .eq("visited", true);
 
-
-  if (visitError) {
-    console.error("Visit load error", visitError);
+  if (visitError || !visits) {
+    if (visitError) {
+      console.error("Visit load error", visitError);
+    }
     return [];
   }
-  console.log("VISITS RESULT", visits);
-  if (!visits) return [];
 
-
-  /* ---------- NORMALIZE ---------- */
-
-  const normalized: UserHotspot[] =
-    visits.map((v: any) => ({
-      hotspot_id: v.hotspot_id,
-      visited_at: v.visited_at,
-      hotspot: v.hotspots
-    }));
-
-
-  /* ---------- COMPUTE STATS ---------- */
+  const normalized: UserHotspot[] = (visits as RawVisitRow[])
+    .map((visit) => ({
+      hotspot_id: visit.hotspot_id,
+      visited_at: visit.visited_at,
+      hotspot: normalizeHotspot(visit.hotspots),
+    }))
+    .filter((visit) => Boolean(visit.visited_at));
 
   const stats = computeUserStats(normalized);
-
-  console.log("User stats", stats);
-
-
-  /* ---------- CHECK BADGES ---------- */
-
   const unlocked: Badge[] = [];
 
   for (const badge of badges as Badge[]) {
-
     if (ownedIds.has(badge.id)) continue;
 
-    const unlock = evaluateCondition(badge, stats);
+    const shouldUnlock = evaluateCondition(badge, stats);
+    if (!shouldUnlock) continue;
 
-    if (!unlock) continue;
-
-
-    /* ---------- SAVE BADGE ---------- */
-
-    await supabase
-      .from("user_badges")
-      .upsert({
+    const { error: saveError } = await supabase.from("user_badges").upsert(
+      {
         user_id: userId,
         badge_id: badge.id,
-      }, {
-        onConflict: "user_id,badge_id"
-      });
+      },
+      {
+        onConflict: "user_id,badge_id",
+      }
+    );
 
-
-    /* ---------- XP REWARD ---------- */
+    if (saveError) {
+      console.error("User badge save error", saveError);
+      continue;
+    }
 
     if (badge.xp_reward) {
-      await supabase.rpc("increment_xp", {
+      const { error: xpError } = await supabase.rpc("increment_xp", {
         p_user_id: userId,
-        p_amount: badge.xp_reward
+        p_amount: badge.xp_reward,
       });
+
+      if (xpError) {
+        console.error("Badge XP reward error", xpError);
+      }
     }
 
     unlocked.push(badge);
@@ -154,12 +146,7 @@ export async function evaluateBadges(
   return unlocked;
 }
 
-/* ========================================================= */
-/* ================= USER STATS ============================= */
-/* ========================================================= */
-
 function computeUserStats(visits: UserHotspot[]): UserStats {
-
   const provinces = new Set<string>();
   const categories = new Map<string, number>();
   const countryRegions = new Map<string, Set<string>>();
@@ -167,34 +154,32 @@ function computeUserStats(visits: UserHotspot[]): UserStats {
 
   let hiddenVisits = 0;
 
-  visits.forEach(v => {
-
-    visitDates.push(new Date(v.visited_at));
-
-    const h = v.hotspot;
-    if (!h) return;
-
-    provinces.add(h.province);
-
-    if (h.category) {
-      categories.set(
-        h.category,
-        (categories.get(h.category) ?? 0) + 1
-      );
+  visits.forEach((visit) => {
+    const date = new Date(visit.visited_at);
+    if (!Number.isNaN(date.getTime())) {
+      visitDates.push(date);
     }
 
-    if (h.country) {
+    const hotspot = visit.hotspot;
+    if (!hotspot) return;
 
-      if (!countryRegions.has(h.country)) {
-        countryRegions.set(h.country, new Set());
+    provinces.add(hotspot.province);
+
+    if (hotspot.category) {
+      categories.set(hotspot.category, (categories.get(hotspot.category) ?? 0) + 1);
+    }
+
+    if (hotspot.country) {
+      if (!countryRegions.has(hotspot.country)) {
+        countryRegions.set(hotspot.country, new Set());
       }
 
-      countryRegions
-        .get(h.country)!
-        .add(h.province);
+      countryRegions.get(hotspot.country)?.add(hotspot.province);
     }
 
-    if (h.is_hidden) hiddenVisits++;
+    if (hotspot.is_hidden) {
+      hiddenVisits += 1;
+    }
   });
 
   return {
@@ -203,106 +188,79 @@ function computeUserStats(visits: UserHotspot[]): UserStats {
     provinces,
     categories,
     countryRegions,
-    hiddenVisits
+    hiddenVisits,
   };
 }
 
-/* ========================================================= */
-/* ================= CONDITION LOGIC ======================== */
-/* ========================================================= */
-
-function evaluateCondition(
-  badge: Badge,
-  stats: UserStats
-): boolean {
-
+function evaluateCondition(badge: Badge, stats: UserStats): boolean {
   switch (badge.condition_type) {
-
     case "visit_count":
       return stats.totalVisits >= badge.condition_value;
 
-
     case "category_count": {
-      const category =
-        badge.condition_meta?.category;
-
-      const count =
-        stats.categories.get(category) ?? 0;
-
+      const category = badge.condition_meta?.category;
+      if (!category) return false;
+      const count = stats.categories.get(category) ?? 0;
       return count >= badge.condition_value;
     }
 
-
     case "region_count": {
-      const country =
-        badge.condition_meta?.country;
-
-      const regions =
-        stats.countryRegions.get(country);
-
-      return (regions?.size ?? 0)
-        >= badge.condition_value;
+      const country = badge.condition_meta?.country;
+      if (!country) return false;
+      const regions = stats.countryRegions.get(country);
+      return (regions?.size ?? 0) >= badge.condition_value;
     }
 
-
     case "visit_streak":
-      return calculateStreak(
-        stats.visitDates
-      ) >= badge.condition_value;
-
+      return calculateStreak(stats.visitDates) >= badge.condition_value;
 
     case "hidden_gems":
-      return stats.hiddenVisits
-        >= badge.condition_value;
-
+      return stats.hiddenVisits >= badge.condition_value;
 
     case "early_visit":
-      return stats.visitDates.some(
-        d => d.getHours() < 7
-      );
-
+      return stats.visitDates.some((date) => date.getHours() < 7);
 
     case "late_visit":
-      return stats.visitDates.some(
-        d => d.getHours() >= 22
-      );
-
+      return stats.visitDates.some((date) => date.getHours() >= 22);
 
     default:
       return false;
   }
 }
 
-/* ========================================================= */
-/* ================= STREAK LOGIC =========================== */
-/* ========================================================= */
-
 function calculateStreak(dates: Date[]): number {
-
   if (!dates.length) return 0;
 
-  const sorted =
-    [...dates].sort(
-      (a,b)=>a.getTime()-b.getTime()
-    );
+  const dayKeys = Array.from(
+    new Set(
+      dates
+        .map((date) => {
+          const normalized = new Date(
+            date.getFullYear(),
+            date.getMonth(),
+            date.getDate()
+          );
+          return normalized.getTime();
+        })
+        .sort((a, b) => a - b)
+    )
+  );
+
+  if (!dayKeys.length) return 0;
 
   let streak = 1;
-  let max = 1;
+  let maxStreak = 1;
 
-  for (let i=1;i<sorted.length;i++){
+  for (let i = 1; i < dayKeys.length; i += 1) {
+    const diffDays = (dayKeys[i] - dayKeys[i - 1]) / 86400000;
 
-    const diff =
-      (sorted[i].getTime() - sorted[i-1].getTime())
-      / 86400000;
-
-    if (diff === 1){
-      streak++;
-      max = Math.max(max, streak);
-    }
-    else if (diff > 1){
+    if (diffDays === 1) {
+      streak += 1;
+      maxStreak = Math.max(maxStreak, streak);
+    } else if (diffDays > 1) {
       streak = 1;
     }
   }
 
-  return max;
+  return maxStreak;
 }

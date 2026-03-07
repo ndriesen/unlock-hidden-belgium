@@ -28,19 +28,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`
-          ${geistSans.variable}
-          ${geistMono.variable}
-          antialiased
-          bg-brand-background
-          text-gray-900
-        `}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-gray-900`}
       >
         <AuthProvider>
           <SearchProvider>
-            <SidebarLayout>
-              {children}
-            </SidebarLayout>
+            <SidebarLayout>{children}</SidebarLayout>
           </SearchProvider>
         </AuthProvider>
       </body>

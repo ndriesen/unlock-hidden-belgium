@@ -1,129 +1,243 @@
 "use client";
 
+import { useState } from "react";
+import Image from "next/image";
+import { Hotspot } from "@/types/hotspot";
 import ReviewsSection from "./ReviewsSection";
 
 interface Props {
-  hotspot: any;
+  hotspot: Hotspot | null;
   onVisit?: (id: string) => void;
   onWishlist?: (id: string) => void;
   onFavorite?: (id: string) => void;
+  onAddToTrip?: (hotspot: Hotspot) => void;
   onClose?: () => void;
   isVisited?: boolean;
   isWishlist?: boolean;
   isFavorite?: boolean;
 }
 
+type DetailTab = "overview" | "plan" | "reviews";
+
 export default function HotspotDetail({
   hotspot,
   onVisit,
   onWishlist,
   onFavorite,
+  onAddToTrip,
   onClose,
   isVisited,
   isWishlist,
-  isFavorite
+  isFavorite,
 }: Props) {
+  const [activeTab, setActiveTab] = useState<DetailTab>("overview");
+
   if (!hotspot) return null;
 
   const routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${hotspot.latitude},${hotspot.longitude}`;
+  const primaryImage =
+    hotspot.images?.[0] ??
+    "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
+
+  const shareHotspot = async () => {
+    const text = `${hotspot.name} - ${hotspot.category} in ${hotspot.province}`;
+    const url = routeUrl;
+
+    if (navigator.share) {
+      await navigator.share({ title: hotspot.name, text, url });
+      return;
+    }
+
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+  };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white">
+      <div className="relative h-52 w-full">
+        <Image
+          src={primaryImage}
+          alt={hotspot.name}
+          fill
+          sizes="(max-width: 768px) 100vw, 420px"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-      {/* Header */}
-      <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">{hotspot.name}</h2>
-          <p className="text-sm text-zinc-500">
-            {hotspot.category} • {hotspot.province}
-          </p>
+        <div className="absolute top-3 right-3">
+          {onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Close detail panel"
+              className="rounded-full bg-black/50 text-white px-3 py-1.5 text-sm"
+            >
+              Close
+            </button>
+          )}
         </div>
 
-        {onClose && (
-          <button onClick={onClose}>✕</button>
-        )}
+        <div className="absolute bottom-4 left-4 right-4">
+          <h2 className="text-2xl font-bold text-white leading-tight">{hotspot.name}</h2>
+          <p className="text-sm text-white/85 mt-1">
+            {hotspot.category} - {hotspot.province}
+          </p>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-8">
-
-        {/* IMAGE CAROUSEL */}
-        {hotspot.images?.length ? (
-          <div className="flex gap-3 overflow-x-auto">
-            {hotspot.images.map((img: string, i: number) => (
-              <img
-                key={i}
-                src={img}
-                className="h-48 rounded-2xl object-cover"
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="h-48 bg-zinc-200 dark:bg-zinc-800 rounded-2xl" />
-        )}
-
-        {/* DESCRIPTION */}
-        {hotspot.description && (
-          <p className="text-zinc-600 dark:text-zinc-300">
-            {hotspot.description}
-          </p>
-        )}
-
-        {/* EXTRA INFO */}
-        <div className="space-y-2 text-sm text-zinc-500">
-          {hotspot.opening_hours && (
-            <p>🕒 {hotspot.opening_hours}</p>
-          )}
-
-          {hotspot.combine_with?.length > 0 && (
-            <p>✨ Nice to combine with: {hotspot.combine_with.join(", ")}</p>
-          )}
-        </div>
-
-        {/* ACTION BUTTONS */}
-        <div className="space-y-3">
-
+      <div className="px-4 pt-4">
+        <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => onVisit?.(hotspot.id)}
-            className={`w-full py-3 rounded-xl ${
-              isVisited
-                ? "bg-zinc-300 text-zinc-700"
-                : "bg-emerald-600 text-white"
+            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+              isVisited ? "bg-emerald-100 text-emerald-800" : "bg-emerald-600 text-white"
             }`}
           >
-            {isVisited ? "Visited ✓" : "Mark as Visited"}
+            {isVisited ? "Visited" : "Mark visited"}
+          </button>
+
+          <button
+            onClick={() => onAddToTrip?.(hotspot)}
+            className="rounded-xl px-3 py-2 text-sm font-semibold border border-slate-200 bg-slate-50 text-slate-800"
+          >
+            Add to trip
           </button>
 
           <button
             onClick={() => onWishlist?.(hotspot.id)}
-            className="w-full py-3 rounded-xl bg-yellow-400"
+            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+              isWishlist ? "bg-amber-100 text-amber-800" : "bg-amber-400 text-slate-900"
+            }`}
           >
-            {isWishlist ? "In Wishlist ✓" : "Add to Wishlist"}
+            {isWishlist ? "In wishlist" : "Wishlist"}
           </button>
 
           <button
             onClick={() => onFavorite?.(hotspot.id)}
-            className="w-full py-3 rounded-xl bg-purple-600 text-white"
+            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+              isFavorite ? "bg-fuchsia-100 text-fuchsia-800" : "bg-fuchsia-600 text-white"
+            }`}
           >
-            {isFavorite ? "Favorited ✓" : "Add to Favorites"}
+            {isFavorite ? "Favorited" : "Favorite"}
           </button>
+        </div>
 
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <button
-            onClick={() => window.open(routeUrl, "_blank")}
-            className="w-full py-3 rounded-xl bg-blue-600 text-white"
+            onClick={() => window.open(routeUrl, "_blank", "noopener,noreferrer")}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
           >
-            🚗 Route Calculator
+            Open route
+          </button>
+          <button
+            onClick={shareHotspot}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          >
+            Share
           </button>
         </div>
+      </div>
 
-        {/* REVIEWS */}
-        <div>
-          <h3 className="font-semibold mb-2">Reviews</h3>
-          <ReviewsSection hotspotId={hotspot.id} />
-
-          <button className="mt-4 w-full py-2 border rounded-xl">
-            Leave a Review
-          </button>
+      <div className="px-4 pt-4">
+        <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "plan", label: "Plan" },
+            { id: "reviews", label: "Reviews" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as DetailTab)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                activeTab === tab.id
+                  ? "bg-white shadow-sm text-slate-900"
+                  : "text-slate-600"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        {activeTab === "overview" && (
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-slate-700">
+              {hotspot.description || "No description yet. Visit and add your own story."}
+            </p>
+
+            {hotspot.images && hotspot.images.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {hotspot.images.slice(1, 6).map((image, index) => (
+                  <div
+                    key={`${hotspot.id}_gallery_${index}`}
+                    className="relative h-24 min-w-32 rounded-lg overflow-hidden"
+                  >
+                    <Image
+                      src={image}
+                      alt={`${hotspot.name} gallery image ${index + 1}`}
+                      fill
+                      sizes="128px"
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 space-y-1">
+              <p>
+                <span className="font-semibold">Category:</span> {hotspot.category}
+              </p>
+              <p>
+                <span className="font-semibold">Province:</span> {hotspot.province}
+              </p>
+              <p>
+                <span className="font-semibold">Coordinates:</span> {hotspot.latitude.toFixed(4)}, {hotspot.longitude.toFixed(4)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "plan" && (
+          <div className="space-y-4 text-sm text-slate-700">
+            <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+              <p className="font-semibold text-slate-900">Visit planning</p>
+              <p>
+                Best for: {hotspot.category} lovers exploring {hotspot.province}.
+              </p>
+              <p>
+                Opening hours: {hotspot.opening_hours || "Not provided"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+              <p className="font-semibold text-slate-900">Combine this with</p>
+              {hotspot.combine_with?.length ? (
+                <ul className="list-disc pl-5 space-y-1">
+                  {hotspot.combine_with.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No suggested combos yet.</p>
+              )}
+            </div>
+
+            <button
+              onClick={() => onAddToTrip?.(hotspot)}
+              className="w-full rounded-xl bg-emerald-600 text-white py-2.5 font-semibold"
+            >
+              Add this stop to a trip
+            </button>
+          </div>
+        )}
+
+        {activeTab === "reviews" && (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600">Help others discover better spots by adding real feedback.</p>
+            <ReviewsSection hotspotId={hotspot.id} />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,32 +1,14 @@
 "use client";
 
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  useMap,
-} from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 import "leaflet.heat";
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-} from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { Hotspot } from "@/types/hotspot";
-import type { LeafletEvent } from "leaflet";
-
-
-/* ========================================================= */
-/* ======================= TYPES =========================== */
-/* ========================================================= */
-
-
 
 interface Props {
   hotspots: Hotspot[];
@@ -37,15 +19,58 @@ interface Props {
   viewMode: "markers" | "heatmap";
   mapStyle: "default" | "satellite";
   onVisit?: (id: string) => void;
-  onSelect?: (h: Hotspot) => void;
+  onSelect?: (hotspot: Hotspot) => void;
 }
 
-/* ========================================================= */
-/* ======================= MAP VIEW ======================== */
-/* ========================================================= */
+interface ZoomAwareMarkersProps {
+  hotspots: Hotspot[];
+  selectedId: string | null;
+  visitedIds: string[];
+  wishlistIds: string[];
+  favoriteIds: string[];
+  onSelect: (hotspot: Hotspot) => void;
+  onVisit?: (id: string) => void;
+}
+
+interface UserLocationProps {
+  hotspots: Hotspot[];
+  onVisit?: (id: string) => void;
+}
+
+interface ClusterLike {
+  getChildCount: () => number;
+}
+
+interface HeatLayerOptions {
+  radius: number;
+  blur: number;
+  maxZoom: number;
+  gradient: Record<number, string>;
+}
+
+interface HeatLayerFactory {
+  heatLayer: (
+    points: [number, number, number][],
+    options: HeatLayerOptions
+  ) => L.Layer;
+}
+
+function getCoordinates(
+  hotspot: Pick<Hotspot, "lat" | "lng" | "latitude" | "longitude">
+): [number, number] | null {
+  const lat = hotspot.lat ?? hotspot.latitude;
+  const lng = hotspot.lng ?? hotspot.longitude;
+
+  if (typeof lat !== "number" || typeof lng !== "number") {
+    return null;
+  }
+
+  return [lat, lng];
+}
 
 export default function MapView({
   hotspots = [],
+  loading,
   visitedIds = [],
   wishlistIds = [],
   favoriteIds = [],
@@ -56,134 +81,119 @@ export default function MapView({
 }: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isDark, setIsDark] = useState(false);
-
-  /* ---------------- DARK MODE ---------------- */
+  const [isDark, setIsDark] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    setIsDark(media.matches);
 
-    const listener = () => setIsDark(media.matches);
+    const listener = (event: MediaQueryListEvent) => {
+      setIsDark(event.matches);
+    };
+
     media.addEventListener("change", listener);
-
     return () => media.removeEventListener("change", listener);
   }, []);
 
-  /* ---------------- PERFORMANCE ---------------- */
-
   const useCanvas = hotspots.length > 1500;
-
-  /* ---------------- TILE SWITCH ---------------- */
 
   const tileUrl =
     mapStyle === "satellite"
       ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
       : isDark
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-
-  
-
-  /* ---------------- SMOOTH SELECT ---------------- */
+        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   const handleSelect = useCallback(
-    (h: Hotspot) => {
-      setSelectedId(h.id);
-      onSelect?.(h);
+    (hotspot: Hotspot) => {
+      setSelectedId(hotspot.id);
+      onSelect?.(hotspot);
 
-      if (mapRef.current) {
-        const lat = h.lat ?? h.latitude;
-        const lng = h.lng ?? h.longitude;
+      const coords = getCoordinates(hotspot);
+      if (!coords || !mapRef.current) return;
 
-        if (lat && lng) {
-          mapRef.current.flyTo([lat, lng], 14, {
-            duration: 0.8,
-          });
-        }
-      }
+      mapRef.current.flyTo(coords, 14, {
+        duration: 0.8,
+      });
     },
     [onSelect]
   );
 
-  /* ========================================================= */
-  /* ====================== RENDER =========================== */
-  /* ========================================================= */
-
   return (
-    <MapContainer
-      preferCanvas={useCanvas}
-      center={[50.85, 4.35]}
-      zoom={8}
-      className="w-full h-[75vh]"
-      ref={(mapInstance) => {
-        if (mapInstance) {
-          mapRef.current = mapInstance;
-        }
-      }}
-    >
-      <TileLayer url={tileUrl} />
+    <div className="relative w-full h-full">
+      <MapContainer
+        preferCanvas={useCanvas}
+        center={[50.85, 4.35]}
+        zoom={8}
+        className="w-full h-full"
+        ref={(mapInstance) => {
+          if (mapInstance) {
+            mapRef.current = mapInstance;
+          }
+        }}
+      >
+        <TileLayer url={tileUrl} />
 
-      {viewMode === "markers" && (
-        <MarkerClusterGroup
-          chunkedLoading
-          maxClusterRadius={60}
-          iconCreateFunction={(cluster: any) => {
-            const count = cluster.getChildCount();
+        {viewMode === "markers" && (
+          <MarkerClusterGroup
+            chunkedLoading
+            maxClusterRadius={60}
+            iconCreateFunction={(cluster: ClusterLike) => {
+              const count = cluster.getChildCount();
+              const size = count < 10 ? 26 : count < 50 ? 36 : 54;
 
-            const size =
-              count < 10 ? 26 :
-              count < 50 ? 36 :
-              54;
+              return L.divIcon({
+                html: `
+                  <div style="
+                    width:${size}px;
+                    height:${size}px;
+                    border-radius:50%;
+                    background:rgba(16,185,129,0.65);
+                    backdrop-filter: blur(8px);
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    color:white;
+                    font-weight:600;
+                    border:2px solid rgba(255,255,255,0.6);
+                    box-shadow:0 8px 20px rgba(0,0,0,0.25);
+                  ">
+                    ${count}
+                  </div>
+                `,
+                className: "",
+                iconSize: L.point(size, size),
+              });
+            }}
+          >
+            <ZoomAwareMarkers
+              hotspots={hotspots}
+              selectedId={selectedId}
+              visitedIds={visitedIds}
+              wishlistIds={wishlistIds}
+              favoriteIds={favoriteIds}
+              onSelect={handleSelect}
+              onVisit={onVisit}
+            />
+          </MarkerClusterGroup>
+        )}
 
-            return L.divIcon({
-              html: `
-                <div style="
-                  width:${size}px;
-                  height:${size}px;
-                  border-radius:50%;
-                  background:rgba(16,185,129,0.65);
-                  backdrop-filter: blur(8px);
-                  display:flex;
-                  align-items:center;
-                  justify-content:center;
-                  color:white;
-                  font-weight:600;
-                  border:2px solid rgba(255,255,255,0.6);
-                  box-shadow:0 8px 20px rgba(0,0,0,0.25);
-                ">
-                  ${count}
-                </div>
-              `,
-              className: "",
-              iconSize: L.point(size, size),
-            });
-          }}
-        >
-          <ZoomAwareMarkers
-            hotspots={hotspots}
-            selectedId={selectedId}
-            visitedIds={visitedIds}
-            wishlistIds={wishlistIds}
-            favoriteIds={favoriteIds}
-            onSelect={handleSelect}
-            onVisit={onVisit}
-          />
-        </MarkerClusterGroup>
+        {viewMode === "heatmap" && <HeatmapLayer hotspots={hotspots} />}
+
+        <UserLocation hotspots={hotspots} onVisit={onVisit} />
+      </MapContainer>
+
+      {loading && (
+        <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center text-emerald-700 font-semibold pointer-events-none">
+          Loading map data...
+        </div>
       )}
-
-      {viewMode === "heatmap" && (
-        <HeatmapLayer hotspots={hotspots} />
-      )}
-
-      <UserLocation hotspots={hotspots} onVisit={onVisit} />
-    </MapContainer>
+    </div>
   );
 }
-
-/* ========================================================= */
-/* ================= ZOOM AWARE MARKERS ==================== */
-/* ========================================================= */
 
 function ZoomAwareMarkers({
   hotspots,
@@ -193,37 +203,33 @@ function ZoomAwareMarkers({
   favoriteIds,
   onSelect,
   onVisit,
-}: any) {
+}: ZoomAwareMarkersProps) {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
 
   useEffect(() => {
     const handleZoom = () => setZoom(map.getZoom());
     map.on("zoomend", handleZoom);
+
     return () => {
       map.off("zoomend", handleZoom);
     };
   }, [map]);
 
-  const size =
-    zoom < 9 ? 16 :
-    zoom < 12 ? 20 :
-    zoom < 14 ? 24 :
-    28;
+  const size = zoom < 9 ? 16 : zoom < 12 ? 20 : zoom < 14 ? 24 : 28;
 
   return (
     <>
-      {hotspots.map((h: any) => {
-        const lat = h.lat ?? h.latitude;
-        const lng = h.lng ?? h.longitude;
-        if (!lat || !lng) return null;
+      {hotspots.map((hotspot) => {
+        const coords = getCoordinates(hotspot);
+        if (!coords) return null;
 
         let color = "#10b981";
 
-        if (selectedId === h.id) color = "#f59e0b";
-        else if (visitedIds.includes(h.id)) color = "#9ca3af";
-        else if (favoriteIds.includes(h.id)) color = "#a855f7";
-        else if (wishlistIds.includes(h.id)) color = "#facc15";
+        if (selectedId === hotspot.id) color = "#f59e0b";
+        else if (visitedIds.includes(hotspot.id)) color = "#9ca3af";
+        else if (favoriteIds.includes(hotspot.id)) color = "#a855f7";
+        else if (wishlistIds.includes(hotspot.id)) color = "#facc15";
 
         const icon = new L.DivIcon({
           className: "",
@@ -243,12 +249,12 @@ function ZoomAwareMarkers({
 
         return (
           <Marker
-            key={h.id}
-            position={[lat, lng]}
+            key={hotspot.id}
+            position={coords}
             icon={icon}
             eventHandlers={{
-              click: () => onSelect(h),
-              dblclick: () => onVisit?.(h.id),
+              click: () => onSelect(hotspot),
+              dblclick: () => onVisit?.(hotspot.id),
             }}
           />
         );
@@ -257,38 +263,31 @@ function ZoomAwareMarkers({
   );
 }
 
-/* ========================================================= */
-/* ======================= HEATMAP ========================= */
-/* ========================================================= */
-
 function HeatmapLayer({ hotspots }: { hotspots: Hotspot[] }) {
   const map = useMap();
 
   useEffect(() => {
     if (!map) return;
 
-    // Get max popularity for normalization
     const maxPopularity = Math.max(
-      ...hotspots.map((h: any) => h.visit_count || h.likes || 1),
+      ...hotspots.map((hotspot) => hotspot.visit_count || 1),
       1
     );
 
     const heatPoints = hotspots
-      .map((h: any) => {
-        const lat = h.lat ?? h.latitude;
-        const lng = h.lng ?? h.longitude;
-        if (!lat || !lng) return null;
+      .map((hotspot) => {
+        const coords = getCoordinates(hotspot);
+        if (!coords) return null;
 
-        const popularity = h.visit_count || h.likes || 1;
-
-        // Normalize 0 → 1
+        const popularity = hotspot.visit_count || 1;
         const intensity = popularity / maxPopularity;
 
-        return [lat, lng, intensity] as [number, number, number];
+        return [coords[0], coords[1], intensity] as [number, number, number];
       })
-      .filter(Boolean) as [number, number, number][];
+      .filter((point): point is [number, number, number] => point !== null);
 
-    const heatLayer = (L as any).heatLayer(heatPoints, {
+    const heatLayerFactory = L as unknown as HeatLayerFactory;
+    const heatLayer = heatLayerFactory.heatLayer(heatPoints, {
       radius: 30,
       blur: 20,
       maxZoom: 17,
@@ -311,37 +310,48 @@ function HeatmapLayer({ hotspots }: { hotspots: Hotspot[] }) {
   return null;
 }
 
-/* ========================================================= */
-/* ==================== USER LOCATION ====================== */
-/* ========================================================= */
-
-function UserLocation({ hotspots, onVisit }: any) {
+function UserLocation({ hotspots, onVisit }: UserLocationProps) {
   const map = useMap();
   const [position, setPosition] = useState<[number, number] | null>(null);
+  const triggeredVisitsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const coords: [number, number] = [
-        pos.coords.latitude,
-        pos.coords.longitude,
-      ];
-      setPosition(coords);
-      map.flyTo(coords, 12);
-    });
+    if (!navigator.geolocation) {
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords: [number, number] = [
+          pos.coords.latitude,
+          pos.coords.longitude,
+        ];
+        setPosition(coords);
+        map.flyTo(coords, 12);
+      },
+      () => {
+        setPosition(null);
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 8000,
+      }
+    );
   }, [map]);
 
   useEffect(() => {
     if (!position) return;
 
-    hotspots.forEach((h: any) => {
-      const lat = h.lat ?? h.latitude;
-      const lng = h.lng ?? h.longitude;
-      if (!lat || !lng) return;
+    hotspots.forEach((hotspot) => {
+      const coords = getCoordinates(hotspot);
+      if (!coords) return;
+      if (triggeredVisitsRef.current.has(hotspot.id)) return;
 
-      const distance = map.distance(position, [lat, lng]);
+      const distance = map.distance(position, coords);
 
       if (distance < 100) {
-        onVisit?.(h.id);
+        triggeredVisitsRef.current.add(hotspot.id);
+        onVisit?.(hotspot.id);
       }
     });
   }, [position, hotspots, onVisit, map]);
