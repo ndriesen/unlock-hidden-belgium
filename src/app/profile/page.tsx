@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -165,6 +165,15 @@ export default function ProfilePage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (!allowed.has(file.type)) {
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      return;
+    }
+
     const filePath = `${userId}-${Date.now()}`;
 
     const { error: uploadError } = await supabase.storage
@@ -310,3 +319,4 @@ function Stat({ value, label }: { value: string | number; label: string }) {
     </div>
   );
 }
+

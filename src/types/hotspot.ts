@@ -1,4 +1,4 @@
-export interface Hotspot {
+﻿export interface Hotspot {
   id: string;
   name: string;
   latitude: number;
@@ -10,8 +10,11 @@ export interface Hotspot {
   opening_hours?: string;
   combine_with?: string[];
   visit_count?: number;
+  likes_count?: number;
+  saves_count?: number;
 
   // optional aliases (for Leaflet compatibility)
   lat?: number;
   lng?: number;
 }
+

@@ -1,25 +1,30 @@
-"use client";
+﻿"use client";
+
+import Image from "next/image";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchHotspots } from "@/lib/services/hotspots";
 import { Hotspot } from "@/types/hotspot";
 import {
   Trip,
+  addHotspotToQuickTrip,
   addHotspotToTrip,
   buildTripShareText,
   createTrip,
-  getTrips,
+  fetchTrips,
   removeStopFromTrip,
   removeTrip,
+  toggleTripLike,
+  toggleTripSave,
   updateStopNote,
-  upsertTrip,
-} from "@/lib/services/tripPlanner";
-import {
-  RouteMode,
-  RoutePlan,
-  fetchRoutePlan,
-} from "@/lib/services/routePlanner";
+  updateTripMeta,
+  uploadTripStopPhoto,
+} from "@/lib/services/tripBuilder";
+import { RouteMode, RoutePlan, fetchRoutePlan } from "@/lib/services/routePlanner";
+import { useAuth } from "@/context/AuthContext";
+import { MediaVisibility } from "@/lib/services/media";
+import { supabase } from "@/lib/Supabase/browser-client";
 
 const TripRouteMap = dynamic(() => import("@/components/trips/TripRouteMap"), {
   ssr: false,
@@ -33,6 +38,14 @@ interface HotspotRow {
   category: string | null;
   province: string | null;
   images?: string[] | null;
+}
+
+interface StopUploadState {
+  file: File | null;
+  caption: string;
+  visibility: MediaVisibility;
+  uploading: boolean;
+  message: string;
 }
 
 function mapHotspotRows(rows: HotspotRow[]): Hotspot[] {
@@ -49,18 +62,25 @@ function mapHotspotRows(rows: HotspotRow[]): Hotspot[] {
     }));
 }
 
-function getInitialTrips(): Trip[] {
-  return getTrips();
+function defaultStopUploadState(): StopUploadState {
+  return {
+    file: null,
+    caption: "",
+    visibility: "friends",
+    uploading: false,
+    message: "",
+  };
 }
 
 export default function TripsPage() {
-  const [trips, setTrips] = useState<Trip[]>(() => getInitialTrips());
-  const [selectedTripId, setSelectedTripId] = useState<string>(() => {
-    const initial = getInitialTrips();
-    return initial[0]?.id ?? "";
-  });
+  const { user, loading: authLoading } = useAuth();
+
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [selectedTripId, setSelectedTripId] = useState<string>("");
   const [allHotspots, setAllHotspots] = useState<Hotspot[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loadingTrips, setLoadingTrips] = useState(false);
+  const [pageMessage, setPageMessage] = useState("");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -71,6 +91,31 @@ export default function TripsPage() {
   const [routePlan, setRoutePlan] = useState<RoutePlan | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeMessage, setRouteMessage] = useState("");
+  const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
+
+  const [stopUploads, setStopUploads] = useState<Record<string, StopUploadState>>({});
+
+  const refreshTrips = useCallback(async () => {
+    if (!user?.id) {
+      setTrips([]);
+      setSelectedTripId("");
+      return;
+    }
+
+    setLoadingTrips(true);
+    const loaded = await fetchTrips(user.id);
+    setTrips(loaded);
+
+    setSelectedTripId((prev) => {
+      if (prev && loaded.some((trip) => trip.id === prev)) {
+        return prev;
+      }
+
+      return loaded[0]?.id ?? "";
+    });
+
+    setLoadingTrips(false);
+  }, [user]);
 
   useEffect(() => {
     const loadHotspots = async () => {
@@ -81,6 +126,55 @@ export default function TripsPage() {
 
     void loadHotspots();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const timer = setTimeout(() => {
+      void (async () => {
+        if (!active) return;
+        await refreshTrips();
+      })();
+    }, 0);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [refreshTrips]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`trips-live-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trips" },
+        async () => {
+          await refreshTrips();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trip_stops" },
+        async () => {
+          await refreshTrips();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trip_media" },
+        async () => {
+          await refreshTrips();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refreshTrips]);
 
   const selectedTrip = useMemo(
     () => trips.find((trip) => trip.id === selectedTripId) ?? null,
@@ -144,10 +238,16 @@ export default function TripsPage() {
       .slice(0, 8);
   }, [allHotspots, searchTerm]);
 
-  const createNewTrip = () => {
+  const createNewTrip = async () => {
+    if (!user?.id) {
+      setPageMessage("Login required.");
+      return;
+    }
+
     if (!title.trim()) return;
 
-    const nextTrip = createTrip({
+    const nextTrip = await createTrip({
+      userId: user.id,
       title,
       description,
       startDate,
@@ -155,52 +255,127 @@ export default function TripsPage() {
       visibility: "private",
     });
 
-    const updated = upsertTrip(nextTrip);
-    setTrips(updated);
+    if (!nextTrip) {
+      setPageMessage("Could not create trip.");
+      return;
+    }
+
+    await refreshTrips();
     setSelectedTripId(nextTrip.id);
 
     setTitle("");
     setDescription("");
     setStartDate("");
     setEndDate("");
+    setPageMessage("Trip created.");
   };
 
-  const handleAddStop = (hotspot: Hotspot) => {
+  const handleAddStop = async (hotspot: Hotspot) => {
     if (!selectedTrip) return;
-    const updated = addHotspotToTrip(selectedTrip.id, hotspot);
-    setTrips(updated);
+    await addHotspotToTrip({ tripId: selectedTrip.id, hotspot });
+    await refreshTrips();
   };
 
-  const handleRemoveStop = (stopId: string) => {
-    if (!selectedTrip) return;
-    const updated = removeStopFromTrip(selectedTrip.id, stopId);
-    setTrips(updated);
-  };
-
-  const handleStopNoteChange = (stopId: string, note: string) => {
-    if (!selectedTrip) return;
-    const updated = updateStopNote(selectedTrip.id, stopId, note);
-    setTrips(updated);
-  };
-
-  const handleTripDelete = (tripId: string) => {
-    const updated = removeTrip(tripId);
-    setTrips(updated);
-
-    if (selectedTripId === tripId) {
-      setSelectedTripId(updated[0]?.id ?? "");
+  const handleAddToQuickTrip = async (hotspot: Hotspot) => {
+    if (!user?.id) {
+      setPageMessage("Login required.");
+      return;
     }
+
+    await addHotspotToQuickTrip(user.id, hotspot);
+    await refreshTrips();
+    setPageMessage(`Added ${hotspot.name} to Quick Ideas.`);
   };
 
-  const handleTripVisibilityChange = (visibility: Trip["visibility"]) => {
+  const handleRemoveStop = async (stopId: string) => {
+    if (!selectedTrip) return;
+    await removeStopFromTrip(selectedTrip.id, stopId);
+    await refreshTrips();
+  };
+
+  const handleStopNoteChange = async (stopId: string, note: string) => {
     if (!selectedTrip) return;
 
-    const updated = upsertTrip({
-      ...selectedTrip,
+    setTrips((prev) =>
+      prev.map((trip) =>
+        trip.id === selectedTrip.id
+          ? {
+              ...trip,
+              stops: trip.stops.map((stop) =>
+                stop.id === stopId
+                  ? {
+                      ...stop,
+                      note,
+                    }
+                  : stop
+              ),
+            }
+          : trip
+      )
+    );
+
+    await updateStopNote(selectedTrip.id, stopId, note);
+  };
+
+  const handleTripDelete = async (tripId: string) => {
+    if (!user?.id) return;
+
+    await removeTrip(tripId, user.id);
+    await refreshTrips();
+  };
+
+  const handleTripVisibilityChange = async (visibility: Trip["visibility"]) => {
+    if (!selectedTrip || !user?.id) return;
+
+    await updateTripMeta({
+      tripId: selectedTrip.id,
+      userId: user.id,
       visibility,
     });
 
-    setTrips(updated);
+    await refreshTrips();
+  };
+
+  const handleTripMetaSave = async () => {
+    if (!selectedTrip || !user?.id) return;
+
+    await updateTripMeta({
+      tripId: selectedTrip.id,
+      userId: user.id,
+      description: selectedTrip.description,
+    });
+
+    await refreshTrips();
+  };
+
+  const handleToggleLike = async () => {
+    if (!selectedTrip || !user?.id) {
+      setPageMessage("Login required.");
+      return;
+    }
+
+    await toggleTripLike({
+      tripId: selectedTrip.id,
+      userId: user.id,
+      tripTitle: selectedTrip.title,
+    });
+
+    await refreshTrips();
+  };
+
+  const handleToggleSave = async () => {
+    if (!selectedTrip || !user?.id) {
+      setPageMessage("Login required.");
+      return;
+    }
+
+    await toggleTripSave({
+      tripId: selectedTrip.id,
+      userId: user.id,
+      tripTitle: selectedTrip.title,
+    });
+
+    await refreshTrips();
   };
 
   const copyTripSummary = async () => {
@@ -208,14 +383,68 @@ export default function TripsPage() {
 
     const text = buildTripShareText(selectedTrip);
     await navigator.clipboard.writeText(text);
+    setPageMessage("Trip summary copied.");
   };
 
-  const saveTripMeta = () => {
-    if (!selectedTrip) return;
-
-    const updated = upsertTrip(selectedTrip);
-    setTrips(updated);
+  const setStopUploadField = (stopId: string, next: Partial<StopUploadState>) => {
+    setStopUploads((prev) => ({
+      ...prev,
+      [stopId]: {
+        ...(prev[stopId] ?? defaultStopUploadState()),
+        ...next,
+      },
+    }));
   };
+
+  const uploadStopPhoto = async (stopId: string) => {
+    if (!selectedTrip || !user?.id) {
+      setPageMessage("Login required.");
+      return;
+    }
+
+    const state = stopUploads[stopId] ?? defaultStopUploadState();
+    const stop = selectedTrip.stops.find((item) => item.id === stopId);
+
+    if (!state.file || !stop) {
+      setStopUploadField(stopId, { message: "Select an image first." });
+      return;
+    }
+
+    setStopUploadField(stopId, { uploading: true, message: "" });
+
+    const result = await uploadTripStopPhoto({
+      userId: user.id,
+      tripId: selectedTrip.id,
+      stopId,
+      hotspotId: stop.hotspotId,
+      file: state.file,
+      caption: state.caption,
+      visibility: state.visibility,
+    });
+
+    setStopUploadField(stopId, {
+      uploading: false,
+      message: result.message,
+      file: result.success ? null : state.file,
+      caption: result.success ? "" : state.caption,
+    });
+
+    if (result.success) {
+      await refreshTrips();
+    }
+  };
+
+  if (authLoading) {
+    return <p className="text-sm text-slate-600">Loading...</p>;
+  }
+
+  if (!user) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm text-sm text-slate-700">
+        Please log in to build and track your trips.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -226,7 +455,7 @@ export default function TripsPage() {
           </p>
           <h1 className="text-2xl font-bold text-slate-900">Trip Builder</h1>
           <p className="text-sm text-slate-600 mt-1">
-            Build your route, add story notes per stop, and get travel estimates.
+            Build routes, track your timeline, and attach photos and notes to each stop.
           </p>
         </div>
 
@@ -263,11 +492,15 @@ export default function TripsPage() {
         >
           Create trip
         </button>
+
+        {pageMessage && <p className="text-xs text-slate-600">{pageMessage}</p>}
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
           <h2 className="font-semibold text-slate-900">Your trips</h2>
+
+          {loadingTrips && <p className="text-xs text-slate-500">Loading trips...</p>}
 
           {trips.length === 0 && (
             <p className="text-sm text-slate-600">No trips yet. Create your first route above.</p>
@@ -285,6 +518,9 @@ export default function TripsPage() {
             >
               <p className="font-semibold text-slate-900">{trip.title}</p>
               <p className="text-xs text-slate-600 mt-1">{trip.stops.length} stops</p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                {trip.likesCount} likes • {trip.savesCount} saves
+              </p>
             </button>
           ))}
         </aside>
@@ -304,7 +540,7 @@ export default function TripsPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <select
                     value={selectedTrip.visibility}
                     onChange={(event) =>
@@ -316,6 +552,28 @@ export default function TripsPage() {
                     <option value="friends">Friends</option>
                     <option value="public">Public</option>
                   </select>
+
+                  <button
+                    onClick={handleToggleLike}
+                    className={`rounded-lg px-3 py-1.5 text-sm ${
+                      selectedTrip.likedByMe
+                        ? "bg-rose-100 text-rose-700"
+                        : "border border-slate-200"
+                    }`}
+                  >
+                    Like ({selectedTrip.likesCount})
+                  </button>
+
+                  <button
+                    onClick={handleToggleSave}
+                    className={`rounded-lg px-3 py-1.5 text-sm ${
+                      selectedTrip.savedByMe
+                        ? "bg-amber-100 text-amber-700"
+                        : "border border-slate-200"
+                    }`}
+                  >
+                    Save ({selectedTrip.savesCount})
+                  </button>
 
                   <button
                     onClick={copyTripSummary}
@@ -336,39 +594,57 @@ export default function TripsPage() {
               <textarea
                 value={selectedTrip.description}
                 onChange={(event) => {
-                  const updated = trips.map((trip) =>
-                    trip.id === selectedTrip.id
-                      ? {
-                          ...trip,
-                          description: event.target.value,
-                        }
-                      : trip
+                  const nextDescription = event.target.value;
+
+                  setTrips((prev) =>
+                    prev.map((trip) =>
+                      trip.id === selectedTrip.id
+                        ? {
+                            ...trip,
+                            description: nextDescription,
+                          }
+                        : trip
+                    )
                   );
-                  setTrips(updated);
                 }}
-                onBlur={saveTripMeta}
+                onBlur={handleTripMetaSave}
                 rows={3}
                 placeholder="Describe the vibe of this trip"
                 className="w-full rounded-xl border border-slate-200 px-3 py-2"
               />
 
               <div className="rounded-xl border border-slate-200 p-3 space-y-3">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
                   <p className="text-sm font-semibold text-slate-800">Route details</p>
-                  <select
-                    value={routeMode}
-                    onChange={(event) => setRouteMode(event.target.value as RouteMode)}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                  >
-                    <option value="driving">Driving</option>
-                    <option value="cycling">Cycling</option>
-                    <option value="walking">Walking</option>
-                  </select>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={routeMode}
+                      onChange={(event) => setRouteMode(event.target.value as RouteMode)}
+                      className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                    >
+                      <option value="driving">Driving</option>
+                      <option value="cycling">Cycling</option>
+                      <option value="walking">Walking</option>
+                    </select>
+
+                    <select
+                      value={mapStyle}
+                      onChange={(event) =>
+                        setMapStyle(
+                          event.target.value as "default" | "satellite" | "retro" | "terrain"
+                        )
+                      }
+                      className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                    >
+                      <option value="default">Default</option>
+                      <option value="satellite">Satellite</option>
+                      <option value="retro">Retro</option>
+                      <option value="terrain">Terrain</option>
+                    </select>
+                  </div>
                 </div>
 
-                {routeLoading && (
-                  <p className="text-sm text-slate-600">Calculating route...</p>
-                )}
+                {routeLoading && <p className="text-sm text-slate-600">Calculating route...</p>}
 
                 {!routeLoading && routeMessage && (
                   <p className="text-sm text-slate-600">{routeMessage}</p>
@@ -423,11 +699,23 @@ export default function TripsPage() {
                 <TripRouteMap
                   stops={selectedTrip.stops}
                   routeGeometry={routePlan?.geometry ?? []}
+                  mapStyle={mapStyle}
                 />
               </div>
 
               <div className="rounded-xl border border-slate-200 p-3 space-y-2">
-                <p className="text-sm font-semibold text-slate-800">Add stops</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-800">Add stops</p>
+                  <button
+                    onClick={() => {
+                      if (!filteredHotspots[0]) return;
+                      void handleAddToQuickTrip(filteredHotspots[0]);
+                    }}
+                    className="text-xs rounded-lg border border-slate-200 px-2 py-1"
+                  >
+                    Quick add first result
+                  </button>
+                </div>
                 <input
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
@@ -439,7 +727,9 @@ export default function TripsPage() {
                   {filteredHotspots.map((hotspot) => (
                     <button
                       key={hotspot.id}
-                      onClick={() => handleAddStop(hotspot)}
+                      onClick={() => {
+                        void handleAddStop(hotspot);
+                      }}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-left hover:border-emerald-200"
                     >
                       <p className="font-semibold text-slate-900">{hotspot.name}</p>
@@ -458,35 +748,100 @@ export default function TripsPage() {
                   <p className="text-sm text-slate-600">No stops yet. Add one from the search list.</p>
                 )}
 
-                {selectedTrip.stops.map((stop, index) => (
-                  <article key={stop.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-900">
-                          {index + 1}. {stop.name}
-                        </p>
-                        <p className="text-xs text-slate-600 mt-1">
-                          {stop.category} - {stop.province}
-                        </p>
+                {selectedTrip.stops.map((stop, index) => {
+                  const uploadState = stopUploads[stop.id] ?? defaultStopUploadState();
+
+                  return (
+                    <article key={stop.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">
+                            {index + 1}. {stop.name}
+                          </p>
+                          <p className="text-xs text-slate-600 mt-1">
+                            {stop.category} - {stop.province}
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            void handleRemoveStop(stop.id);
+                          }}
+                          className="text-xs text-red-600"
+                        >
+                          Remove
+                        </button>
                       </div>
 
-                      <button
-                        onClick={() => handleRemoveStop(stop.id)}
-                        className="text-xs text-red-600"
-                      >
-                        Remove
-                      </button>
-                    </div>
+                      <textarea
+                        value={stop.note}
+                        onChange={(event) => {
+                          void handleStopNoteChange(stop.id, event.target.value);
+                        }}
+                        rows={2}
+                        placeholder="Add memory note, meeting point, or timing"
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      />
 
-                    <textarea
-                      value={stop.note}
-                      onChange={(event) => handleStopNoteChange(stop.id, event.target.value)}
-                      rows={2}
-                      placeholder="Add memory note, meeting point, or timing"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                    />
-                  </article>
-                ))}
+                      {stop.media.length > 0 && (
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {stop.media.slice(0, 8).map((item) => (
+                            <div key={item.id} className="relative h-24 w-32 overflow-hidden rounded-lg border border-slate-200"><Image src={item.signedUrl} alt={item.caption || `${stop.name} media`} fill sizes="128px" className="object-cover" /></div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="grid gap-2 md:grid-cols-4">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(event) =>
+                            setStopUploadField(stop.id, {
+                              file: event.target.files?.[0] ?? null,
+                            })
+                          }
+                          className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
+                        />
+                        <input
+                          value={uploadState.caption}
+                          onChange={(event) =>
+                            setStopUploadField(stop.id, {
+                              caption: event.target.value,
+                            })
+                          }
+                          placeholder="Photo caption"
+                          className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
+                        />
+                        <select
+                          value={uploadState.visibility}
+                          onChange={(event) =>
+                            setStopUploadField(stop.id, {
+                              visibility: event.target.value as MediaVisibility,
+                            })
+                          }
+                          className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
+                        >
+                          <option value="private">Private</option>
+                          <option value="friends">Friends</option>
+                          <option value="public">Public</option>
+                        </select>
+                        <button
+                          onClick={() => {
+                            void uploadStopPhoto(stop.id);
+                          }}
+                          disabled={uploadState.uploading}
+                          className="rounded-lg bg-slate-900 text-white px-3 py-2 text-xs font-semibold disabled:opacity-60"
+                        >
+                          {uploadState.uploading ? "Uploading..." : "Upload photo"}
+                        </button>
+                      </div>
+
+                      {uploadState.message && (
+                        <p className="text-xs text-slate-600">{uploadState.message}</p>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             </>
           )}
@@ -495,3 +850,14 @@ export default function TripsPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

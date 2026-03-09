@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 import "leaflet.heat";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
@@ -17,7 +17,10 @@ interface Props {
   wishlistIds?: string[];
   favoriteIds?: string[];
   viewMode: "markers" | "heatmap";
-  mapStyle: "default" | "satellite";
+  mapStyle: "default" | "satellite" | "retro" | "terrain";
+  autoLocate?: boolean;
+  autoFit?: boolean;
+  enableClustering?: boolean;
   onVisit?: (id: string) => void;
   onSelect?: (hotspot: Hotspot) => void;
 }
@@ -68,6 +71,71 @@ function getCoordinates(
   return [lat, lng];
 }
 
+function mapTileConfig(style: Props["mapStyle"], isDark: boolean) {
+  if (style === "satellite") {
+    return {
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Tiles © Esri",
+    };
+  }
+
+  if (style === "retro") {
+    return {
+      url: "https://tiles.stadiamaps.com/tiles/stamen_toner_lite/{z}/{x}/{y}{r}.png",
+      attribution: "© Stadia Maps © Stamen Design © OpenMapTiles © OpenStreetMap contributors",
+    };
+  }
+
+  if (style === "terrain") {
+    return {
+      url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+      attribution: "Map data: © OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap",
+    };
+  }
+
+  if (isDark) {
+    return {
+      url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      attribution: "© OpenStreetMap contributors © CARTO",
+    };
+  }
+
+  return {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "© OpenStreetMap contributors",
+  };
+}
+
+function FitToHotspots({ hotspots, enabled }: { hotspots: Hotspot[]; enabled: boolean }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!enabled || !hotspots.length) return;
+
+    const points = hotspots
+      .map((hotspot) => getCoordinates(hotspot))
+      .filter((point): point is [number, number] => point !== null);
+
+    if (!points.length) return;
+
+    if (points.length === 1) {
+      map.setView(points[0], 14, {
+        animate: true,
+      });
+      return;
+    }
+
+    const bounds = L.latLngBounds(points.map((point) => L.latLng(point[0], point[1])));
+    map.fitBounds(bounds, {
+      padding: [28, 28],
+      maxZoom: 13,
+      animate: true,
+    });
+  }, [enabled, hotspots, map]);
+
+  return null;
+}
+
 export default function MapView({
   hotspots = [],
   loading,
@@ -76,6 +144,9 @@ export default function MapView({
   favoriteIds = [],
   viewMode = "markers",
   mapStyle = "default",
+  autoLocate = true,
+  autoFit = false,
+  enableClustering = true,
   onVisit,
   onSelect,
 }: Props) {
@@ -88,6 +159,8 @@ export default function MapView({
   );
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const media = window.matchMedia("(prefers-color-scheme: dark)");
 
     const listener = (event: MediaQueryListEvent) => {
@@ -99,13 +172,7 @@ export default function MapView({
   }, []);
 
   const useCanvas = hotspots.length > 1500;
-
-  const tileUrl =
-    mapStyle === "satellite"
-      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      : isDark
-        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+  const tile = useMemo(() => mapTileConfig(mapStyle, isDark), [mapStyle, isDark]);
 
   const handleSelect = useCallback(
     (hotspot: Hotspot) => {
@@ -135,9 +202,9 @@ export default function MapView({
           }
         }}
       >
-        <TileLayer url={tileUrl} />
+        <TileLayer url={tile.url} attribution={tile.attribution} />
 
-        {viewMode === "markers" && (
+        {viewMode === "markers" && enableClustering && hotspots.length > 1 && (
           <MarkerClusterGroup
             chunkedLoading
             maxClusterRadius={60}
@@ -181,9 +248,22 @@ export default function MapView({
           </MarkerClusterGroup>
         )}
 
+        {viewMode === "markers" && (!enableClustering || hotspots.length <= 1) && (
+          <ZoomAwareMarkers
+            hotspots={hotspots}
+            selectedId={selectedId}
+            visitedIds={visitedIds}
+            wishlistIds={wishlistIds}
+            favoriteIds={favoriteIds}
+            onSelect={handleSelect}
+            onVisit={onVisit}
+          />
+        )}
+
         {viewMode === "heatmap" && <HeatmapLayer hotspots={hotspots} />}
 
-        <UserLocation hotspots={hotspots} onVisit={onVisit} />
+        {autoLocate && <UserLocation hotspots={hotspots} onVisit={onVisit} />}
+        <FitToHotspots hotspots={hotspots} enabled={autoFit} />
       </MapContainer>
 
       {loading && (
@@ -216,7 +296,7 @@ function ZoomAwareMarkers({
     };
   }, [map]);
 
-  const size = zoom < 9 ? 16 : zoom < 12 ? 20 : zoom < 14 ? 24 : 28;
+  const size = zoom < 9 ? 18 : zoom < 12 ? 22 : zoom < 14 ? 26 : 30;
 
   return (
     <>
@@ -225,11 +305,21 @@ function ZoomAwareMarkers({
         if (!coords) return null;
 
         let color = "#10b981";
+        let symbol = "•";
 
-        if (selectedId === hotspot.id) color = "#f59e0b";
-        else if (visitedIds.includes(hotspot.id)) color = "#9ca3af";
-        else if (favoriteIds.includes(hotspot.id)) color = "#a855f7";
-        else if (wishlistIds.includes(hotspot.id)) color = "#facc15";
+        if (selectedId === hotspot.id) {
+          color = "#f59e0b";
+          symbol = "?";
+        } else if (visitedIds.includes(hotspot.id)) {
+          color = "#64748b";
+          symbol = "?";
+        } else if (favoriteIds.includes(hotspot.id)) {
+          color = "#e11d48";
+          symbol = "?";
+        } else if (wishlistIds.includes(hotspot.id)) {
+          color = "#f59e0b";
+          symbol = "?";
+        }
 
         const icon = new L.DivIcon({
           className: "",
@@ -238,10 +328,15 @@ function ZoomAwareMarkers({
               width:${size}px;
               height:${size}px;
               background:${color};
-              border-radius:50%;
+              border-radius:999px;
               border:2px solid white;
-              box-shadow:0 4px 10px rgba(0,0,0,0.25);
-            "></div>
+              box-shadow:0 8px 16px rgba(0,0,0,0.25);
+              color:white;
+              font-size:${Math.max(11, Math.floor(size * 0.45))}px;
+              line-height:${size - 4}px;
+              text-align:center;
+              font-weight:700;
+            ">${symbol}</div>
           `,
           iconSize: [size, size],
           iconAnchor: [size / 2, size / 2],
@@ -327,7 +422,6 @@ function UserLocation({ hotspots, onVisit }: UserLocationProps) {
           pos.coords.longitude,
         ];
         setPosition(coords);
-        map.flyTo(coords, 12);
       },
       () => {
         setPosition(null);
@@ -337,7 +431,7 @@ function UserLocation({ hotspots, onVisit }: UserLocationProps) {
         timeout: 8000,
       }
     );
-  }, [map]);
+  }, []);
 
   useEffect(() => {
     if (!position) return;
@@ -358,5 +452,22 @@ function UserLocation({ hotspots, onVisit }: UserLocationProps) {
 
   if (!position) return null;
 
-  return <Marker position={position} />;
+  const icon = new L.DivIcon({
+    className: "",
+    html: `
+      <div style="
+        width:16px;
+        height:16px;
+        border-radius:50%;
+        background:#2563eb;
+        border:2px solid #fff;
+        box-shadow:0 0 0 6px rgba(37,99,235,0.25);
+      "></div>
+    `,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+
+  return <Marker position={position} icon={icon} />;
 }
+

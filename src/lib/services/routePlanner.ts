@@ -1,4 +1,4 @@
-import { TripStop } from "@/lib/services/tripPlanner";
+﻿import { TripStop } from "@/lib/services/tripBuilder";
 
 export type RouteMode = "driving" | "cycling" | "walking";
 
@@ -138,3 +138,4 @@ export async function fetchRoutePlan(
     provider: "osrm",
   };
 }
+

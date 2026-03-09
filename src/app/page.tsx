@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -21,7 +21,7 @@ import MissionDeck from "@/components/home/MissionDeck";
 import LeaguePanel from "@/components/home/LeaguePanel";
 import NearbyQuests from "@/components/home/NearbyQuests";
 import { fetchVisitStatsForUser } from "@/lib/services/engagement";
-import { addHotspotToQuickTrip } from "@/lib/services/tripPlanner";
+import { addHotspotToQuickTrip } from "@/lib/services/tripBuilder";
 import { fetchHotspots } from "@/lib/services/hotspots";
 import { NearbyQuest, buildNearbyQuests } from "@/lib/services/quests";
 
@@ -77,7 +77,7 @@ export default function Home() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [provinceFilter, setProvinceFilter] = useState("");
   const [viewMode, setViewMode] = useState<"markers" | "heatmap">("markers");
-  const [mapStyle, setMapStyle] = useState<"default" | "satellite">("default");
+  const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
   const [toast, setToast] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [provinces, setProvinces] = useState<string[]>([]);
@@ -173,11 +173,16 @@ export default function Home() {
   );
 
   const handleAddToTrip = useCallback(
-    (hotspot: Hotspot) => {
-      addHotspotToQuickTrip(hotspot);
+    async (hotspot: Hotspot) => {
+      if (!user) {
+        showToast("Login required.");
+        return;
+      }
+
+      await addHotspotToQuickTrip(user.id, hotspot);
       showToast(`Added ${hotspot.name} to Quick Ideas.`);
     },
-    [showToast]
+    [showToast, user]
   );
 
   useEffect(() => {
@@ -434,9 +439,9 @@ export default function Home() {
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap gap-3 items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">
-            Discover Belgium
+            Spotly
           </p>
-          <h1 className="text-xl md:text-2xl font-bold text-slate-900">Map Explorer</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-900">Unlock hidden gems</h1>
           <p className="text-sm text-slate-600 mt-1">
             Find hidden gems, must-sees, activities and food spots.
           </p>
@@ -450,6 +455,15 @@ export default function Home() {
             Find Buddies
           </Link>
         </div>
+      </section>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Spotly Plus</p>
+          <p className="text-sm text-slate-700 mt-1">Unlock advanced trip insights, richer timeline tools and priority discovery alerts.</p>
+        </div>
+        <Link href="/pricing" className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
+          View plans
+        </Link>
       </section>
 
       <MissionDeck
@@ -503,17 +517,21 @@ export default function Home() {
           {viewMode === "markers" ? "Heatmap" : "Markers"}
         </button>
 
-        <button
-          onClick={() =>
-            setMapStyle((prev) => (prev === "default" ? "satellite" : "default"))
+        <select
+          value={mapStyle}
+          onChange={(event) =>
+            setMapStyle(event.target.value as "default" | "satellite" | "retro" | "terrain")
           }
-          className="px-4 py-2 bg-slate-800 text-white rounded-full text-sm"
+          className="px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm text-sm"
         >
-          {mapStyle === "default" ? "Satellite" : "Default"}
-        </button>
+          <option value="default">Default</option>
+          <option value="satellite">Satellite</option>
+          <option value="retro">Retro</option>
+          <option value="terrain">Terrain</option>
+        </select>
       </div>
 
-      <div className="flex-1 min-h-[22rem] rounded-3xl overflow-hidden shadow-2xl border border-white/40">
+      <div className="h-[58vh] min-h-[28rem] md:h-[65vh] rounded-3xl overflow-hidden shadow-2xl border border-white/40">
         <MapContainer
           viewMode={viewMode}
           mapStyle={mapStyle}
@@ -572,3 +590,5 @@ export default function Home() {
     </div>
   );
 }
+
+

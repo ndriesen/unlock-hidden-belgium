@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Unlock Hidden Belgium",
-  description: "Discover hidden gems in Belgium!",
+  title: "Spotly",
+  description: "Unlock hidden gems",
 };
 
 export default function RootLayout({
@@ -39,3 +39,4 @@ export default function RootLayout({
     </html>
   );
 }
+

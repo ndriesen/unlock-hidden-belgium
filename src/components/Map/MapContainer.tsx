@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { fetchHotspots } from "@/lib/services/hotspots";
@@ -18,6 +18,8 @@ interface HotspotRow {
   opening_hours?: string | null;
   combine_with?: string[] | null;
   visit_count?: number | null;
+  likes_count?: number | null;
+  saves_count?: number | null;
 }
 
 export interface MapContainerProps {
@@ -25,7 +27,7 @@ export interface MapContainerProps {
   categoryFilter?: string;
   provinceFilter?: string;
   viewMode: "markers" | "heatmap";
-  mapStyle?: "default" | "satellite";
+  mapStyle?: "default" | "satellite" | "retro" | "terrain";
 
   visitedIds: string[];
   wishlistIds: string[];
@@ -82,6 +84,8 @@ export default function MapContainer({
           opening_hours: hotspot.opening_hours ?? undefined,
           combine_with: hotspot.combine_with ?? undefined,
           visit_count: hotspot.visit_count ?? 0,
+          likes_count: hotspot.likes_count ?? 0,
+          saves_count: hotspot.saves_count ?? 0,
         }));
 
       setHotspots(mapped);
@@ -94,7 +98,7 @@ export default function MapContainer({
   }, []);
 
   useEffect(() => {
-    loadHotspots();
+    void loadHotspots();
   }, [loadHotspots]);
 
   useEffect(() => {
@@ -146,3 +150,4 @@ export default function MapContainer({
     />
   );
 }
+

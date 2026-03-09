@@ -1,13 +1,14 @@
-"use client";
+﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Home, Menu, Route, Users, User, X } from "lucide-react";
+import { Bell, Compass, Home, Menu, Route, User, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { useAuth } from "@/context/AuthContext";
 import Sidebar from "./Sidebar";
 import { useSearch } from "@/context/SearchContext";
+import { fetchUnreadNotificationCount } from "@/lib/services/activity";
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
@@ -22,6 +23,7 @@ export default function SidebarLayout({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const { searchQuery, setSearchQuery } = useSearch();
   const { user } = useAuth();
@@ -30,14 +32,37 @@ export default function SidebarLayout({
 
   const isAuthPage = pathname === "/auth";
 
+  useEffect(() => {
+    let active = true;
+
+    const loadUnread = async () => {
+      if (!user?.id) {
+        if (active) setUnreadCount(0);
+        return;
+      }
+
+      const count = await fetchUnreadNotificationCount(user.id);
+      if (active) {
+        setUnreadCount(count);
+      }
+    };
+
+    void loadUnread();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id, pathname]);
+
   if (isAuthPage) {
     return <div className="h-full">{children}</div>;
   }
 
   const mobileTabs = [
     { href: "/", label: "Home", icon: Home },
+    { href: "/hotspots", label: "Explore", icon: Compass },
     { href: "/trips", label: "Trips", icon: Route },
-    { href: "/buddies", label: "Buddies", icon: Users },
+    { href: "/activity", label: "Activity", icon: Bell, badge: unreadCount },
     { href: "/profile", label: "Profile", icon: User },
   ];
 
@@ -84,9 +109,19 @@ export default function SidebarLayout({
               <Menu size={20} />
             </button>
 
-            <h1 className="text-base md:text-lg font-semibold truncate text-slate-900">
-              Unlock Hidden Belgium
-            </h1>
+            <div className="flex items-center gap-2 min-w-0">
+              <Image
+                src="/branding/spotly-logo.svg"
+                alt="Spotly logo"
+                width={30}
+                height={30}
+                className="rounded-lg"
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-bold truncate text-slate-900">Spotly</p>
+                <p className="text-[11px] text-slate-500 truncate">Unlock hidden gems</p>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 md:gap-4">
@@ -97,6 +132,19 @@ export default function SidebarLayout({
               onChange={(event) => setSearchQuery(event.target.value)}
               className="hidden md:block px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 w-72"
             />
+
+            <button
+              onClick={() => router.push("/activity")}
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
+              aria-label="Open activity"
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
 
             {user ? (
               <div className="relative">
@@ -119,7 +167,57 @@ export default function SidebarLayout({
                 </button>
 
                 {accountMenuOpen && (
-                  <div className="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-xl border z-50">
+                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-xl border z-50 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        router.push("/hotspots");
+                      }}
+                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
+                    >
+                      Explore
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        router.push("/hotspots/my");
+                      }}
+                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
+                    >
+                      My Hotspots
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        router.push("/trips");
+                      }}
+                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
+                    >
+                      Trips
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        router.push("/activity");
+                      }}
+                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
+                    >
+                      Activity
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        router.push("/pricing");
+                      }}
+                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
+                    >
+                      Pricing
+                    </button>
+
                     <button
                       onClick={() => {
                         setAccountMenuOpen(false);
@@ -180,7 +278,7 @@ export default function SidebarLayout({
         </main>
 
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur">
-          <div className="grid grid-cols-4">
+          <div className="grid grid-cols-5">
             {mobileTabs.map((tab) => {
               const active = isActive(pathname, tab.href);
               const Icon = tab.icon;
@@ -189,12 +287,17 @@ export default function SidebarLayout({
                 <button
                   key={tab.href}
                   onClick={() => router.push(tab.href)}
-                  className={`flex flex-col items-center justify-center gap-1 py-2 ${
+                  className={`relative flex flex-col items-center justify-center gap-1 py-2 ${
                     active ? "text-emerald-700" : "text-slate-500"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span className="text-[11px] font-medium">{tab.label}</span>
+                  {tab.badge && tab.badge > 0 && (
+                    <span className="absolute right-2 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-semibold text-white">
+                      {tab.badge > 9 ? "9+" : tab.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -204,3 +307,4 @@ export default function SidebarLayout({
     </div>
   );
 }
+

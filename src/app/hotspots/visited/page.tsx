@@ -1,13 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import HotspotCollectionPage from "@/components/hotspots/HotspotCollectionPage";
-
-export default function VisitedPage() {
-  return (
-    <HotspotCollectionPage
-      collection="visited"
-      title="Visited Hotspots"
-      emptyMessage="You have not visited any hotspots yet."
-    />
-  );
+export default function VisitedLegacyPage() {
+  redirect("/hotspots/my?filter=visited");
 }
