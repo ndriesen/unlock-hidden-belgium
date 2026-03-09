@@ -271,6 +271,12 @@ export default function MapView({
           Loading map data...
         </div>
       )}
+
+      {!loading && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg text-sm text-emerald-700 font-medium">
+          {hotspots.length} hotspots loaded • Click markers to explore
+        </div>
+      )}
     </div>
   );
 }
@@ -286,6 +292,12 @@ function ZoomAwareMarkers({
 }: ZoomAwareMarkersProps) {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
+  const [visibleCount, setVisibleCount] = useState(50); // Start with 50 markers
+
+  // Reset visible count when hotspots change
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [hotspots]);
 
   useEffect(() => {
     const handleZoom = () => setZoom(map.getZoom());
@@ -296,11 +308,28 @@ function ZoomAwareMarkers({
     };
   }, [map]);
 
+  // Staggered marker loading - progressively show more markers
+  useEffect(() => {
+    if (visibleCount >= hotspots.length) return;
+    
+    const timeout = setTimeout(() => {
+      setVisibleCount((prev) => Math.min(prev + 50, hotspots.length));
+    }, 100);
+
+    return () => clearTimeout(timeout);
+  }, [visibleCount, hotspots.length]);
+
+  // Only show markers up to visibleCount for performance
+  const visibleHotspots = useMemo(() => 
+    hotspots.slice(0, visibleCount), 
+    [hotspots, visibleCount]
+  );
+
   const size = zoom < 9 ? 18 : zoom < 12 ? 22 : zoom < 14 ? 26 : 30;
 
   return (
     <>
-      {hotspots.map((hotspot) => {
+      {visibleHotspots.map((hotspot) => {
         const coords = getCoordinates(hotspot);
         if (!coords) return null;
 

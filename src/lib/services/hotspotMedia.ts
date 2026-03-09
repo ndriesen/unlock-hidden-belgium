@@ -6,6 +6,7 @@ import {
   uploadImageToMediaBucket,
 } from "@/lib/services/media";
 import { recordActivity } from "@/lib/services/activity";
+import { OrganizedHotspotMedia } from "@/types/hotspot";
 
 interface HotspotMediaRow {
   id: string;
@@ -138,5 +139,79 @@ export async function uploadHotspotPhoto(params: {
   });
 
   return { success: true, message: "Photo uploaded." };
+}
+
+/**
+ * Fetch hotspot media organized by priority for Polarsteps-like display
+ * Priority: Personal → Community → Inspiration (database filler images)
+ */
+export async function fetchOrganizedHotspotMedia(params: {
+  hotspotId: string;
+  userId?: string | null;
+  limit?: number;
+}): Promise<OrganizedHotspotMedia> {
+  const currentUserId = params.userId ?? "";
+
+  // Fetch user-uploaded media from hotspot_media table
+  const { data: mediaData, error } = await supabase
+    .from("hotspot_media")
+    .select("id,hotspot_id,uploaded_by,storage_path,caption,visibility,created_at")
+    .eq("hotspot_id", params.hotspotId)
+    .order("created_at", { ascending: false })
+    .limit(params.limit ?? 50);
+
+  if (error || !mediaData) {
+    // Return empty organized structure on error
+    return { personal: [], community: [], inspiration: [] };
+  }
+
+  // Get signed URLs for all media
+  const signedUrls = await Promise.all(
+    mediaData.map((row) => createSignedMediaUrl(row.storage_path))
+  );
+
+  // Map to media items
+  const allMedia = mediaData
+    .map((row, index) => {
+      const signedUrl = signedUrls[index];
+      if (!signedUrl) return null;
+
+      return {
+        id: row.id,
+        signedUrl,
+        caption: row.caption,
+        visibility: row.visibility,
+        createdAt: row.created_at,
+        uploadedBy: row.uploaded_by,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  // Separate into personal (current user's) and community (others' public)
+  const personal: OrganizedHotspotMedia["personal"] = [];
+  const community: OrganizedHotspotMedia["community"] = [];
+
+  for (const item of allMedia) {
+    if (item.uploadedBy === currentUserId) {
+      // User's own photos (regardless of visibility)
+      personal.push(item);
+    } else if (item.visibility === "public") {
+      // Other users' public photos
+      community.push(item);
+    }
+    // Private photos from others are not included
+  }
+
+  // Sort personal by newest first
+  personal.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  // Sort community by newest first
+  community.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  // Inspiration (filler images) will be handled by the hotspot.images field
+  // which contains database URLs (Wikimedia, etc.)
+  // These will be passed separately from the hotspot data
+
+  return { personal, community, inspiration: [] };
 }
 

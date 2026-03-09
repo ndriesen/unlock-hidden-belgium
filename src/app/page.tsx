@@ -20,6 +20,7 @@ import BadgeCelebration from "@/components/BadgeCelebration";
 import MissionDeck from "@/components/home/MissionDeck";
 import LeaguePanel from "@/components/home/LeaguePanel";
 import NearbyQuests from "@/components/home/NearbyQuests";
+import HeroSection from "@/components/home/HeroSection";
 import { fetchVisitStatsForUser } from "@/lib/services/engagement";
 import { addHotspotToQuickTrip } from "@/lib/services/tripBuilder";
 import { fetchHotspots } from "@/lib/services/hotspots";
@@ -436,18 +437,22 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-full space-y-4 md:space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap gap-3 items-center justify-between">
+      {/* Hero Section with 3D Globe */}
+      <HeroSection hotspots={questCandidates} />
+
+      {/* Quick Actions - Below Hero */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap gap-3 items-center mt-4 md:mt-6">
         <div>
           <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">
             Spotly
           </p>
-          <h1 className="text-xl md:text-2xl font-bold text-slate-900">Unlock hidden gems</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-900">Your adventures await</h1>
           <p className="text-sm text-slate-600 mt-1">
             Find hidden gems, must-sees, activities and food spots.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 ml-auto">
           <Link href="/trips" className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium">
             Open Trips
           </Link>
@@ -509,6 +514,19 @@ export default function Home() {
         <div className="flex-1" />
 
         <button
+          onClick={() => {
+            if (questCandidates.length === 0) return;
+            const randomIndex = Math.floor(Math.random() * questCandidates.length);
+            const random = questCandidates[randomIndex];
+            setSelected(random);
+            showToast(`Surprise! Discover: ${random.name}`);
+          }}
+          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm font-medium hover:from-amber-600 hover:to-orange-600 transition-all shadow-md"
+        >
+          🎲 Surprise Me
+        </button>
+
+        <button
           onClick={() =>
             setViewMode((prev) => (prev === "markers" ? "heatmap" : "markers"))
           }
@@ -531,7 +549,7 @@ export default function Home() {
         </select>
       </div>
 
-      <div className="h-[58vh] min-h-[28rem] md:h-[65vh] rounded-3xl overflow-hidden shadow-2xl border border-white/40">
+      <div className="h-[70vh] min-h-[32rem] md:h-[75vh] rounded-3xl overflow-hidden shadow-2xl border border-white/40">
         <MapContainer
           viewMode={viewMode}
           mapStyle={mapStyle}

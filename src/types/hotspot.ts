@@ -18,3 +18,25 @@
   lng?: number;
 }
 
+// Organized media for Polarsteps-like display
+// Note: Uses raw fields to avoid circular imports
+export interface OrganizedHotspotMedia {
+  personal: {
+    id: string;
+    signedUrl: string;
+    caption: string;
+    visibility: string;
+    createdAt: string;
+    uploadedBy: string;
+  }[];
+  community: {
+    id: string;
+    signedUrl: string;
+    caption: string;
+    visibility: string;
+    createdAt: string;
+    uploadedBy: string;
+  }[];
+  inspiration: string[]; // Database filler images
+}
+

@@ -2,6 +2,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import dotenv from "dotenv"
+dotenv.config({ path: ".env.local" })
+
 
 async function main() {
   const __filename = fileURLToPath(import.meta.url);

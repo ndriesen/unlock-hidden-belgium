@@ -1,14 +1,15 @@
 ﻿"use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import ReviewsSection from "@/components/ReviewsSection";
+import GalleryCarousel from "@/components/GalleryCarousel";
+import TripMemoriesGallery from "@/components/TripMemoriesGallery";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/Supabase/browser-client";
-import { fetchHotspotMedia, uploadHotspotPhoto } from "@/lib/services/hotspotMedia";
+import { fetchHotspotMedia, fetchOrganizedHotspotMedia, uploadHotspotPhoto } from "@/lib/services/hotspotMedia";
 import {
   fetchHotspotReactionState,
   toggleHotspotLike,
@@ -45,6 +46,37 @@ interface HotspotRow {
   longitude: number | string | null;
 }
 
+/**
+ * Safely parse images field from Supabase.
+ * Handles cases where Supabase might return a stringified JSON array
+ * instead of a proper array.
+ */
+function parseImages(images: unknown): string[] {
+  if (!images) return [];
+  
+  // If it's already an array of strings
+  if (Array.isArray(images)) {
+    const filtered = images.filter((item): item is string => typeof item === "string");
+    return filtered;
+  }
+  
+  // If it's a string (stringified JSON array)
+  if (typeof images === "string") {
+    try {
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((item): item is string => typeof item === "string");
+        return filtered;
+      }
+    } catch {
+      // Not a valid JSON string, return empty array
+      return [];
+    }
+  }
+  
+  return [];
+}
+
 export default function HotspotDetailPage() {
   const params = useParams<{ id: string }>();
   const hotspotId = params.id;
@@ -59,6 +91,10 @@ export default function HotspotDetailPage() {
   const [savedByMe, setSavedByMe] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
+  
+  // Organized media for Polarsteps-like display
+  const [personalPhotos, setPersonalPhotos] = useState<{id: string; signedUrl: string; caption: string; visibility: string; createdAt: string; uploadedBy: string}[]>([]);
+  const [communityPhotos, setCommunityPhotos] = useState<{id: string; signedUrl: string; caption: string; visibility: string; createdAt: string; uploadedBy: string}[]>([]);
 
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadCaption, setUploadCaption] = useState("");
@@ -105,7 +141,7 @@ export default function HotspotDetailPage() {
         category: row.category ?? "Unknown",
         province: row.province ?? "Unknown",
         description: row.description ?? "No description yet.",
-        images: row.images ?? [],
+        images: parseImages(row.images),
         opening_hours: row.opening_hours ?? undefined,
         combine_with: row.combine_with ?? undefined,
         visit_count: row.visit_count ?? 0,
@@ -119,17 +155,29 @@ export default function HotspotDetailPage() {
       setOpeningHours(row.opening_hours ?? "Not provided");
       setCombineWith(row.combine_with ?? []);
 
-      const [media, reaction] = await Promise.all([
+      const [media, organizedMedia, reaction] = await Promise.all([
         fetchHotspotMedia({ hotspotId: row.id, userId: user?.id ?? null, limit: 16 }),
+        fetchOrganizedHotspotMedia({ hotspotId: row.id, userId: user?.id ?? null, limit: 50 }),
         user?.id ? fetchHotspotReactionState(user.id, row.id) : Promise.resolve({ liked: false, saved: false }),
       ]);
 
       if (!active) return;
 
-      const uploaded = media.map((item) => item.signedUrl);
-      const baseImages = row.images ?? [];
-      const dedup = Array.from(new Set([...uploaded, ...baseImages]));
+      // Build carousel: personal photos first, then community, then inspiration (database images)
+      const personalUrls = organizedMedia.personal.map(p => p.signedUrl);
+      const communityUrls = organizedMedia.community.map(c => c.signedUrl);
+      const baseImages = parseImages(row.images); // Database filler images
+      
+      // Priority order: personal → community → inspiration
+      const priorityUrls = [...personalUrls, ...communityUrls, ...baseImages];
+      const dedup = Array.from(new Set([...priorityUrls]));
+      
       setMediaUrls(dedup);
+      
+      // Set organized media
+      setPersonalPhotos(organizedMedia.personal);
+      setCommunityPhotos(organizedMedia.community);
+      
       setLikedByMe(reaction.liked);
       setSavedByMe(reaction.saved);
       setLoading(false);
@@ -147,10 +195,10 @@ export default function HotspotDetailPage() {
     return `https://www.google.com/maps/dir/?api=1&destination=${hotspot.latitude},${hotspot.longitude}`;
   }, [hotspot]);
 
-  const imageUrl =
-    mediaUrls[0] ??
-    hotspot?.images?.[0] ??
-    "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
+  // Fallback image if no images available
+  const fallbackImage = hotspot?.images && hotspot.images.length > 0 
+    ? hotspot.images 
+    : ["https://images.unsplash.com/photo-1469474968028-56623f02e42e"];
 
   const handleToggleLike = async () => {
     if (!user || !hotspot) {
@@ -262,19 +310,20 @@ export default function HotspotDetailPage() {
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="relative h-72 w-full">
-          <Image
-            src={imageUrl}
+      {/* Hero Carousel - shows personal photos first, then fallback to inspiration */}
+        <div className="relative">
+          <GalleryCarousel
+            images={mediaUrls.length > 0 ? mediaUrls : fallbackImage}
             alt={hotspot.name}
-            fill
-            sizes="100vw"
-            className="object-cover"
+            aspectRatio="16/9"
+            showCounter={true}
+            showArrows={true}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-
-          <div className="absolute bottom-4 left-4 right-4 text-white">
-            <h1 className="text-2xl font-bold">{hotspot.name}</h1>
-            <p className="text-sm text-white/85">
+          
+          {/* Text overlay on top of carousel */}
+          <div className="absolute bottom-4 left-4 right-4 pointer-events-none">
+            <h1 className="text-2xl font-bold text-white drop-shadow-lg">{hotspot.name}</h1>
+            <p className="text-sm text-white/90 drop-shadow">
               {hotspot.category} - {hotspot.province}
             </p>
           </div>
@@ -315,22 +364,6 @@ export default function HotspotDetailPage() {
             </div>
           )}
 
-          {mediaUrls.length > 1 && (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {mediaUrls.slice(0, 10).map((url, index) => (
-                <div key={`${url}_${index}`} className="relative h-20 overflow-hidden rounded-lg">
-                  <Image
-                    src={url}
-                    alt={`${hotspot.name} image ${index + 1}`}
-                    fill
-                    sizes="160px"
-                    className="object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handleToggleLike}
@@ -364,7 +397,7 @@ export default function HotspotDetailPage() {
             </Link>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 p-3 space-y-2">
+          <div id="upload-section" className="rounded-2xl border border-slate-200 p-3 space-y-2">
             <p className="text-sm font-semibold text-slate-900">Add your photo</p>
             <div className="grid gap-2 md:grid-cols-4">
               <input
@@ -399,6 +432,18 @@ export default function HotspotDetailPage() {
             {uploadMessage && <p className="text-xs text-slate-600">{uploadMessage}</p>}
           </div>
         </div>
+      </section>
+
+      {/* Polarsteps-style Photo Gallery - Personal photos only with toggle */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Trip Memories</h2>
+        <TripMemoriesGallery
+          personal={personalPhotos}
+          community={communityPhotos}
+          inspiration={hotspot.images ?? []}
+          currentUserId={user?.id}
+          hotspotName={hotspot.name}
+        />
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm space-y-2">

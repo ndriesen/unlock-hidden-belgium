@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Hotspot } from "@/types/hotspot";
 import ReviewsSection from "./ReviewsSection";
 import { useAuth } from "@/context/AuthContext";
@@ -12,6 +11,7 @@ import {
   toggleHotspotLike,
   toggleHotspotSave,
 } from "@/lib/services/hotspotSocial";
+import GalleryCarousel from "./GalleryCarousel";
 
 interface Props {
   hotspot: Hotspot | null;
@@ -83,10 +83,11 @@ export default function HotspotDetail({
   if (!hotspot) return null;
 
   const routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${hotspot.latitude},${hotspot.longitude}`;
-  const primaryImage =
-    galleryImages[0] ??
-    hotspot.images?.[0] ??
-    "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
+
+  // Fallback image if no images available
+  const fallbackImage = hotspot?.images && hotspot.images.length > 0 
+    ? hotspot.images 
+    : ["https://images.unsplash.com/photo-1469474968028-56623f02e42e"];
 
   const shareHotspot = async () => {
     const text = `${hotspot.name} - ${hotspot.category} in ${hotspot.province}`;
@@ -134,15 +135,17 @@ export default function HotspotDetail({
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="relative h-52 w-full">
-        <Image
-          src={primaryImage}
+      {/* Hero Carousel */}
+      <div className="relative w-full">
+        <GalleryCarousel
+          images={galleryImages.length > 0 ? galleryImages : fallbackImage}
           alt={hotspot.name}
-          fill
-          sizes="(max-width: 768px) 100vw, 420px"
-          className="object-cover"
+          aspectRatio="16/9"
+          showCounter={true}
+          showArrows={true}
+          className="rounded-t-xl"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
 
         <div className="absolute top-3 right-3">
           {onClose && (
@@ -271,25 +274,6 @@ export default function HotspotDetail({
             <p className="text-sm leading-relaxed text-slate-700">
               {hotspot.description || "No description yet. Visit and add your own story."}
             </p>
-
-            {galleryImages.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {galleryImages.slice(1, 8).map((image, index) => (
-                  <div
-                    key={`${hotspot.id}_gallery_${index}`}
-                    className="relative h-24 min-w-32 rounded-lg overflow-hidden"
-                  >
-                    <Image
-                      src={image}
-                      alt={`${hotspot.name} gallery image ${index + 1}`}
-                      fill
-                      sizes="128px"
-                      className="object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
 
             <div className="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 space-y-1">
               <p>

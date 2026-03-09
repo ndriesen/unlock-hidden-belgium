@@ -14,6 +14,37 @@ interface HotspotJoinRow {
   longitude: number | string | null;
 }
 
+/**
+ * Safely parse images field from Supabase.
+ * Handles cases where Supabase might return a stringified JSON array
+ * instead of a proper array.
+ */
+function parseImages(images: unknown): string[] | null {
+  if (!images) return null;
+  
+  // If it's already an array of strings
+  if (Array.isArray(images)) {
+    const filtered = images.filter((item): item is string => typeof item === "string");
+    return filtered.length > 0 ? filtered : null;
+  }
+  
+  // If it's a string (stringified JSON array)
+  if (typeof images === "string") {
+    try {
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((item): item is string => typeof item === "string");
+        return filtered.length > 0 ? filtered : null;
+      }
+    } catch {
+      // Not a valid JSON string, return null
+      return null;
+    }
+  }
+  
+  return null;
+}
+
 interface UserHotspotRow {
   hotspot_id: string;
   visited: boolean | null;
@@ -111,8 +142,14 @@ export async function fetchMyHotspots(userId: string): Promise<MyHotspotEntry[]>
       const hotspot = normalizeHotspot(row.hotspots);
       if (!hotspot) return null;
 
-      const latitude = Number(hotspot.latitude);
-      const longitude = Number(hotspot.longitude);
+      // Parse images to ensure they're proper arrays
+      const parsedHotspot = {
+        ...hotspot,
+        images: parseImages(hotspot.images)
+      };
+
+      const latitude = Number(parsedHotspot.latitude);
+      const longitude = Number(parsedHotspot.longitude);
 
       if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
         return null;
@@ -121,17 +158,17 @@ export async function fetchMyHotspots(userId: string): Promise<MyHotspotEntry[]>
       const review = reviewStats.get(row.hotspot_id) ?? { count: 0, avg: 0 };
 
       return {
-        id: hotspot.id,
-        name: hotspot.name,
-        category: hotspot.category ?? "Unknown",
-        province: hotspot.province ?? "Unknown",
-        description: hotspot.description ?? "No description yet.",
-        imageUrl: safeImage(hotspot.images),
-        visitCount: hotspot.visit_count ?? 0,
+        id: parsedHotspot.id,
+        name: parsedHotspot.name,
+        category: parsedHotspot.category ?? "Unknown",
+        province: parsedHotspot.province ?? "Unknown",
+        description: parsedHotspot.description ?? "No description yet.",
+        imageUrl: safeImage(parsedHotspot.images),
+        visitCount: parsedHotspot.visit_count ?? 0,
         reviewCount: review.count,
         averageRating: review.avg,
-        likesCount: hotspot.likes_count ?? 0,
-        savesCount: hotspot.saves_count ?? 0,
+        likesCount: parsedHotspot.likes_count ?? 0,
+        savesCount: parsedHotspot.saves_count ?? 0,
         latitude,
         longitude,
         visited: Boolean(row.visited),

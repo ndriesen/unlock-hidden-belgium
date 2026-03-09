@@ -12,6 +12,37 @@ interface HotspotRow {
   saves_count: number | null;
 }
 
+/**
+ * Safely parse images field from Supabase.
+ * Handles cases where Supabase might return a stringified JSON array
+ * instead of a proper array.
+ */
+function parseImages(images: unknown): string[] | null {
+  if (!images) return null;
+  
+  // If it's already an array of strings
+  if (Array.isArray(images)) {
+    const filtered = images.filter((item): item is string => typeof item === "string");
+    return filtered.length > 0 ? filtered : null;
+  }
+  
+  // If it's a string (stringified JSON array)
+  if (typeof images === "string") {
+    try {
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((item): item is string => typeof item === "string");
+        return filtered.length > 0 ? filtered : null;
+      }
+    } catch {
+      // Not a valid JSON string, return null
+      return null;
+    }
+  }
+  
+  return null;
+}
+
 interface ReviewRow {
   hotspot_id: string;
   rating: number;
@@ -134,7 +165,11 @@ export async function fetchExploreHotspots(userId?: string | null): Promise<Expl
     throw hotspotError ?? new Error("Could not load hotspots");
   }
 
-  const rows = hotspotData as HotspotRow[];
+  // Parse images to ensure they're proper arrays
+  const rows = (hotspotData as HotspotRow[]).map(row => ({
+    ...row,
+    images: parseImages(row.images)
+  }));
   const hotspotIds = rows.map((row) => row.id);
 
   if (!hotspotIds.length) {
