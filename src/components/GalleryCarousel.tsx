@@ -30,7 +30,7 @@ export default function GalleryCarousel({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
-  const aspectRatioClasses = {
+  const aspectRatioClasses: Record<string, string> = {
     "4/3": "aspect-[4/3]",
     "16/9": "aspect-[16/9]",
     "3/2": "aspect-[3/2]",

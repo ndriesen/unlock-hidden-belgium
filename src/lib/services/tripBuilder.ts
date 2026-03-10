@@ -35,6 +35,7 @@ interface TripStopRow {
   lng: number;
   note: string;
   added_at: string;
+  visited_at: string | null;
 }
 
 interface TripMediaRow {
@@ -45,6 +46,7 @@ interface TripMediaRow {
   storage_path: string;
   caption: string;
   visibility: MediaVisibility;
+  is_highlight: boolean;
   created_at: string;
 }
 
@@ -61,6 +63,7 @@ export interface TripMedia {
   signedUrl: string;
   caption: string;
   visibility: MediaVisibility;
+  isHighlight: boolean;
   createdAt: string;
 }
 
@@ -75,6 +78,7 @@ export interface TripStop {
   note: string;
   photoUrl: string;
   addedAt: string;
+  visitedAt: string | null;
   media: TripMedia[];
 }
 
@@ -165,6 +169,7 @@ function mapTripRows(
         note: stop.note ?? "",
         photoUrl: stopMedia[0]?.signedUrl ?? "",
         addedAt: stop.added_at,
+        visitedAt: stop.visited_at ?? null,
         media: stopMedia,
       };
     });
@@ -192,17 +197,53 @@ function mapTripRows(
 async function fetchTripMedia(tripIds: string[]): Promise<TripMedia[]> {
   if (!tripIds.length) return [];
 
+  // First try to fetch with is_highlight column (if migration was run)
   const { data, error } = await supabase
     .from("trip_media")
-    .select("id,trip_id,trip_stop_id,hotspot_id,storage_path,caption,visibility,created_at")
+    .select("id,trip_id,trip_stop_id,hotspot_id,storage_path,caption,visibility,is_highlight,created_at")
     .in("trip_id", tripIds)
     .order("created_at", { ascending: false });
 
   if (error || !data) {
-    return [];
+    // Fallback: try without is_highlight if the column doesn't exist
+    console.log("fetchTripMedia: trying without is_highlight", error);
+    const fallbackResult = await supabase
+      .from("trip_media")
+      .select("id,trip_id,trip_stop_id,hotspot_id,storage_path,caption,visibility,created_at")
+      .in("trip_id", tripIds)
+      .order("created_at", { ascending: false });
+    
+    if (fallbackResult.error || !fallbackResult.data) {
+      return [];
+    }
+    
+    const rows = fallbackResult.data;
+    const signedUrls = await Promise.all(
+      rows.map((row) => createSignedMediaUrl(row.storage_path))
+    );
+
+    return rows
+      .map((row, index) => {
+        const signedUrl = signedUrls[index];
+        if (!signedUrl) return null;
+
+        return {
+          id: row.id,
+          tripId: row.trip_id,
+          tripStopId: row.trip_stop_id,
+          hotspotId: row.hotspot_id,
+          storagePath: row.storage_path,
+          signedUrl,
+          caption: row.caption,
+          visibility: row.visibility,
+          isHighlight: false,
+          createdAt: row.created_at,
+        };
+      })
+      .filter((item): item is TripMedia => item !== null);
   }
 
-  const rows = data as TripMediaRow[];
+  const rows = data;
 
   const signedUrls = await Promise.all(
     rows.map((row) => createSignedMediaUrl(row.storage_path))
@@ -222,6 +263,7 @@ async function fetchTripMedia(tripIds: string[]): Promise<TripMedia[]> {
         signedUrl,
         caption: row.caption,
         visibility: row.visibility,
+        isHighlight: (row as any).is_highlight ?? false,
         createdAt: row.created_at,
       };
     })
@@ -229,27 +271,42 @@ async function fetchTripMedia(tripIds: string[]): Promise<TripMedia[]> {
 }
 
 export async function fetchTrips(userId: string): Promise<Trip[]> {
-  const { data: tripData, error } = await supabase
+  // First, get trips created by this user
+  console.log("fetchTrips called with userId:", userId);
+  
+  const { data: tripData, error: tripsError } = await supabase
     .from("trips")
     .select("id,title,description,start_date,end_date,visibility,cover_image,created_at,updated_at,likes_count,saves_count,views_count")
     .eq("created_by", userId)
     .order("updated_at", { ascending: false });
 
-  if (error || !tripData) {
+  if (tripsError) {
+    console.error("Error fetching trips:", JSON.stringify(tripsError, null, 2));
     return [];
   }
+
+  if (!tripData) {
+    console.log("No trip data returned for userId:", userId);
+    return [];
+  }
+
+  console.log("Trips fetched successfully:", tripData.length, "trips");
 
   const trips = tripData as TripRow[];
   const tripIds = trips.map((trip) => trip.id);
 
   if (!tripIds.length) {
+    console.log("No trip IDs found for userId:", userId);
     return [];
   }
 
+  console.log("Fetching stops for trip IDs:", tripIds);
+
   const [stopResult, media, likesResult, savesResult] = await Promise.all([
+    // Fetch stops with explicit trip_id filter for ownership
     supabase
       .from("trip_stops")
-      .select("id,trip_id,hotspot_id,stop_order,name,province,category,lat,lng,note,added_at")
+      .select("id,trip_id,hotspot_id,stop_order,name,province,category,lat,lng,note,added_at,visited_at")
       .in("trip_id", tripIds)
       .order("stop_order", { ascending: true }),
     fetchTripMedia(tripIds),
@@ -264,6 +321,17 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
       .eq("user_id", userId)
       .in("trip_id", tripIds),
   ]);
+
+  if (stopResult.error) {
+    console.error("Error fetching trip stops:", JSON.stringify(stopResult.error, null, 2));
+    console.log("Stop result data:", stopResult.data);
+  }
+
+  // Log debug info for RLS troubleshooting
+  // Note: Even with RLS errors, data might be null or empty
+  if ((stopResult.error || !stopResult.data) && tripIds.length > 0) {
+    console.warn("No stops found for trips. This might be an RLS issue. Trip IDs:", tripIds);
+  }
 
   const stopRows = (stopResult.data ?? []) as TripStopRow[];
   const likedByMe = new Set(
@@ -396,6 +464,10 @@ export async function addHotspotToTrip(params: {
 
   const order = await nextStopOrder(params.tripId);
 
+  // Use latitude/longitude or fallback to lat/lng
+  const lat = params.hotspot.latitude ?? params.hotspot.lat ?? 0;
+  const lng = params.hotspot.longitude ?? params.hotspot.lng ?? 0;
+
   await supabase.from("trip_stops").insert({
     trip_id: params.tripId,
     hotspot_id: hotspotId,
@@ -403,8 +475,8 @@ export async function addHotspotToTrip(params: {
     name: params.hotspot.name,
     province: params.hotspot.province,
     category: params.hotspot.category,
-    lat: params.hotspot.latitude,
-    lng: params.hotspot.longitude,
+    lat: lat,
+    lng: lng,
     note: "",
   });
 }
@@ -421,6 +493,14 @@ export async function updateStopNote(tripId: string, stopId: string, note: strin
   await supabase
     .from("trip_stops")
     .update({ note: note.trim().slice(0, 500) })
+    .eq("id", stopId)
+    .eq("trip_id", tripId);
+}
+
+export async function updateStopVisitedAt(tripId: string, stopId: string, visitedAt: string | null): Promise<void> {
+  await supabase
+    .from("trip_stops")
+    .update({ visited_at: visitedAt })
     .eq("id", stopId)
     .eq("trip_id", tripId);
 }
@@ -609,5 +689,61 @@ export async function uploadTripStopPhoto(params: {
   });
 
   return { success: true, message: "Photo uploaded." };
+}
+
+export async function setTripCoverImage(params: {
+  tripId: string;
+  userId: string;
+  storagePath: string;
+}): Promise<{ success: boolean; message: string }> {
+  // First, get a signed URL for the cover image
+  const signedUrl = await createSignedMediaUrl(params.storagePath);
+  if (!signedUrl) {
+    return { success: false, message: "Could not create cover image URL." };
+  }
+
+  const { error } = await supabase
+    .from("trips")
+    .update({ cover_image: params.storagePath })
+    .eq("id", params.tripId)
+    .eq("created_by", params.userId);
+
+  if (error) {
+    return { success: false, message: "Could not set cover image." };
+  }
+
+  return { success: true, message: "Cover image updated." };
+}
+
+export async function toggleTripMediaHighlight(params: {
+  mediaId: string;
+  userId: string;
+  isHighlight: boolean;
+}): Promise<{ success: boolean; message: string }> {
+  // First verify the user owns this media
+  const { data: media, error: fetchError } = await supabase
+    .from("trip_media")
+    .select("uploaded_by")
+    .eq("id", params.mediaId)
+    .maybeSingle();
+
+  if (fetchError || !media) {
+    return { success: false, message: "Media not found." };
+  }
+
+  if (media.uploaded_by !== params.userId) {
+    return { success: false, message: "Not authorized to modify this photo." };
+  }
+
+  const { error } = await supabase
+    .from("trip_media")
+    .update({ is_highlight: params.isHighlight })
+    .eq("id", params.mediaId);
+
+  if (error) {
+    return { success: false, message: "Could not update highlight status." };
+  }
+
+  return { success: true, message: params.isHighlight ? "Added to highlights." : "Removed from highlights." };
 }
 

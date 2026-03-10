@@ -12,6 +12,7 @@ import {
   toggleHotspotSave,
 } from "@/lib/services/hotspotSocial";
 import GalleryCarousel from "./GalleryCarousel";
+import TripSelectorModal from "./trips/TripSelectorModal";
 
 interface Props {
   hotspot: Hotspot | null;
@@ -23,6 +24,9 @@ interface Props {
   isVisited?: boolean;
   isWishlist?: boolean;
   isFavorite?: boolean;
+  showTripSelector?: boolean;
+  onShowTripSelector?: (show: boolean) => void;
+  onTripUpdated?: () => void;
 }
 
 type DetailTab = "overview" | "plan" | "reviews";
@@ -37,6 +41,9 @@ export default function HotspotDetail({
   isVisited,
   isWishlist,
   isFavorite,
+  showTripSelector,
+  onShowTripSelector,
+  onTripUpdated,
 }: Props) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
@@ -179,7 +186,7 @@ export default function HotspotDetail({
           </button>
 
           <button
-            onClick={() => onAddToTrip?.(hotspot)}
+            onClick={() => onShowTripSelector?.(true)}
             className="rounded-xl px-3 py-2 text-sm font-semibold border border-slate-200 bg-slate-50 text-slate-800"
           >
             Add to trip
@@ -315,7 +322,7 @@ export default function HotspotDetail({
             </div>
 
             <button
-              onClick={() => onAddToTrip?.(hotspot)}
+              onClick={() => onShowTripSelector?.(true)}
               className="w-full rounded-xl bg-emerald-600 text-white py-2.5 font-semibold"
             >
               Add this stop to a trip
@@ -332,6 +339,13 @@ export default function HotspotDetail({
           </div>
         )}
       </div>
+
+      <TripSelectorModal
+        isOpen={showTripSelector ?? false}
+        onClose={() => onShowTripSelector?.(false)}
+        hotspot={hotspot}
+        onSuccess={onTripUpdated}
+      />
     </div>
   );
 }

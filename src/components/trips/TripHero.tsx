@@ -2,21 +2,53 @@
 
 import Image from "next/image";
 
+interface TripMedia {
+  signedUrl: string;
+  isHighlight?: boolean;
+}
+
+interface TripStop {
+  media: TripMedia[];
+}
+
+interface Trip {
+  title: string;
+  startDate: string;
+  endDate: string;
+  visibility: string;
+  coverImage?: string;
+  stops: TripStop[];
+}
+
 interface TripHeroProps {
-  trip: {
-    title: string;
-    startDate: string;
-    endDate: string;
-    visibility: string;
-    stops: { media: { signedUrl: string }[] }[];
-  };
+  trip: Trip;
   coverImage?: string;
 }
 
 export default function TripHero({ trip, coverImage }: TripHeroProps) {
-  // Get cover image priority: cover_photo → first memory photo → fallback
+  // Get cover image priority:
+  // 1. Explicit coverImage prop
+  // 2. Trip's coverImage (user selected)
+  // 3. First highlight photo
+  // 4. First memory photo
+  // 5. Fallback
   const getHeroImage = () => {
-    if (coverImage) return coverImage;
+    // Check prop coverImage - only use if it's a valid URL
+    if (coverImage && coverImage.startsWith('http')) {
+      return coverImage;
+    }
+    // Check trip coverImage - only use if it's a valid URL
+    if (trip.coverImage && trip.coverImage.startsWith('http')) {
+      return trip.coverImage;
+    }
+
+    // Check for highlight photos first
+    const allPhotos = trip.stops.flatMap(stop => stop.media);
+    const highlightPhotos = allPhotos.filter(m => m.isHighlight);
+    if (highlightPhotos.length > 0) {
+      return highlightPhotos[0].signedUrl;
+    }
+
     // Check first stop's media
     for (const stop of trip.stops) {
       if (stop.media.length > 0) {
@@ -38,9 +70,9 @@ export default function TripHero({ trip, coverImage }: TripHeroProps) {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  const dateRange = trip.startDate && trip.endDate 
+  const dateRange = trip.startDate && trip.endDate
     ? `${formatDate(trip.startDate)} – ${formatDate(trip.endDate)}`
-    : trip.startDate 
+    : trip.startDate
       ? formatDate(trip.startDate)
       : "No dates set";
 
@@ -54,10 +86,10 @@ export default function TripHero({ trip, coverImage }: TripHeroProps) {
         className="object-cover"
         sizes="100vw"
       />
-      
+
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20" />
-      
+
       {/* Content overlay */}
       <div className="absolute bottom-0 left-0 right-0 p-6">
         <div className="flex items-end justify-between">
@@ -80,7 +112,7 @@ export default function TripHero({ trip, coverImage }: TripHeroProps) {
             <span>{trip.stops.length} stops • {totalMemories} memories</span>
           </div>
           <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-emerald-400 rounded-full transition-all duration-500"
               style={{ width: `${Math.min(100, progress)}%` }}
             />

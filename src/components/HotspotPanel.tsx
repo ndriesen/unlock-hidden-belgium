@@ -19,6 +19,9 @@ interface HotspotPanelProps {
   onPrevious: () => void;
   onNext: () => void;
   positionLabel: string;
+  showTripSelector?: boolean;
+  onShowTripSelector?: (show: boolean) => void;
+  onTripUpdated?: () => void;
 }
 
 export default function HotspotPanel({
@@ -36,6 +39,9 @@ export default function HotspotPanel({
   onPrevious,
   onNext,
   positionLabel,
+  showTripSelector,
+  onShowTripSelector,
+  onTripUpdated,
 }: HotspotPanelProps) {
   return (
     <AnimatePresence>
@@ -82,7 +88,7 @@ export default function HotspotPanel({
             </div>
 
             <div className="flex-1 overflow-hidden">
-              <HotspotDetail
+            <HotspotDetail
                 hotspot={hotspot}
                 onVisit={onVisit}
                 onAddToTrip={onAddToTrip}
@@ -92,6 +98,9 @@ export default function HotspotPanel({
                 onWishlist={onWishlist}
                 onFavorite={onFavorite}
                 onClose={onClose}
+                showTripSelector={showTripSelector}
+                onShowTripSelector={onShowTripSelector}
+                onTripUpdated={onTripUpdated}
               />
             </div>
           </motion.aside>

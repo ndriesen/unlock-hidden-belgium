@@ -19,6 +19,9 @@ interface HotspotSheetProps {
   onPrevious: () => void;
   onNext: () => void;
   positionLabel: string;
+  showTripSelector?: boolean;
+  onShowTripSelector?: (show: boolean) => void;
+  onTripUpdated?: () => void;
 }
 
 export default function HotspotSheet({
@@ -36,6 +39,9 @@ export default function HotspotSheet({
   onPrevious,
   onNext,
   positionLabel,
+  showTripSelector,
+  onShowTripSelector,
+  onTripUpdated,
 }: HotspotSheetProps) {
   if (!hotspot) return null;
 
@@ -85,6 +91,9 @@ export default function HotspotSheet({
           isVisited={isVisited}
           isWishlist={isWishlist}
           isFavorite={isFavorite}
+          showTripSelector={showTripSelector}
+          onShowTripSelector={onShowTripSelector}
+          onTripUpdated={onTripUpdated}
         />
       </motion.div>
     </AnimatePresence>

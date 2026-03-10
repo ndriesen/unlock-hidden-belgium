@@ -30,7 +30,10 @@ function parseImages(images: unknown): string[] | undefined {
 }
 
 export async function fetchHotspots() {
-  const { data, error } = await supabase.from("hotspots").select("*");
+  const { data, error } = await supabase
+    .from("hotspots")
+    .select("*")
+    .eq("status", "approved");
   if (error) throw error;
   
   // Process images to ensure they're proper arrays

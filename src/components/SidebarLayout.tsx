@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Bell, Compass, Home, Menu, Route, User, X } from "lucide-react";
+import { Bell, Compass, Home, Menu, Route, Settings, Shield, User, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +24,7 @@ export default function SidebarLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const { searchQuery, setSearchQuery } = useSearch();
   const { user } = useAuth();
@@ -53,6 +54,36 @@ export default function SidebarLayout({
       active = false;
     };
   }, [user?.id, pathname]);
+
+  // Check if user is admin
+  useEffect(() => {
+    let active = true;
+
+    const checkAdmin = async () => {
+      if (!user?.id) {
+        if (active) setIsAdmin(false);
+        return;
+      }
+
+      const { data: userData } = await supabase
+        .from("users")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single();
+
+      if (active) {
+        setIsAdmin(userData?.is_admin === true);
+      }
+    };
+
+    if (user) {
+      void checkAdmin();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   if (isAuthPage) {
     return <div className="h-full">{children}</div>;
@@ -232,6 +263,24 @@ export default function SidebarLayout({
                       Profile
                     </button>
 
+                    {isAdmin && (
+                      <>
+                        <div className="border-t border-slate-100" />
+                        <button
+                          onClick={() => {
+                            setAccountMenuOpen(false);
+                            router.push("/admin/pending-hotspots");
+                          }}
+                          className="block w-full text-left px-4 py-3 hover:bg-slate-50 text-amber-600"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Shield className="w-4 h-4" />
+                            Admin Dashboard
+                          </span>
+                        </button>
+                      </>
+                    )}
+
                     <button
                       onClick={async () => {
                         await supabase.auth.signOut();
@@ -298,7 +347,7 @@ export default function SidebarLayout({
                   <Icon className="w-4 h-4" />
                   <span className="text-[11px] font-medium">{tab.label}</span>
                   {tab.badge && tab.badge > 0 && (
-                    <span className="absolute right-2 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-semibold text-white">
+                    <span className="absolute right-2 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[0.25rem] font-semibold text-white">
                       {tab.badge > 9 ? "9+" : tab.badge}
                     </span>
                   )}

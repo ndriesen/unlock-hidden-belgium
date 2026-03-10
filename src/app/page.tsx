@@ -93,6 +93,8 @@ export default function Home() {
   const [questCandidates, setQuestCandidates] = useState<Hotspot[]>([]);
   const [nearbyQuests, setNearbyQuests] = useState<NearbyQuest[]>([]);
   const [questLoading, setQuestLoading] = useState(false);
+  const [showTripSelector, setShowTripSelector] = useState(false);
+  const [tripsVersion, setTripsVersion] = useState(0);
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -580,6 +582,9 @@ export default function Home() {
         onPrevious={handleSelectPrevious}
         onNext={handleSelectNext}
         positionLabel={selectedIndex >= 0 ? `Hotspot ${selectedIndex + 1} / ${questCandidates.length}` : "Hotspot"}
+        showTripSelector={showTripSelector}
+        onShowTripSelector={setShowTripSelector}
+        onTripUpdated={() => setTripsVersion((v) => v + 1)}
       />
 
       <HotspotSheet
@@ -597,6 +602,9 @@ export default function Home() {
         onPrevious={handleSelectPrevious}
         onNext={handleSelectNext}
         positionLabel={selectedIndex >= 0 ? `Hotspot ${selectedIndex + 1} / ${questCandidates.length}` : "Hotspot"}
+        showTripSelector={showTripSelector}
+        onShowTripSelector={setShowTripSelector}
+        onTripUpdated={() => setTripsVersion((v) => v + 1)}
       />
 
       {toast && <Toast message={toast} />}

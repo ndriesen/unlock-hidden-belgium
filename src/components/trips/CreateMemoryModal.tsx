@@ -2,19 +2,34 @@
 
 import { useState, useRef } from "react";
 import { MediaVisibility } from "@/lib/services/media";
+import { uploadTripStopPhoto } from "@/lib/services/tripBuilder";
 
 interface CreateMemoryModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   stopId: string;
   stopName: string;
+  tripId: string;
+  userId: string;
+  hotspotId: string;
 }
 
-export default function CreateMemoryModal({ isOpen, onClose, stopId, stopName }: CreateMemoryModalProps) {
+export default function CreateMemoryModal({ 
+  isOpen, 
+  onClose, 
+  onSuccess,
+  stopId, 
+  stopName, 
+  tripId, 
+  userId,
+  hotspotId 
+}: CreateMemoryModalProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [caption, setCaption] = useState("");
   const [visibility, setVisibility] = useState<MediaVisibility>("friends");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -26,16 +41,46 @@ export default function CreateMemoryModal({ isOpen, onClose, stopId, stopName }:
   };
 
   const handleSubmit = async () => {
+    if (files.length === 0) return;
+    
     setIsSubmitting(true);
-    // TODO: Implement actual submission to trip_memories / memory_media tables
-    // For now, just simulate a delay and close
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setError("");
+
+    try {
+      // Upload all photos
+      for (const file of files) {
+        const result = await uploadTripStopPhoto({
+          userId,
+          tripId,
+          stopId,
+          hotspotId,
+          file,
+          caption,
+          visibility,
+        });
+
+        if (!result.success) {
+          setError(result.message);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Reset form and close
       setFiles([]);
       setCaption("");
       setVisibility("friends");
       onClose();
-    }, 1000);
+      
+      // Call success callback to refresh data
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (err) {
+      setError("Failed to upload photos. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const removeFile = (index: number) => {
@@ -65,9 +110,18 @@ export default function CreateMemoryModal({ isOpen, onClose, stopId, stopName }:
 
           {/* Content */}
           <div className="p-4 space-y-4 overflow-y-auto max-h-[60vh]">
+            {/* Error message */}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                {error}
+              </div>
+            )}
+
             {/* Photo Upload */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Photos</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Photos {files.length > 0 && `(${files.length})`}
+              </label>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -160,7 +214,7 @@ export default function CreateMemoryModal({ isOpen, onClose, stopId, stopName }:
               disabled={files.length === 0 || isSubmitting}
               className="flex-1 py-2.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Posting..." : "Post Memory"}
+              {isSubmitting ? "Uploading..." : `Post ${files.length > 0 ? `(${files.length})` : "Memory"}`}
             </button>
           </div>
         </div>

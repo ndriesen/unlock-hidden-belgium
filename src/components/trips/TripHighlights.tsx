@@ -5,6 +5,7 @@ import Image from "next/image";
 interface Photo {
   id: string;
   signedUrl: string;
+  isHighlight?: boolean;
 }
 
 interface TripHighlightsProps {
@@ -12,10 +13,13 @@ interface TripHighlightsProps {
 }
 
 export default function TripHighlights({ photos }: TripHighlightsProps) {
-  if (photos.length === 0) return null;
+  // Filter to only show highlight photos
+  const highlightPhotos = photos.filter(photo => photo.isHighlight);
+  
+  if (highlightPhotos.length === 0) return null;
 
-  // Get top 3 photos
-  const highlights = photos.slice(0, 3);
+  // Get top 3 highlight photos
+  const highlights = highlightPhotos.slice(0, 3);
 
   return (
     <div className="rounded-xl border border-slate-200 p-4 space-y-3">

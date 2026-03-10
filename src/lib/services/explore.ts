@@ -159,7 +159,8 @@ function buildReviewStats(rows: ReviewRow[]): Map<string, { count: number; avg: 
 export async function fetchExploreHotspots(userId?: string | null): Promise<ExploreHotspot[]> {
   const { data: hotspotData, error: hotspotError } = await supabase
     .from("hotspots")
-    .select("id,name,category,province,description,images,visit_count,likes_count,saves_count");
+    .select("id,name,category,province,description,images,visit_count,likes_count,saves_count")
+    .eq("status", "approved");
 
   if (hotspotError || !hotspotData) {
     throw hotspotError ?? new Error("Could not load hotspots");

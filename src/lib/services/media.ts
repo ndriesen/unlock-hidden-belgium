@@ -70,6 +70,9 @@ export async function uploadImageToMediaBucket(params: {
       cacheControl: "3600",
       upsert: false,
       contentType: params.file.type,
+      metadata: {
+        owner: params.userId,
+      },
     });
 
   if (error) {

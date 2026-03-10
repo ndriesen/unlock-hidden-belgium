@@ -12,6 +12,8 @@
   visit_count?: number;
   likes_count?: number;
   saves_count?: number;
+  status?: "private" | "pending" | "approved";
+  created_by?: string;
 
   // optional aliases (for Leaflet compatibility)
   lat?: number;

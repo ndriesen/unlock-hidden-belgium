@@ -5,8 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+
 import { fetchMyHotspots, MyHotspotEntry } from "@/lib/services/myHotspots";
 import { Hotspot } from "@/types/hotspot";
+import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
 
 type StatusFilter = "all" | "visited" | "wishlist" | "favorite";
 
@@ -52,7 +54,9 @@ export default function MyHotspotsPage() {
   const [provinceFilter, setProvinceFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [showMap, setShowMap] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
+
   useEffect(() => {
     const timer = setTimeout(() => {
       const filter = parseStatusFilter(
@@ -65,6 +69,7 @@ export default function MyHotspotsPage() {
       clearTimeout(timer);
     };
   }, []);
+
   useEffect(() => {
     let active = true;
 
@@ -211,6 +216,13 @@ export default function MyHotspotsPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-2 font-semibold text-emerald-700 hover:bg-emerald-100"
+        >
+          + Add Hotspot
+        </button>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <input
             value={searchQuery}
@@ -366,9 +378,17 @@ export default function MyHotspotsPage() {
           ))}
         </section>
       )}
+
+      <AddHotspotModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdded={() => {
+          // Close modal and refresh data
+          setIsAddModalOpen(false);
+          // The useEffect will reload the hotspots
+        }}
+      />
     </div>
   );
 }
-
-
 
