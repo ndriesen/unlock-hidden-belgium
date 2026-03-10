@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Hotspot } from "@/types/hotspot";
 import { addHotspot } from "@/lib/services/addHotspot";
 import { useAuth } from "@/context/AuthContext";
+import OptimizedImage from "@/components/ui/OptimizedImage";
 
 interface AddHotspotModalProps {
   isOpen: boolean;
@@ -208,13 +209,12 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
             />
             {imageUrl && (
               <div className="mt-2 relative w-full h-32 rounded-lg overflow-hidden bg-slate-100">
-                <img
+                <OptimizedImage
                   src={imageUrl}
                   alt="Preview"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
+                  fill
+                  className="object-cover"
+                  fallbackUrl="/branding/spotly-logo.svg"
                 />
               </div>
             )}

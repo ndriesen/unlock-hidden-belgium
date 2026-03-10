@@ -1,19 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { useRouter } from "next/navigation";
+import { validatePasswordStrength, validateEmail, mapAuthError, mapSignupError } from "@/lib/security/passwordValidation";
+import { isRateLimited, getRemainingRequests } from "@/lib/security/rateLimit";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lastAttempt, setLastAttempt] = useState(0);
   const router = useRouter();
+
+  // Get client IP for rate limiting (simplified - in production use proper IP detection)
+  const getClientKey = () => {
+    return `auth-${email.toLowerCase()}`;
+  };
 
   const handleSignup = async () => {
     setLoading(true);
     setErrorMessage("");
+
+    // Rate limiting check
+    const clientKey = getClientKey();
+    if (isRateLimited(clientKey, 'auth')) {
+      const remaining = getRemainingRequests(clientKey, 'auth');
+      setErrorMessage(`Too many attempts. Please try again later.`);
+      setLoading(false);
+      return;
+    }
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      setErrorMessage(emailValidation.error || "Invalid email");
+      setLoading(false);
+      return;
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+      setErrorMessage(passwordValidation.error || "Password too weak");
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -22,7 +55,7 @@ export default function AuthPage() {
       });
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(mapSignupError(error.message));
         return;
       }
 
@@ -37,7 +70,7 @@ export default function AuthPage() {
         );
 
         if (insertError) {
-          setErrorMessage(insertError.message);
+          setErrorMessage(mapSignupError(insertError.message));
           return;
         }
 
@@ -45,12 +78,36 @@ export default function AuthPage() {
       }
     } finally {
       setLoading(false);
+      setLastAttempt(Date.now());
     }
   };
 
   const handleLogin = async () => {
     setLoading(true);
     setErrorMessage("");
+
+    // Rate limiting check
+    const clientKey = getClientKey();
+    if (isRateLimited(clientKey, 'auth')) {
+      setErrorMessage("Too many attempts. Please try again later.");
+      setLoading(false);
+      return;
+    }
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      setErrorMessage(emailValidation.error || "Invalid email");
+      setLoading(false);
+      return;
+    }
+
+    // Validate password is not empty
+    if (!password) {
+      setErrorMessage("Password is required");
+      setLoading(false);
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -59,13 +116,14 @@ export default function AuthPage() {
       });
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(mapAuthError(error.message));
         return;
       }
 
       router.push("/");
     } finally {
       setLoading(false);
+      setLastAttempt(Date.now());
     }
   };
 
@@ -87,6 +145,7 @@ export default function AuthPage() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           autoComplete="email"
+          disabled={loading}
         />
 
         <input
@@ -96,6 +155,7 @@ export default function AuthPage() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           autoComplete="current-password"
+          disabled={loading}
         />
 
         <button
@@ -117,3 +177,4 @@ export default function AuthPage() {
     </main>
   );
 }
+

@@ -310,7 +310,7 @@ export default function ExplorePage() {
           )}
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredHotspots.map((hotspot) => (
+            {filteredHotspots.map((hotspot, index) => (
               <article
                 key={hotspot.id}
                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
@@ -322,6 +322,7 @@ export default function ExplorePage() {
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover"
+                    priority={index < 6}
                   />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                     <p className="font-semibold text-white">{hotspot.name}</p>

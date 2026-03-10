@@ -16,6 +16,7 @@ export default function TripsOverview({ onCreateTrip, refreshKey }: TripsOvervie
   const { user, loading: authLoading } = useAuth();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tripCoverUrls, setTripCoverUrls] = useState<Record<string, string>>({});
 
   const loadTrips = useCallback(async () => {
     if (!user?.id) {
@@ -27,6 +28,18 @@ export default function TripsOverview({ onCreateTrip, refreshKey }: TripsOvervie
     setLoading(true);
     const loaded = await fetchTrips(user.id);
     setTrips(loaded);
+    
+    // Fetch signed URLs for any cover images that are storage paths
+    const coverUrls: Record<string, string> = {};
+    for (const trip of loaded) {
+      if (trip.coverImage && !trip.coverImage.startsWith('http')) {
+        const signedUrl = await createSignedMediaUrl(trip.coverImage);
+        if (signedUrl) {
+          coverUrls[trip.id] = signedUrl;
+        }
+      }
+    }
+    setTripCoverUrls(coverUrls);
     setLoading(false);
   }, [user?.id]);
 
@@ -35,28 +48,44 @@ export default function TripsOverview({ onCreateTrip, refreshKey }: TripsOvervie
   }, [loadTrips, refreshKey]);
 
   const getTripCover = (trip: Trip): string => {
-    // coverImage could be a storage path or a signed URL
+    // Default fallback image
+    const defaultImage = "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
+
+    // 1. Check for explicit cover image set by user (优先使用用户设置的封面)
     if (trip.coverImage) {
       // If it's already a full URL, use it directly
       if (trip.coverImage.startsWith('http')) {
         return trip.coverImage;
       }
-      // If it's a storage path, we need to get signed URL - for now return fallback
-      // In a real app, you'd fetch the signed URL here
-      return "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
+      // If we have a cached signed URL, use it
+      if (tripCoverUrls[trip.id]) {
+        return tripCoverUrls[trip.id];
+      }
+      // Storage path but no signed URL yet - fall through to other options
     }
 
+    // 2. Check for highlight photos (在用户设置的封面之后，检查高亮照片)
+    for (const stop of trip.stops) {
+      const highlightMedia = stop.media.find(m => m.isHighlight);
+      if (highlightMedia) {
+        return highlightMedia.signedUrl;
+      }
+    }
+
+    // 3. Fall back to first media from first stop
     for (const stop of trip.stops) {
       if (stop.media.length > 0) {
         return stop.media[0].signedUrl;
       }
     }
 
+    // 4. Fall back to first stop's photoUrl
     if (trip.stops[0]?.photoUrl) {
       return trip.stops[0].photoUrl;
     }
 
-    return "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
+    // 5. Return default image
+    return defaultImage;
   };
 
   const getTripSummary = (trip: Trip): string => {
@@ -271,16 +300,16 @@ export default function TripsOverview({ onCreateTrip, refreshKey }: TripsOvervie
         <section>
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Upcoming Trips</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {sortedUpcomingTrips.map((trip) => (
+            {sortedUpcomingTrips.map((trip, index) => (
               <Link key={trip.id} href={`/trips/${trip.id}`} className="group block">
                 <div className="relative aspect-[4/3] rounded-xl overflow-hidden shadow-md mb-2">
                   <Image
                     src={getTripCover(trip)}
                     alt={trip.title}
                     fill
-                    loading="lazy"
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                     sizes="(max-width: 768px) 50vw, 25vw"
+                    priority={index < 4}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
@@ -299,16 +328,16 @@ export default function TripsOverview({ onCreateTrip, refreshKey }: TripsOvervie
         <section>
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Past Trips</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {sortedPastTrips.map((trip) => (
+            {sortedPastTrips.map((trip, index) => (
               <Link key={trip.id} href={`/trips/${trip.id}`} className="group block">
                 <div className="relative aspect-[4/3] rounded-xl overflow-hidden shadow-md mb-2">
                   <Image
                     src={getTripCover(trip)}
                     alt={trip.title}
                     fill
-                    loading="lazy"
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                     sizes="(max-width: 768px) 50vw, 25vw"
+                    priority={index < 4}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>

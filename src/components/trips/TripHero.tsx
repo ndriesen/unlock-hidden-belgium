@@ -1,6 +1,8 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
+import { createSignedMediaUrl } from "@/lib/services/media";
 
 interface TripMedia {
   signedUrl: string;
@@ -25,40 +27,59 @@ interface TripHeroProps {
   coverImage?: string;
 }
 
-export default function TripHero({ trip, coverImage }: TripHeroProps) {
+export default function TripHero({ trip, coverImage: propCoverImage }: TripHeroProps) {
   // Get cover image priority:
   // 1. Explicit coverImage prop
-  // 2. Trip's coverImage (user selected)
+  // 2. Trip's coverImage (user selected) - stored as storage path, need to get signed URL
   // 3. First highlight photo
   // 4. First memory photo
   // 5. Fallback
-  const getHeroImage = () => {
-    // Check prop coverImage - only use if it's a valid URL
-    if (coverImage && coverImage.startsWith('http')) {
-      return coverImage;
-    }
-    // Check trip coverImage - only use if it's a valid URL
-    if (trip.coverImage && trip.coverImage.startsWith('http')) {
-      return trip.coverImage;
-    }
+  const [heroImage, setHeroImage] = React.useState<string>("https://images.unsplash.com/photo-1469474968028-56623f02e42e");
 
-    // Check for highlight photos first
-    const allPhotos = trip.stops.flatMap(stop => stop.media);
-    const highlightPhotos = allPhotos.filter(m => m.isHighlight);
-    if (highlightPhotos.length > 0) {
-      return highlightPhotos[0].signedUrl;
-    }
-
-    // Check first stop's media
-    for (const stop of trip.stops) {
-      if (stop.media.length > 0) {
-        return stop.media[0].signedUrl;
+  React.useEffect(() => {
+    const getHeroImage = async () => {
+      // Check prop coverImage - only use if it's a valid URL
+      if (propCoverImage && propCoverImage.startsWith('http')) {
+        setHeroImage(propCoverImage);
+        return;
       }
-    }
-    return "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
-  };
+      
+      // Check trip coverImage - could be a storage path or URL
+      if (trip.coverImage) {
+        if (trip.coverImage.startsWith('http')) {
+          setHeroImage(trip.coverImage);
+          return;
+        }
+        // It's a storage path - get signed URL
+        const signedUrl = await createSignedMediaUrl(trip.coverImage);
+        if (signedUrl) {
+          setHeroImage(signedUrl);
+          return;
+        }
+      }
 
-  const heroImage = getHeroImage();
+      // Check for highlight photos first
+      const allPhotos = trip.stops.flatMap(stop => stop.media);
+      const highlightPhotos = allPhotos.filter(m => m.isHighlight);
+      if (highlightPhotos.length > 0) {
+        setHeroImage(highlightPhotos[0].signedUrl);
+        return;
+      }
+
+      // Check first stop's media
+      for (const stop of trip.stops) {
+        if (stop.media.length > 0) {
+          setHeroImage(stop.media[0].signedUrl);
+          return;
+        }
+      }
+      
+      // Default fallback
+      setHeroImage("https://images.unsplash.com/photo-1469474968028-56623f02e42e");
+    };
+
+    getHeroImage();
+  }, [trip.coverImage, trip.stops, propCoverImage]);
 
   // Calculate progress
   const totalMemories = trip.stops.reduce((acc, stop) => acc + stop.media.length, 0);

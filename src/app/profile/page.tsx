@@ -174,7 +174,9 @@ export default function ProfilePage() {
       return;
     }
 
-    const filePath = `${userId}-${Date.now()}`;
+    // Use UUID for secure random path
+    const uniqueId = crypto.randomUUID();
+    const filePath = `${userId}/${uniqueId}`;
 
     const { error: uploadError } = await supabase.storage
       .from("avatars")
