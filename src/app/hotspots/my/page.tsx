@@ -314,7 +314,7 @@ export default function MyHotspotsPage() {
 
       {!loading && !errorMessage && filteredEntries.length > 0 && (
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredEntries.map((entry) => (
+          {filteredEntries.map((entry, index) => (
             <article key={entry.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="relative h-40 w-full">
                 <Image
@@ -323,6 +323,7 @@ export default function MyHotspotsPage() {
                   fill
                   sizes="(max-width: 768px) 100vw, 33vw"
                   className="object-cover"
+                  priority={index < 6}
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                   <p className="font-semibold text-white">{entry.name}</p>

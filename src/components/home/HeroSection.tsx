@@ -229,7 +229,7 @@ export default function HeroSection({ hotspots }: HeroSectionProps) {
                       <div className="w-1 h-1 bg-white rounded-full" />
                     </div>
                     <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap 
-                      text-[0.25rem] text-slate-300 opacity-0 hover:opacity-100 transition-opacity">
+                      text-[2px] text-slate-300 opacity-0 hover:opacity-100 transition-opacity">
                       {gem.name}
                     </div>
                   </div>

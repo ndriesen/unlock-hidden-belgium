@@ -26,6 +26,13 @@ import { addHotspotToQuickTrip } from "@/lib/services/tripBuilder";
 import { fetchHotspots } from "@/lib/services/hotspots";
 import { NearbyQuest, buildNearbyQuests } from "@/lib/services/quests";
 
+// Pre-login components
+import PreLoginHero from "@/components/home/PreLoginHero";
+import HowItWorks from "@/components/home/HowItWorks";
+import PreLoginFooter from "@/components/home/PreLoginFooter";
+import FeaturedHotspots from "@/components/home/FeaturedHotspots";
+import QuickActions from "@/components/home/QuickActions";
+
 const MapContainer = dynamic(
   () =>
     import("@/components/Map/MapContainer").then(
@@ -398,71 +405,43 @@ export default function Home() {
     setSelected(questCandidates[selectedIndex + 1]);
   }, [canNavigateNext, questCandidates, selectedIndex]);
 
-  useEffect(() => {
-    if (!selected) {
-      return;
-    }
+  // Surprise Me handler
+  const handleSurpriseMe = useCallback(() => {
+    if (questCandidates.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * questCandidates.length);
+    const random = questCandidates[randomIndex];
+    setSelected(random);
+    showToast(`Surprise! Discover: ${random.name}`);
+  }, [questCandidates, showToast]);
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setSelected(null);
-        return;
-      }
+  // Render pre-login homepage
+  const renderPreLoginHomepage = () => (
+    <div className="flex flex-col min-h-screen">
+      <PreLoginHero hotspotCount={questCandidates.length} explorerCount={12000} />
+      <HowItWorks />
+      <FeaturedHotspots 
+        hotspots={questCandidates.slice(0, 10)} 
+        wishlistIds={[]}
+      />
+      <PreLoginFooter />
+    </div>
+  );
 
-      if (event.key === "ArrowLeft") {
-        handleSelectPrevious();
-      }
-
-      if (event.key === "ArrowRight") {
-        handleSelectNext();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [handleSelectNext, handleSelectPrevious, selected]);
-
-  if (loading) return null;
-
-  if (user && !userDataLoaded) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-emerald-600 text-xl font-semibold">
-          Loading your hotspots...
-        </div>
-      </div>
-    );
-  }
-
-  return (
+  // Render logged-in homepage
+  const renderLoggedInHomepage = () => (
     <div className="flex flex-col h-full space-y-4 md:space-y-6">
       {/* Hero Section with 3D Globe */}
       <HeroSection hotspots={questCandidates} />
 
-      {/* Quick Actions - Below Hero */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap gap-3 items-center mt-4 md:mt-6">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">
-            Spotly
-          </p>
-          <h1 className="text-xl md:text-2xl font-bold text-slate-900">Your adventures await</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Find hidden gems, must-sees, activities and food spots.
-          </p>
-        </div>
+      {/* Quick Actions Panel */}
+      <QuickActions
+        onSurpriseMe={handleSurpriseMe}
+        visitedCount={visitedIds.length}
+        wishlistCount={wishlistIds.length}
+        streak={visitStreak}
+      />
 
-        <div className="flex flex-wrap gap-2 ml-auto">
-          <Link href="/trips" className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium">
-            Open Trips
-          </Link>
-          <Link href="/buddies" className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium">
-            Find Buddies
-          </Link>
-        </div>
-      </section>
+      {/* Pricing Card */}
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Spotly Plus</p>
@@ -516,13 +495,7 @@ export default function Home() {
         <div className="flex-1" />
 
         <button
-          onClick={() => {
-            if (questCandidates.length === 0) return;
-            const randomIndex = Math.floor(Math.random() * questCandidates.length);
-            const random = questCandidates[randomIndex];
-            setSelected(random);
-            showToast(`Surprise! Discover: ${random.name}`);
-          }}
+          onClick={handleSurpriseMe}
           className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm font-medium hover:from-amber-600 hover:to-orange-600 transition-all shadow-md"
         >
           🎲 Surprise Me
@@ -551,7 +524,7 @@ export default function Home() {
         </select>
       </div>
 
-      <div className="h-[70vh] min-h-[32rem] md:h-[75vh] rounded-3xl overflow-hidden shadow-2xl border border-white/40">
+      <div className="h-[50vh] min-h-[24rem] md:h-[75vh] rounded-3xl overflow-hidden shadow-2xl border border-white/40">
         <MapContainer
           viewMode={viewMode}
           mapStyle={mapStyle}
@@ -615,6 +588,52 @@ export default function Home() {
       />
     </div>
   );
+
+  useEffect(() => {
+    if (!selected) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelected(null);
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        handleSelectPrevious();
+      }
+
+      if (event.key === "ArrowRight") {
+        handleSelectNext();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [handleSelectNext, handleSelectPrevious, selected]);
+
+  if (loading) return null;
+
+  if (user && !userDataLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-emerald-600 text-xl font-semibold">
+          Loading your hotspots...
+        </div>
+      </div>
+    );
+  }
+
+  // Conditional rendering based on auth status
+  if (!user) {
+    return renderPreLoginHomepage();
+  }
+
+  return renderLoggedInHomepage();
 }
 
 

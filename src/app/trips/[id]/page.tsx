@@ -379,7 +379,7 @@ export default function TripDetailPage() {
                     <div className="max-h-48 overflow-y-auto space-y-2">
                       {searchResults.map(hotspot => (
                         <button key={hotspot.id} onClick={() => handleAddStop(hotspot)} className="w-full p-2 rounded-lg border border-slate-100 hover:border-[#2A7FFF] flex items-center gap-2 text-left">
-                          {hotspot.images?.[0] && <div className="relative w-10 h-10 rounded overflow-hidden"><Image src={hotspot.images[0]} alt={hotspot.name} fill className="object-cover" /></div>}
+{hotspot.images?.[0] && <div className="relative w-10 h-10 rounded overflow-hidden"><Image src={hotspot.images[0]} alt={hotspot.name} fill className="object-cover" sizes="40px" /></div>}
                           <div><p className="font-medium text-sm">{hotspot.name}</p><p className="text-xs text-slate-500">{hotspot.category}</p></div>
                         </button>
                       ))}
@@ -398,8 +398,8 @@ export default function TripDetailPage() {
                   const img = stop.media[0]?.signedUrl || stop.photoUrl || "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
                   return (
                     <div key={stop.id} className="bg-white rounded-2xl p-3 shadow-sm flex gap-3">
-                      <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
-                        <Image src={img} alt={stop.name} fill className="object-cover" />
+<div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                        <Image src={img} alt={stop.name} fill className="object-cover" sizes="80px" />
                         <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-[#2A7FFF] text-white text-xs flex items-center justify-center">{index + 1}</div>
                       </div>
                       <div className="flex-1 min-w-0">

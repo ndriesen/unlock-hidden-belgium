@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import Image, { ImageProps } from "next/image";
 import { getCachedImageRequest } from "@/lib/cache/imageRequestCache";
 import { limitImageRequests } from "@/lib/network/concurrencyLimiter";
@@ -37,6 +37,11 @@ export interface OptimizedImageProps extends Omit<ImageProps, "onError" | "onLoa
    * Custom skeleton className
    */
   skeletonClassName?: string;
+
+  /**
+   * Callback when image loads successfully
+   */
+  onLoadCallback?: () => void;
 }
 
 /**
@@ -81,6 +86,7 @@ export default function OptimizedImage({
   priority = false,
   placeholder,
   loading,
+  onLoadCallback,
   ...rest
 }: OptimizedImageProps) {
   const [currentSrc, setCurrentSrc] = useState<string>(src as string);
@@ -187,13 +193,19 @@ export default function OptimizedImage({
   const handleLoad = useCallback(() => {
     setIsLoading(false);
     setHasError(false);
-  }, []);
+    if (onLoadCallback) {
+      onLoadCallback();
+    }
+  }, [onLoadCallback]);
 
   // Determine the final source to display
   const displaySrc = hasError || !currentSrc ? fallbackUrl : currentSrc;
 
+  // Check if fill mode is explicitly enabled via props
+  const useFill = 'fill' in rest && rest.fill === true;
+
   return (
-    <div className={`relative overflow-hidden ${className}`}>
+    <div className={`relative overflow-hidden ${useFill ? 'h-full w-full' : className}`}>
       {/* Skeleton loader - shown while loading */}
       {showSkeleton && isLoading && (
         <div
@@ -211,7 +223,8 @@ export default function OptimizedImage({
         priority={priority}
         loading={effectiveLoading}
         placeholder={effectivePlaceholder}
-        {...rest}
+        fill={useFill}
+        className={useFill ? `object-cover ${className}` : className}
       />
     </div>
   );
@@ -255,4 +268,3 @@ export async function preloadImages(
     concurrency
   );
 }
-

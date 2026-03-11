@@ -347,7 +347,7 @@ export default function SidebarLayout({
                   <Icon className="w-4 h-4" />
                   <span className="text-[11px] font-medium">{tab.label}</span>
                   {tab.badge && tab.badge > 0 && (
-                    <span className="absolute right-2 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[0.25rem] font-semibold text-white">
+                    <span className="absolute right-2 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[2px] font-semibold text-white">
                       {tab.badge > 9 ? "9+" : tab.badge}
                     </span>
                   )}

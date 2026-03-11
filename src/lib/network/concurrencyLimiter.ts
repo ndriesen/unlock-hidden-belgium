@@ -9,7 +9,9 @@ import pLimit from "p-limit";
 
 /**
  * Maximum concurrent image requests allowed.
- * This balance prevents 429 errors while maintaining good UX.
+ * Set to 6 to balance between loading performance and avoiding 429 errors.
+ * The OptimizedImage component also has retry logic with exponential backoff
+ * to handle rate limiting gracefully.
  */
 export const MAX_CONCURRENT_IMAGE_REQUESTS = 6;
 
