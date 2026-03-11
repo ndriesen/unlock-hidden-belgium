@@ -59,6 +59,26 @@ export default function AuthModal() {
 
   const getClientKey = () => `auth-${email.toLowerCase()}`;
 
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        setErrorMessage(mapAuthError(error.message));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
     setLoading(true);
     setErrorMessage("");
@@ -84,19 +104,15 @@ export default function AuthModal() {
     }
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
         setErrorMessage(mapAuthError(error.message));
         return;
       }
 
-      onClose();
+      // Alleen closeModal nodig
       closeModal();
-      onSuccess?.();
     } finally {
       setLoading(false);
     }
@@ -291,7 +307,7 @@ export default function AuthModal() {
               </button>
 
               {signupStep === "success" ? (
-                <SuccessView onClose={onClose} onSuccess={onSuccess} />
+                <SuccessView onClose={closeModal} />
               ) : activeTab === "login" ? (
                 <LoginView
                   email={email}
@@ -303,6 +319,7 @@ export default function AuthModal() {
                   loading={loading}
                   errorMessage={errorMessage}
                   onLogin={handleLogin}
+                  onGoogleLogin={handleGoogleLogin}
                   onSwitchToSignup={() => setActiveTab("signup")}
                 />
               ) : (
@@ -349,6 +366,7 @@ function LoginView({
   loading,
   errorMessage,
   onLogin,
+  onGoogleLogin,
   onSwitchToSignup,
 }: {
   email: string;
@@ -360,6 +378,7 @@ function LoginView({
   loading: boolean;
   errorMessage: string;
   onLogin: () => void;
+  onGoogleLogin: () => void;
   onSwitchToSignup: () => void;
 }) {
   return (
@@ -464,7 +483,9 @@ function LoginView({
 
       {/* Social Login */}
       <button
-        className="w-full py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-3"
+        onClick={onGoogleLogin}
+        disabled={loading}
+        className="w-full py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -733,9 +754,9 @@ function SuccessView({ onClose, onSuccess }: { onClose: () => void; onSuccess?: 
   const router = useRouter();
 
   const handleGoToMap = () => {
-      closeModal();
+      onClose();
       onSuccess?.();
-    router.push("/map");
+    router.push("/hotspots");
   };
 
   return (

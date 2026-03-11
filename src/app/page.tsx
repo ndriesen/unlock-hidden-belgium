@@ -25,6 +25,7 @@ import { fetchVisitStatsForUser } from "@/lib/services/engagement";
 import { addHotspotToQuickTrip } from "@/lib/services/tripBuilder";
 import { fetchHotspots } from "@/lib/services/hotspots";
 import { NearbyQuest, buildNearbyQuests } from "@/lib/services/quests";
+import { getTopHotspots, HotspotRanking } from "@/lib/services/ranking";
 
 // Pre-login components
 import PreLoginHero from "@/components/home/PreLoginHero";
@@ -414,13 +415,50 @@ export default function Home() {
     showToast(`Surprise! Discover: ${random.name}`);
   }, [questCandidates, showToast]);
 
+  // State for ranked hotspots
+  const [rankedHotspots, setRankedHotspots] = useState<Hotspot[]>([]);
+
+  // Fetch ranked hotspots for FeaturedHotspots (pre-login)
+  useEffect(() => {
+    async function fetchRankedHotspots() {
+      try {
+        const rankings = await getTopHotspots(10);
+        if (rankings && rankings.length > 0) {
+          const converted: Hotspot[] = rankings.map((r) => ({
+            id: r.hotspot_id,
+            name: r.hotspot_name,
+            latitude: r.latitude,
+            longitude: r.longitude,
+            category: r.category,
+            province: r.province,
+            description: r.description || '',
+            images: r.images || [],
+            tags: r.tags || [],
+            saves_count: r.saves_count,
+            views_count: r.views_count,
+            visit_count: r.trip_visits_count,
+          }));
+          setRankedHotspots(converted);
+        }
+      } catch (error) {
+        // Ranking view may not exist yet - that's OK, use fallback data
+        console.warn('Ranking not available yet:', error);
+      }
+    }
+
+    if (!user) {
+      fetchRankedHotspots();
+    }
+  }, [user]);
+
   // Render pre-login homepage
   const renderPreLoginHomepage = () => (
     <div className="flex flex-col min-h-screen">
       <PreLoginHero hotspotCount={questCandidates.length} explorerCount={12000} />
       <HowItWorks />
       <FeaturedHotspots 
-        hotspots={questCandidates.slice(0, 10)} 
+        // Use ranked hotspots when available, fallback to questCandidates
+        hotspots={rankedHotspots.length > 0 ? rankedHotspots : questCandidates.slice(0, 10)} 
         wishlistIds={[]}
       />
       <PreLoginFooter />

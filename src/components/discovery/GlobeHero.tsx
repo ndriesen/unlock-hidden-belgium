@@ -247,18 +247,44 @@ export default function GlobeHero({
     <div className={`relative w-full h-full min-h-[400px] ${className}`} ref={containerRef}>
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-3xl overflow-hidden">
-        {/* Star field */}
+        {/* Star field - using fixed positions to avoid hydration mismatch */}
         <div className="absolute inset-0 opacity-30">
-          {Array.from({ length: 50 }).map((_, i) => (
+          {[
+            { left: 10, top: 15, size: 1.5, opacity: 0.8 },
+            { left: 25, top: 8, size: 1, opacity: 0.5 },
+            { left: 40, top: 22, size: 2, opacity: 0.6 },
+            { left: 55, top: 5, size: 1.2, opacity: 0.7 },
+            { left: 70, top: 18, size: 1.8, opacity: 0.4 },
+            { left: 85, top: 12, size: 1.3, opacity: 0.6 },
+            { left: 15, top: 35, size: 1.1, opacity: 0.5 },
+            { left: 30, top: 42, size: 1.6, opacity: 0.7 },
+            { left: 50, top: 38, size: 1.4, opacity: 0.4 },
+            { left: 65, top: 45, size: 1.9, opacity: 0.6 },
+            { left: 80, top: 32, size: 1.2, opacity: 0.8 },
+            { left: 92, top: 40, size: 1.5, opacity: 0.5 },
+            { left: 5, top: 55, size: 1.3, opacity: 0.6 },
+            { left: 20, top: 62, size: 1.7, opacity: 0.4 },
+            { left: 38, top: 58, size: 1.1, opacity: 0.7 },
+            { left: 52, top: 65, size: 1.8, opacity: 0.5 },
+            { left: 68, top: 52, size: 1.4, opacity: 0.6 },
+            { left: 75, top: 68, size: 1.2, opacity: 0.8 },
+            { left: 88, top: 55, size: 1.6, opacity: 0.5 },
+            { left: 12, top: 78, size: 1.5, opacity: 0.6 },
+            { left: 28, top: 85, size: 1.3, opacity: 0.7 },
+            { left: 45, top: 75, size: 1.9, opacity: 0.4 },
+            { left: 58, top: 82, size: 1.1, opacity: 0.6 },
+            { left: 72, top: 78, size: 1.7, opacity: 0.5 },
+            { left: 95, top: 85, size: 1.4, opacity: 0.8 },
+          ].map((star, i) => (
             <div
               key={i}
               className="absolute bg-white rounded-full"
               style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                width: Math.random() * 2 + 1,
-                height: Math.random() * 2 + 1,
-                opacity: Math.random() * 0.5 + 0.3
+                left: `${star.left}%`,
+                top: `${star.top}%`,
+                width: star.size,
+                height: star.size,
+                opacity: star.opacity
               }}
             />
           ))}

@@ -69,10 +69,35 @@ export default function ProfilePage() {
         .single();
 
       if (userError) {
-        console.error("User profile load error:", userError);
-      }
-
-      if (userData) {
+        // If user doesn't exist, create them
+        if (userError.code === "PGRST116") {
+          const { error: insertError } = await supabase
+            .from("users")
+            .insert({
+              id: authUser.id,
+              email: authUser.email,
+              name: authUser.user_metadata?.full_name || authUser.email,
+              avatar_url: authUser.user_metadata?.avatar_url,
+              created_at: new Date().toISOString(),
+            });
+          
+          if (!insertError) {
+            // User created, fetch again
+            const { data: newUserData } = await supabase
+              .from("users")
+              .select("xp_points, username")
+              .eq("id", authUser.id)
+              .single();
+            
+            if (newUserData) {
+              setXpPoints(newUserData.xp_points ?? 0);
+              setUsername(newUserData.username ?? "");
+            }
+          }
+        } else {
+          console.error("User profile load error:", userError);
+        }
+      } else if (userData) {
         setXpPoints(userData.xp_points ?? 0);
         setUsername(userData.username ?? "");
       }

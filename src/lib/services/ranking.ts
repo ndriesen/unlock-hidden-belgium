@@ -50,18 +50,25 @@ export interface TravelBuddyHotspotsParams {
  * Used for GlobeHero and discovery feeds
  */
 export async function getTopHotspots(limit: number = RANKING_QUERY_CONFIG.DEFAULT_LIMIT): Promise<HotspotRanking[]> {
-  const { data, error } = await supabase
-    .from('hotspot_rankings')
-    .select('*')
-    .order('ranking_score', { ascending: false })
-    .limit(limit);
+  try {
+    const { data, error } = await supabase
+      .from('hotspot_rankings')
+      .select('*')
+      .order('ranking_score', { ascending: false })
+      .limit(limit);
 
-  if (error) {
-    console.error('Error fetching top hotspots:', error);
-    throw error;
+    if (error) {
+      // Materialized view might not exist yet - return empty array
+      console.warn('Ranking view not available:', error.message);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    // Handle network errors or other issues gracefully
+    console.warn('Error fetching top hotspots:', error);
+    return [];
   }
-
-  return data || [];
 }
 
 /**

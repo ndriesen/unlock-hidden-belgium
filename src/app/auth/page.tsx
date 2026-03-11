@@ -51,11 +51,31 @@ export default function AuthPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (session) {
-      router.push("/map");
+      router.push("/hotspots");
     }
   }, [session, router]);
 
   const getClientKey = () => `auth-${email.toLowerCase()}`;
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        setErrorMessage(mapAuthError(error.message));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     setLoading(true);
@@ -92,7 +112,7 @@ export default function AuthPage() {
         return;
       }
 
-      router.push("/map");
+      router.push("/hotspots");
     } finally {
       setLoading(false);
     }
@@ -341,6 +361,7 @@ export default function AuthPage() {
                       setRememberMe={setRememberMe}
                       loading={loading}
                       onLogin={handleLogin}
+                      onGoogleLogin={handleGoogleLogin}
                     />
                   </motion.div>
                 ) : (
@@ -415,6 +436,7 @@ function LoginForm({
   setRememberMe,
   loading,
   onLogin,
+  onGoogleLogin,
 }: {
   email: string;
   setEmail: (v: string) => void;
@@ -424,6 +446,7 @@ function LoginForm({
   setRememberMe: (v: boolean) => void;
   loading: boolean;
   onLogin: () => void;
+  onGoogleLogin: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -493,7 +516,9 @@ function LoginForm({
 
       {/* Social Login */}
       <button
-        className="w-full py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-3"
+        onClick={onGoogleLogin}
+        disabled={loading}
+        className="w-full py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -756,7 +781,7 @@ function SuccessView() {
       </p>
 
       <button
-        onClick={() => router.push("/map")}
+        onClick={() => router.push("/hotspots")}
         className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 flex items-center justify-center gap-2"
       >
         Start Exploring

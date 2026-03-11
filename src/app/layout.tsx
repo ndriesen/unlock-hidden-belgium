@@ -34,10 +34,10 @@ export default function RootLayout({
       >
         <AuthProvider>
           <SearchProvider>
-            <AuthModalProvider>
+            <AuthProvider>
               <SidebarLayout>{children}</SidebarLayout>
               <AuthModal />
-            </AuthModalProvider>
+            </AuthProvider>
           </SearchProvider>
         </AuthProvider>
       </body>
