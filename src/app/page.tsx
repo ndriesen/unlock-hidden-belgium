@@ -32,7 +32,19 @@ import PreLoginHero from "@/components/home/PreLoginHero";
 import HowItWorks from "@/components/home/HowItWorks";
 import PreLoginFooter from "@/components/home/PreLoginFooter";
 import FeaturedHotspots from "@/components/home/FeaturedHotspots";
+import SocialProof from "@/components/home/SocialProof";
+
+// New logged-in components - Premium Redesign
+import StickyHeader from "@/components/home/StickyHeader";
 import QuickActions from "@/components/home/QuickActions";
+import MapPreview from "@/components/home/MapPreview";
+import CommunityActivity from "@/components/home/CommunityActivity";
+
+// New discovery components
+import DiscoveryChips from "@/components/home/DiscoveryChips";
+import AdventuresNearYou from "@/components/home/AdventuresNearYou";
+import TrendingHotspots from "@/components/home/TrendingHotspots";
+import NatureDiscoveries from "@/components/home/NatureDiscoveries";
 
 const MapContainer = dynamic(
   () =>
@@ -103,6 +115,30 @@ export default function Home() {
   const [questLoading, setQuestLoading] = useState(false);
   const [showTripSelector, setShowTripSelector] = useState(false);
   const [tripsVersion, setTripsVersion] = useState(0);
+  
+  // User position for distance calculations
+  const [userPosition, setUserPosition] = useState<[number, number] | undefined>(undefined);
+  
+  // Category filter for discovery chips
+  const [selectedCategory, setSelectedCategory] = useState("");
+  
+  // Loading states for discovery sections
+  const [discoveriesLoading, setDiscoveriesLoading] = useState(true);
+  
+  // Get user position on mount
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserPosition([position.coords.latitude, position.coords.longitude]);
+      },
+      () => {
+        // User denied or unavailable - continue without position
+      },
+      { enableHighAccuracy: false, timeout: 5000 }
+    );
+  }, []);
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -441,7 +477,6 @@ export default function Home() {
           setRankedHotspots(converted);
         }
       } catch (error) {
-        // Ranking view may not exist yet - that's OK, use fallback data
         console.warn('Ranking not available yet:', error);
       }
     }
@@ -457,118 +492,67 @@ export default function Home() {
       <PreLoginHero hotspotCount={questCandidates.length} explorerCount={12000} />
       <HowItWorks />
       <FeaturedHotspots 
-        // Use ranked hotspots when available, fallback to questCandidates
         hotspots={rankedHotspots.length > 0 ? rankedHotspots : questCandidates.slice(0, 10)} 
         wishlistIds={[]}
       />
+      <SocialProof />
       <PreLoginFooter />
     </div>
   );
 
-  // Render logged-in homepage
+  // Render logged-in homepage - PREMIUM DISCOVERY-FIRST STRUCTURE
   const renderLoggedInHomepage = () => (
-    <div className="flex flex-col h-full space-y-4 md:space-y-6">
-      {/* Hero Section with 3D Globe */}
-      <HeroSection hotspots={questCandidates} />
+    <div className="flex flex-col min-h-screen pb-20">
+      {/* Sticky Header */}
+      <StickyHeader />
 
-      {/* Quick Actions Panel */}
-      <QuickActions
-        onSurpriseMe={handleSurpriseMe}
-        visitedCount={visitedIds.length}
-        wishlistCount={wishlistIds.length}
-        streak={visitStreak}
-      />
-
-      {/* Pricing Card */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Spotly Plus</p>
-          <p className="text-sm text-slate-700 mt-1">Unlock advanced trip insights, richer timeline tools and priority discovery alerts.</p>
+      {/* Main Content - Discovery First */}
+      <main className="flex-1">
+        {/* Discovery Chips - Category Filter */}
+        <div className="sticky top-16 z-40 bg-white pt-3 pb-2 shadow-sm">
+          <DiscoveryChips 
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
         </div>
-        <Link href="/pricing" className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
-          View plans
-        </Link>
-      </section>
 
-      <MissionDeck
-        visitedCount={visitedIds.length}
-        wishlistCount={wishlistIds.length}
-        favoriteCount={favoriteIds.length}
-        streak={visitStreak}
-        visitedToday={visitedToday}
-      />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <LeaguePanel userId={user?.id ?? null} />
-        <NearbyQuests
-          quests={nearbyQuests}
-          loading={questLoading}
-          onOpenHotspot={handleOpenQuest}
+        {/* Adventures Near You - Hero Discovery Section */}
+        <AdventuresNearYou
+          hotspots={questCandidates}
+          userPosition={userPosition}
+          wishlistIds={wishlistIds}
+          visitedIds={visitedIds}
+          onWishlistToggle={handleWishlist}
+          loading={!userDataLoaded}
         />
-      </div>
 
-      <div className="backdrop-blur-xl bg-white/80 border border-white/40 shadow-xl rounded-2xl p-4 flex flex-wrap gap-3 items-center">
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm"
-        >
-          <option value="">All categories</option>
-          {categories.map((category) => (
-            <option key={category}>{category}</option>
-          ))}
-        </select>
+        {/* Quick Actions - Playful Discovery */}
+        <QuickActions
+          onSurpriseMe={handleSurpriseMe}
+          visitedCount={visitedIds.length}
+          wishlistCount={wishlistIds.length}
+          streak={visitStreak}
+        />
 
-        <select
-          value={provinceFilter}
-          onChange={(e) => setProvinceFilter(e.target.value)}
-          className="px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm"
-        >
-          <option value="">All provinces</option>
-          {provinces.map((province) => (
-            <option key={province}>{province}</option>
-          ))}
-        </select>
+        {/* Featured Hotspots */}
+        <FeaturedHotspots 
+          hotspots={questCandidates.slice(0, 10)} 
+          wishlistIds={wishlistIds}
+          onWishlistToggle={handleWishlist}
+        />
 
-        <div className="flex-1" />
+        {/* Trending This Week */}
+        <TrendingHotspots
+          hotspots={questCandidates}
+          wishlistIds={wishlistIds}
+          visitedIds={visitedIds}
+          onWishlistToggle={handleWishlist}
+          loading={!userDataLoaded}
+        />
 
-        <button
-          onClick={handleSurpriseMe}
-          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm font-medium hover:from-amber-600 hover:to-orange-600 transition-all shadow-md"
-        >
-          🎲 Surprise Me
-        </button>
-
-        <button
-          onClick={() =>
-            setViewMode((prev) => (prev === "markers" ? "heatmap" : "markers"))
-          }
-          className="px-4 py-2 bg-emerald-600 text-white rounded-full text-sm"
-        >
-          {viewMode === "markers" ? "Heatmap" : "Markers"}
-        </button>
-
-        <select
-          value={mapStyle}
-          onChange={(event) =>
-            setMapStyle(event.target.value as "default" | "satellite" | "retro" | "terrain")
-          }
-          className="px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm text-sm"
-        >
-          <option value="default">Default</option>
-          <option value="satellite">Satellite</option>
-          <option value="retro">Retro</option>
-          <option value="terrain">Terrain</option>
-        </select>
-      </div>
-
-      <div className="h-[50vh] min-h-[24rem] md:h-[75vh] rounded-3xl overflow-hidden shadow-2xl border border-white/40">
-        <MapContainer
-          viewMode={viewMode}
-          mapStyle={mapStyle}
-          searchQuery={searchQuery}
-          categoryFilter={categoryFilter}
-          provinceFilter={provinceFilter}
+        {/* Map Preview - Compact */}
+        <MapPreview
+          hotspots={questCandidates}
           visitedIds={visitedIds}
           wishlistIds={wishlistIds}
           favoriteIds={favoriteIds}
@@ -576,8 +560,59 @@ export default function Home() {
           onVisit={handleVisit}
           onToast={showToast}
         />
-      </div>
 
+        {/* Nature Discoveries */}
+        <NatureDiscoveries
+          hotspots={questCandidates}
+          wishlistIds={wishlistIds}
+          visitedIds={visitedIds}
+          onWishlistToggle={handleWishlist}
+          loading={!userDataLoaded}
+        />
+
+        {/* Mission Deck - Gamification */}
+        <div className="container mx-auto px-4 py-4">
+          <MissionDeck
+            visitedCount={visitedIds.length}
+            wishlistCount={wishlistIds.length}
+            favoriteCount={favoriteIds.length}
+            streak={visitStreak}
+            visitedToday={visitedToday}
+          />
+        </div>
+
+        {/* League Panel & Community Activity */}
+        <div className="container mx-auto px-4 py-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <LeaguePanel userId={user?.id ?? null} />
+            <CommunityActivity limit={5} />
+          </div>
+        </div>
+
+        {/* Nearby Quests */}
+        <div className="container mx-auto px-4 py-4 pb-8">
+          <NearbyQuests
+            quests={nearbyQuests}
+            loading={questLoading}
+            onOpenHotspot={handleOpenQuest}
+          />
+        </div>
+
+        {/* Pricing Card */}
+        <div className="container mx-auto px-4 pb-8">
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Spotly Plus</p>
+              <p className="text-sm text-slate-700 mt-1">Unlock advanced trip insights, richer timeline tools and priority discovery alerts.</p>
+            </div>
+            <Link href="/pricing" className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
+              View plans
+            </Link>
+          </section>
+        </div>
+      </main>
+
+      {/* Hotspot Panel/Drawer */}
       <HotspotPanel
         hotspot={selected}
         onClose={() => setSelected(null)}
@@ -673,5 +708,4 @@ export default function Home() {
 
   return renderLoggedInHomepage();
 }
-
 

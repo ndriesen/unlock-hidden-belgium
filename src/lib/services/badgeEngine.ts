@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/Supabase/browser-client";
+import { addXp } from "./xpEngine";
 
 interface Hotspot {
   id: string;
@@ -130,13 +131,9 @@ export async function evaluateBadges(userId: string): Promise<Badge[]> {
     }
 
     if (badge.xp_reward) {
-      const { error: xpError } = await supabase.rpc("increment_xp", {
-        p_user_id: userId,
-        p_amount: badge.xp_reward,
-      });
-
-      if (xpError) {
-        console.error("Badge XP reward error", xpError);
+      const xpResult = await addXp(userId, badge.xp_reward);
+      if (!xpResult) {
+        console.error("Badge XP reward error: user not found or update failed");
       }
     }
 

@@ -2,8 +2,20 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { Sparkles, Map, Heart, Trophy, Users } from "lucide-react";
-import { Hotspot } from "@/types/hotspot";
+import { useRouter } from "next/navigation";
+import { 
+  Sparkles, 
+  MapPin, 
+  Plus, 
+  Compass, 
+  Heart, 
+  Footprints, 
+  Trophy,
+  Navigation,
+  Users,
+  Shuffle
+} from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface QuickActionsProps {
   onSurpriseMe: () => void;
@@ -18,116 +30,163 @@ export default function QuickActions({
   wishlistCount,
   streak,
 }: QuickActionsProps) {
+  const router = useRouter();
+  const { user } = useAuth();
   const [isSurprising, setIsSurprising] = useState(false);
 
   const handleSurpriseMe = useCallback(() => {
     setIsSurprising(true);
     onSurpriseMe();
-    setTimeout(() => setIsSurprising(false), 1000);
+    setTimeout(() => setIsSurprising(false), 1500);
   }, [onSurpriseMe]);
+
+  const handleAddHotspot = useCallback(() => {
+    if (!user) {
+      router.push("/auth");
+      return;
+    }
+    // Open add hotspot modal or navigate
+    router.push("/hotspots/my");
+  }, [user, router]);
+
+  const handleNearMe = useCallback(() => {
+    router.push("/hotspots?filter=nearme");
+  }, [router]);
 
   const actions = [
     {
-      icon: Map,
-      label: "Open Map",
-      href: "/hotspots",
+      icon: Plus,
+      label: "Add Hotspot",
+      description: "Share a hidden gem",
+      onClick: handleAddHotspot,
       color: "bg-emerald-500",
-      description: "Explore all hotspots",
+      highlight: true,
     },
     {
-      icon: Heart,
-      label: "Wishlist",
-      href: "/hotspots/wishlist",
-      color: "bg-rose-500",
-      description: `${wishlistCount} places saved`,
-    },
-    {
-      icon: Trophy,
-      label: "Achievements",
-      href: "/profile",
+      icon: Shuffle,
+      label: "Surprise Me",
+      description: "Random discovery",
+      onClick: handleSurpriseMe,
       color: "bg-amber-500",
-      description: `${streak} day streak`,
+      highlight: true,
     },
     {
-      icon: Users,
-      label: "Find Buddies",
-      href: "/buddies",
+      icon: MapPin,
+      label: "My Trips",
+      description: "Plan your adventures",
+      href: "/trips",
       color: "bg-blue-500",
-      description: "Connect with explorers",
+    },
+    {
+      icon: Navigation,
+      label: "Near Me",
+      description: "Discover nearby",
+      onClick: handleNearMe,
+      color: "bg-rose-500",
     },
   ];
 
   return (
-    <section className="py-6">
+    <section className="py-4 md:py-6">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {/* Surprise Me Button - Featured */}
-          <button
-            onClick={handleSurpriseMe}
-            disabled={isSurprising}
-            className="col-span-2 md:col-span-4 group relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 p-4 text-white shadow-lg shadow-amber-500/30 transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/40 active:scale-[0.98] disabled:opacity-80"
-          >
-            {/* Animated Background */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSA2MCAwIEwgMCAwIDAgNjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIiBvcGFjaXR5PSIwLjEiLz48L3N2Zz4=')] opacity-30 animate-pulse" />
-            </div>
-            
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-                  <Sparkles className={`w-6 h-6 ${isSurprising ? 'animate-spin' : 'animate-pulse'}`} />
-                </div>
-                <div className="text-left">
-                  <p className="font-bold text-lg">🎲 Surprise Me!</p>
-                  <p className="text-white/80 text-sm">Discover a random gem</p>
-                </div>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                <Sparkles className="w-5 h-5" />
-              </div>
-            </div>
-          </button>
-
-          {/* Action Grid */}
+        {/* Primary Actions - Featured */}
+        <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6">
           {actions.map((action) => {
             const Icon = action.icon;
-            return (
-              <Link
-                key={action.label}
-                href={action.href}
-                className="group flex items-center gap-3 p-4 rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
-              >
-                <div className={`w-11 h-11 rounded-xl ${action.color} flex items-center justify-center flex-shrink-0`}>
-                  <Icon className="w-5 h-5 text-white" />
+            const isAction = "onClick" in action;
+
+            const buttonContent = (
+              <>
+                <div className={`w-11 h-11 rounded-xl ${action.color} flex items-center justify-center flex-shrink-0 shadow-md`}>
+                  {isSurprising && action.label === "Surprise Me" ? (
+                    <Sparkles className="w-5 h-5 text-white animate-spin" />
+                  ) : (
+                    <Icon className="w-5 h-5 text-white" />
+                  )}
                 </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-900 text-sm truncate">
+                <div className="min-w-0 text-left">
+                  <p className="font-bold text-slate-900 text-sm md:text-base truncate">
                     {action.label}
                   </p>
                   <p className="text-slate-500 text-xs truncate">
                     {action.description}
                   </p>
                 </div>
+              </>
+            );
+
+            if (isAction) {
+              return (
+                <button
+                  key={action.label}
+                  onClick={action.onClick}
+                  className={`flex items-center gap-3 p-4 rounded-2xl border transition-all duration-200 hover:shadow-lg active:scale-[0.98] ${
+                    action.highlight
+                      ? "bg-gradient-to-br from-white to-slate-50 border-slate-200 hover:border-emerald-300 hover:-translate-y-1"
+                      : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  {buttonContent}
+                </button>
+              );
+            }
+
+            return (
+              <Link
+                key={action.label}
+                href={action.href || "/"}
+                className={`flex items-center gap-3 p-4 rounded-2xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${
+                  action.highlight
+                    ? "bg-gradient-to-br from-white to-slate-50 border-slate-200 hover:border-emerald-300"
+                    : "bg-white border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                {buttonContent}
               </Link>
             );
           })}
         </div>
 
+        {/* Secondary Links */}
+        <div className="flex flex-wrap gap-2 justify-center">
+          <Link
+            href="/hotspots"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full text-sm font-medium text-slate-700 hover:border-emerald-300 hover:text-emerald-600 transition-colors"
+          >
+            <Compass className="w-4 h-4" />
+            Explore Map
+          </Link>
+          <Link
+            href="/hotspots/wishlist"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full text-sm font-medium text-slate-700 hover:border-rose-300 hover:text-rose-600 transition-colors"
+          >
+            <Heart className="w-4 h-4" />
+            Wishlist ({wishlistCount})
+          </Link>
+          <Link
+            href="/profile"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full text-sm font-medium text-slate-700 hover:border-amber-300 hover:text-amber-600 transition-colors"
+          >
+            <Trophy className="w-4 h-4" />
+            {streak} Day Streak
+          </Link>
+        </div>
+
         {/* Stats Summary */}
-        <div className="mt-6 flex items-center justify-center gap-8 text-center">
-          <div>
-            <p className="text-2xl font-bold text-slate-900">{visitedCount}</p>
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Visited</p>
+        <div className="mt-6 flex items-center justify-center gap-6 md:gap-10 text-center">
+          <div className="flex flex-col">
+            <p className="text-xl md:text-2xl font-bold text-slate-900">{visitedCount}</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500">Visited</p>
           </div>
-          <div className="w-px h-10 bg-slate-200" />
-          <div>
-            <p className="text-2xl font-bold text-slate-900">{wishlistCount}</p>
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Wishlist</p>
+          <div className="w-px h-8 md:h-10 bg-slate-200" />
+          <div className="flex flex-col">
+            <p className="text-xl md:text-2xl font-bold text-slate-900">{wishlistCount}</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500">Wishlist</p>
           </div>
-          <div className="w-px h-10 bg-slate-200" />
-          <div>
-            <p className="text-2xl font-bold text-amber-600">{streak}</p>
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Day Streak</p>
+          <div className="w-px h-8 md:h-10 bg-slate-200" />
+          <div className="flex flex-col">
+            <p className="text-xl md:text-2xl font-bold text-amber-600">{streak}</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500">Streak</p>
           </div>
         </div>
       </div>
