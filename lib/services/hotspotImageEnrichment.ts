@@ -1,244 +1,300 @@
-﻿import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import fetch from "node-fetch"; // nodig voor fallback
+﻿import { createClient } from "@supabase/supabase-js";
 
-const COMMONS_API_URL = "https://commons.wikimedia.org/w/api.php";
-const COMMONS_USER_AGENT = "SpotlyHotspotImageEnrichment/1.0";
-const MAX_IMAGES_PER_HOTSPOT = 3;
-const MIN_LANDSCAPE_WIDTH = 1200;
-const PAGE_SIZE = 200;
-const REQUEST_DELAY_MS = 250;
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-interface HotspotRow {
-  id: string;
-  name: string;
-  municipality?: string;
-  images: string[] | null;
+const DELAY = 1200;
+
+const sleep = (ms:number)=>new Promise(r=>setTimeout(r,ms));
+
+type Metadata = {
+  images?:string[]
+  latitude?:number
+  longitude?:number
+  description?:string
+  wikipedia_intro?:string
+  tags?:string[]
+  tourism_type?:string
+  opening_hours?:string
+  heritage?:boolean
 }
 
-interface WikimediaImageInfo {
-  url?: string;
-  width?: number;
-  height?: number;
-  mime?: string;
+/* --------------------------- */
+/* Wikidata search */
+/* --------------------------- */
+
+async function searchWikidata(name:string){
+
+  const url=
+  "https://www.wikidata.org/w/api.php?action=wbsearchentities"+
+  "&language=en&format=json&origin=*"+
+  "&search="+encodeURIComponent(name)
+
+  const res=await fetch(url)
+  const data=await res.json()
+
+  return data?.search?.[0]??null
 }
 
-interface WikimediaPage {
-  imageinfo?: WikimediaImageInfo[];
-}
+/* --------------------------- */
+/* Wikidata entity data */
+/* --------------------------- */
 
-interface WikimediaResponse {
-  query?: {
-    pages?: Record<string, WikimediaPage>;
-  };
-}
+async function fetchWikidataEntity(qid:string){
 
-interface HotspotAddress {
-  display_name?: string;
-  lat?: string;
-  lon?: string;
-}
+  const res=await fetch(
+  `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`
+  )
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+  const data=await res.json()
 
-function getSupabaseCredentials(): { url: string; key: string } {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.SUPABASE_SERVICE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const entity=data.entities[qid]
 
-  if (!url) throw new Error("Missing SUPABASE_URL");
-  if (!key) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or anon key");
+  const claims=entity.claims
 
-  return { url, key };
-}
+  const osmRelation=
+  claims?.P402?.[0]?.mainsnak?.datavalue?.value
 
-function createAdminClient(): SupabaseClient {
-  const { url, key } = getSupabaseCredentials();
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
+  const instanceOf=
+  claims?.P31?.map((c:any)=>
+  c.mainsnak?.datavalue?.value?.id)
 
-// Fetch all hotspots (images IS NULL or niet)
-async function fetchAllHotspots(supabase: SupabaseClient): Promise<HotspotRow[]> {
-  const results: HotspotRow[] = [];
-  let offset = 0;
+  const wikipedia=
+  entity?.sitelinks?.enwiki?.title
 
-  while (true) {
-    const { data, error } = await supabase
-      .from("hotspots")
-      .select("id,name,municipality,images")
-      .order("name", { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
-
-    if (error) throw error;
-
-    const page = (data ?? []) as HotspotRow[];
-    results.push(...page);
-
-    if (page.length < PAGE_SIZE) break;
-    offset += PAGE_SIZE;
-  }
-
-  return results;
-}
-
-// TypeScript helper: landscape & large enough
-function isLandscapeAndLarge(info: WikimediaImageInfo): info is Required<WikimediaImageInfo> {
-  const width = Number(info.width ?? 0);
-  const height = Number(info.height ?? 0);
-  const url = info.url ?? "";
-  const mime = (info.mime ?? "").toLowerCase();
-  return !!url && (mime === "image/jpeg" || mime === "image/png" || mime === "image/webp") && width > height && width > MIN_LANDSCAPE_WIDTH;
-}
-
-// Wikimedia fetch
-async function fetchWikimediaImagesForHotspot(searchTerm: string): Promise<string[]> {
-  const params = new URLSearchParams({
-    action: "query",
-    format: "json",
-    origin: "*",
-    generator: "search",
-    gsrsearch: searchTerm,
-    gsrnamespace: "6",
-    gsrlimit: "20",
-    prop: "imageinfo",
-    iiprop: "url|size|mime",
-  });
-
-  const response = await fetch(`${COMMONS_API_URL}?${params.toString()}`, {
-    headers: { "User-Agent": COMMONS_USER_AGENT, Accept: "application/json" },
-  });
-
-  if (!response.ok) return [];
-  const payload = (await response.json()) as WikimediaResponse;
-  const pages = Object.values(payload.query?.pages ?? {});
-
-  const candidates = pages
-    .flatMap((page) => page.imageinfo ?? [])
-    .filter(isLandscapeAndLarge)
-    .sort((a, b) => (b.width ?? 0) - (a.width ?? 0));
-
-  const uniqueUrls: string[] = [];
-  const seen = new Set<string>();
-  for (const item of candidates) {
-    const imageUrl = item.url;
-    if (seen.has(imageUrl)) continue;
-    seen.add(imageUrl);
-    uniqueUrls.push(imageUrl);
-    if (uniqueUrls.length >= MAX_IMAGES_PER_HOTSPOT) break;
-  }
-
-  return uniqueUrls;
-}
-
-// Fallback (Unsplash)
-async function fetchFromFallbackSource(query: string): Promise<string[]> {
-  const apiKey = process.env.UNSPLASH_API_KEY;
-  if (!apiKey) return [];
-
-  try {
-    const res = await fetch(`https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&count=3&client_id=${apiKey}`);
-    if (!res.ok) return [];
-
-    const data = (await res.json()) as Array<{ urls: { regular?: string } }>;
-    return data.map(item => item.urls.regular).filter((url): url is string => !!url);
-  } catch (err) {
-    console.error("Fallback source error:", err);
-    return [];
+  return{
+    osmRelation,
+    instanceOf,
+    wikipedia
   }
 }
 
-// Fetch address via OpenStreetMap Nominatim
-async function fetchHotspotAddress(searchTerm: string): Promise<HotspotAddress | null> {
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTerm)}&format=json&limit=1`;
-    const res = await fetch(url, { headers: { "User-Agent": "SpotlyHotspotEnrichment/1.0" } });
-    if (!res.ok) return null;
+/* --------------------------- */
+/* Wikipedia intro */
+/* --------------------------- */
 
-    const data = (await res.json()) as HotspotAddress[];
-    return data.length ? data[0] : null;
-  } catch (err) {
-    console.error(`Error fetching address for ${searchTerm}:`, err);
-    return null;
-  }
+async function fetchWikipediaIntro(title:string){
+
+  const url=
+  "https://en.wikipedia.org/api/rest_v1/page/summary/"
+  +encodeURIComponent(title)
+
+  const res=await fetch(url)
+
+  if(!res.ok) return null
+
+  const data=await res.json()
+
+  return data.extract
 }
 
-// Update images + address
-async function updateHotspotWithImagesAndAddress(
-  supabase: SupabaseClient,
-  hotspotId: string,
-  imageUrls: string[],
-  address?: string,
-  lat?: string,
-  lon?: string
-): Promise<void> {
-  const { error } = await supabase
-    .from("hotspots")
-    .update({ images: imageUrls, address, latitude: lat, longitude: lon })
-    .eq("id", hotspotId);
-  if (error) throw error;
+/* --------------------------- */
+/* OSM geometry + tags */
+/* --------------------------- */
+
+async function fetchOSMData(osmRelation:number){
+
+const query=`
+[out:json];
+relation(${osmRelation});
+out geom tags;
+`
+
+const res=await fetch(
+"https://overpass-api.de/api/interpreter",
+{
+method:"POST",
+body:query
+})
+
+const data=await res.json()
+
+const rel=data.elements?.[0]
+
+if(!rel) return null
+
+const coords:any[]=[]
+
+for(const m of rel.members){
+
+if(m.geometry) coords.push(...m.geometry)
+
 }
 
-// Main enrichment
-export async function enrichHotspotsWithImages(): Promise<void> {
-  const supabase = createAdminClient();
-  const hotspots = await fetchAllHotspots(supabase);
+if(!coords.length) return null
 
-  if (!hotspots.length) {
-    console.log("No hotspots found.");
-    return;
-  }
+const lat=
+coords.reduce((s,c)=>s+c.lat,0)/coords.length
 
-  console.log(`Found ${hotspots.length} hotspots.`);
+const lon=
+coords.reduce((s,c)=>s+c.lon,0)/coords.length
 
-  let updated = 0;
-  let skipped = 0;
-  let failed = 0;
+return{
+lat,
+lon,
+tags:rel.tags
+}
 
-  for (const hotspot of hotspots) {
-    try {
-      const searchTerm = hotspot.municipality ? `${hotspot.name} ${hotspot.municipality}` : hotspot.name;
+}
 
-      // Only fetch images if empty
-      let images: string[] = hotspot.images ?? [];
-      if (!images.length) {
-        images = await fetchWikimediaImagesForHotspot(searchTerm);
-        if (!images.length) {
-          images = await fetchFromFallbackSource(searchTerm);
-          if (!images.length) {
-            skipped += 1;
-            console.log(`[SKIP] ${searchTerm}: no images found.`);
-          } else {
-            console.log(`[FALLBACK] ${searchTerm}: used fallback source.`);
-          }
-        }
-      }
+/* --------------------------- */
+/* Wikimedia category images */
+/* --------------------------- */
 
-      // Fetch address always
-      const addressData = await fetchHotspotAddress(searchTerm);
+async function fetchCommonsImages(term:string){
 
-      await updateHotspotWithImagesAndAddress(
-        supabase,
-        hotspot.id,
-        images,
-        addressData?.display_name,
-        addressData?.lat,
-        addressData?.lon
-      );
+const url=
+"https://commons.wikimedia.org/w/api.php"+
+"?action=query"+
+"&generator=search"+
+"&gsrsearch="+encodeURIComponent(term)+
+"&gsrlimit=20"+
+"&prop=imageinfo"+
+"&iiprop=url"+
+"&format=json"+
+"&origin=*"
 
-      updated += 1;
-      console.log(`[OK] ${searchTerm}: stored ${images.length} image(s) and address.`);
-    } catch (error) {
-      failed += 1;
-      console.error(`[FAIL] ${hotspot.name}:`, error);
-    }
+const res=await fetch(url)
+const data=await res.json()
 
-    await sleep(REQUEST_DELAY_MS);
-  }
+const pages=data?.query?.pages
 
-  console.log(`Enrichment complete. Updated=${updated}, Skipped=${skipped}, Failed=${failed}`);
+if(!pages) return null
+
+return Object.values(pages)
+.map((p:any)=>p.imageinfo?.[0]?.url)
+.filter(Boolean)
+
+}
+
+/* --------------------------- */
+/* Update Supabase */
+/* --------------------------- */
+
+async function updateHotspot(id:string,meta:Metadata){
+
+const{error}=await supabase
+.from("hotspots")
+.update(meta)
+.eq("id",id)
+
+if(error) throw error
+
+}
+
+/* --------------------------- */
+/* MAIN ENGINE */
+/* --------------------------- */
+
+export async function enrichHotspots(){
+
+const{data:hotspots,error}=
+await supabase.from("hotspots").select("*")
+
+if(error) throw error
+
+console.log("Hotspots:",hotspots.length)
+
+for(const hotspot of hotspots){
+
+try{
+
+const search=
+hotspot.municipality
+?`${hotspot.name} ${hotspot.municipality}`
+:hotspot.name
+
+const metadata:Metadata={}
+
+/* Wikidata */
+
+const wd=await searchWikidata(search)
+
+if(wd?.description&&!hotspot.description)
+metadata.description=wd.description
+
+if(wd){
+
+const entity=
+await fetchWikidataEntity(wd.id)
+
+/* Wikipedia */
+
+if(entity.wikipedia&&!hotspot.wikipedia_intro){
+
+const intro=
+await fetchWikipediaIntro(entity.wikipedia)
+
+if(intro)
+metadata.wikipedia_intro=intro
+
+}
+
+/* OSM */
+
+if(entity.osmRelation
+&&(!hotspot.latitude||!hotspot.longitude)){
+
+const osm=
+await fetchOSMData(entity.osmRelation)
+
+if(osm){
+
+metadata.latitude=osm.lat
+metadata.longitude=osm.lon
+
+if(osm.tags?.tourism)
+metadata.tourism_type=osm.tags.tourism
+
+if(osm.tags?.opening_hours)
+metadata.opening_hours=osm.tags.opening_hours
+
+if(osm.tags?.heritage)
+metadata.heritage=true
+
+}
+
+}
+
+/* tags */
+
+if(entity.instanceOf)
+metadata.tags=entity.instanceOf
+
+}
+
+/* images */
+
+if(!hotspot.images){
+
+const imgs=
+await fetchCommonsImages(search)
+
+if(imgs?.length)
+metadata.images=imgs
+
+}
+
+/* update */
+
+if(Object.keys(metadata).length){
+
+await updateHotspot(hotspot.id,metadata)
+
+console.log("✓",search)
+
+}
+
+}catch(e){
+
+console.error("FAIL",hotspot.name,e)
+
+}
+
+await sleep(DELAY)
+
+}
+
 }

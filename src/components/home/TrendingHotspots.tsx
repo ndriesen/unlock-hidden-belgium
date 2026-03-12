@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { Trees, Mountain, ChevronRight, Leaf } from "lucide-react";
+import { Flame, ChevronRight, TrendingUp } from "lucide-react";
 import { Hotspot } from "@/types/hotspot";
 import HotspotCard from "./HotspotCard";
 import SkeletonCard from "./SkeletonCard";
 
-interface NatureDiscoveriesProps {
+interface TrendingHotspotsProps {
   hotspots: Hotspot[];
   wishlistIds: string[];
   visitedIds: string[];
@@ -16,28 +16,26 @@ interface NatureDiscoveriesProps {
   selectedCategory?: string;
 }
 
-export default function NatureDiscoveries({
+export default function TrendingHotspots({
   hotspots,
   wishlistIds,
   visitedIds,
   onWishlistToggle,
   loading = false,
   selectedCategory = "",
-}: NatureDiscoveriesProps) {
+}: TrendingHotspotsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
 
-  // Filter hotspots by Nature category or related categories
-  const natureCategories = ['Nature', 'Waterfalls', 'Viewpoints'];
-  
-  // Filter by selected category first, then by nature categories
-  const filteredByCategory = selectedCategory 
+  // Filter by category first, then get top 6 trending
+  const filteredHotspots = selectedCategory 
     ? hotspots.filter(h => h.category === selectedCategory)
     : hotspots;
     
-  const natureHotspots = filteredByCategory
-    .filter(h => natureCategories.includes(h.category))
+  // Get top 6 trending hotspots (by visit count)
+  const trendingHotspots = [...filteredHotspots]
+    .sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0))
     .slice(0, 6);
 
   const checkScroll = useCallback(() => {
@@ -70,15 +68,13 @@ export default function NatureDiscoveries({
       <section className="py-6">
         <div className="container mx-auto px-4">
           <div className="flex items-center gap-2 mb-4">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500 rounded-lg">
-              <Trees className="w-4 h-4 text-white" />
-            </div>
+            <Flame className="w-5 h-5 text-orange-500" />
             <h2 className="text-xl md:text-2xl font-bold text-slate-900">
-              Nature Discoveries
+              Trending This Week
             </h2>
           </div>
           <p className="text-sm text-slate-600 mb-6">
-            Escape to forests, waterfalls, and scenic viewpoints
+            Hotspots getting the most attention from explorers
           </p>
           <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
             {[...Array(4)].map((_, i) => (
@@ -90,7 +86,7 @@ export default function NatureDiscoveries({
     );
   }
 
-  if (!hotspots || natureHotspots.length === 0) {
+  if (!hotspots || hotspots.length === 0) {
     return null;
   }
 
@@ -99,20 +95,20 @@ export default function NatureDiscoveries({
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="flex items-center gap-2 mb-2">
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500 rounded-lg">
-            <span className="text-lg">🏞</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-orange-500 to-rose-500 rounded-lg">
+            <span className="text-lg">🔥</span>
           </div>
           <h2 className="text-xl md:text-2xl font-bold text-slate-900">
-            Nature Discoveries
+            Trending near you
           </h2>
         </div>
         
         <p className="text-sm text-slate-600 mb-4">
-          Escape to forests, waterfalls, and scenic viewpoints - explore the outdoors!
+          Places explorers are discovering this week.
         </p>
 
         {/* Scroll Controls */}
-        {natureHotspots.length > 3 && (
+        {trendingHotspots.length > 3 && (
           <div className="hidden md:flex gap-2 mb-4 justify-end">
             <button
               onClick={() => scroll('left')}
@@ -141,7 +137,7 @@ export default function NatureDiscoveries({
           }}
           onScroll={checkScroll}
         >
-          {natureHotspots.map((hotspot, index) => (
+          {trendingHotspots.map((hotspot, index) => (
             <HotspotCard
               key={hotspot.id}
               hotspot={hotspot}
@@ -156,10 +152,10 @@ export default function NatureDiscoveries({
         {/* View All Link */}
         <div className="mt-4 text-center">
           <Link 
-            href="/hotspots?category=Nature"
-            className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+            href="/hotspots?sort=popular"
+            className="inline-flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
           >
-            Explore more nature
+            See all trending
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>

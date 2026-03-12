@@ -1,3 +1,4 @@
+﻿﻿
 ﻿"use client";
 
 import Image from "next/image";
@@ -22,17 +23,164 @@ interface UserHotspotRow {
   hotspots: Hotspot | Hotspot[] | null;
 }
 
-interface Badge {
+interface BadgeFull {
   id: string;
   name: string;
+  description: string;
   icon: string;
-  unlocked: boolean;
+  condition_type: string;
+  condition_value: number;
+  condition_meta?: object;
 }
 
-interface BadgeRow {
+interface UserBadgeRow {
+  awarded_at: string;
+  badges: BadgeFull;
+}
+
+interface VisitHotspot {
   id: string;
-  name: string;
-  icon: string;
+  province: string;
+  category?: string;
+  country?: string;
+  is_hidden?: boolean;
+}
+
+interface UserVisitRow {
+  hotspot_id: string;
+  visited_at: string;
+  hotspots: VisitHotspot;
+}
+
+interface UserStats {
+  totalVisits: number;
+  visitDates: Date[];
+  provinces: Set<string>;
+  categories: Map<string, number>;
+  countryRegions: Map<string, Set<string>>;
+  hiddenVisits: number;
+}
+
+function computeUserStats(visits: UserVisitRow[]): UserStats {
+  const provinces = new Set<string>();
+  const categories = new Map<string, number>();
+  const countryRegions = new Map<string, Set<string>>();
+  const visitDates: Date[] = [];
+  let hiddenVisits = 0;
+
+  visits.forEach((visit) => {
+    const date = new Date(visit.visited_at);
+    if (!Number.isNaN(date.getTime())) {
+      visitDates.push(date);
+    }
+
+    const hotspot = visit.hotspots;
+    if (!hotspot) return;
+
+    provinces.add(hotspot.province);
+
+    if (hotspot.category) {
+      categories.set(hotspot.category, (categories.get(hotspot.category) ?? 0) + 1);
+    }
+
+    if (hotspot.country) {
+      if (!countryRegions.has(hotspot.country)) {
+        countryRegions.set(hotspot.country, new Set());
+      }
+      countryRegions.get(hotspot.country)?.add(hotspot.province);
+    }
+
+    if (hotspot.is_hidden) hiddenVisits += 1;
+  });
+
+  return {
+    totalVisits: visitDates.length,
+    visitDates,
+    provinces,
+    categories,
+    countryRegions,
+    hiddenVisits,
+  };
+}
+
+function calculateStreak(dates: Date[]): number {
+  if (!dates.length) return 0;
+
+  const dayKeys = Array.from(
+    new Set(
+      dates.map((date) => {
+        const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        return normalized.getTime();
+      }).sort((a, b) => a - b)
+    )
+  );
+
+  if (!dayKeys.length) return 0;
+
+  let streak = 1;
+  let maxStreak = 1;
+
+  for (let i = 1; i < dayKeys.length; i++) {
+    const diffDays = (dayKeys[i] - dayKeys[i - 1]) / 86400000;
+    if (diffDays === 1) {
+      streak += 1;
+      maxStreak = Math.max(maxStreak, streak);
+    } else if (diffDays > 1) {
+      streak = 1;
+    }
+  }
+
+  return maxStreak;
+}
+
+interface ProgressInfo {
+  current: number;
+  desc: string;
+}
+
+function getProgress(badge: BadgeFull, stats: UserStats): ProgressInfo {
+  const value = badge.condition_value;
+  let current = 0;
+  let desc = 'unknown';
+
+  switch (badge.condition_type) {
+    case "visit_count":
+      current = stats.totalVisits;
+      desc = "visits";
+      break;
+    case "visit_streak":
+      current = calculateStreak(stats.visitDates);
+      desc = "day streak";
+      break;
+    case "category_count": {
+      const cat = (badge.condition_meta as any)?.category ?? "";
+      current = stats.categories.get(cat) ?? 0;
+      desc = `${cat}s`;
+      break;
+    }
+    case "region_count": {
+      const country = (badge.condition_meta as any)?.country ?? "BE";
+      current = stats.countryRegions.get(country)?.size ?? 0;
+      desc = "regions";
+      break;
+    }
+    case "hidden_gems":
+      current = stats.hiddenVisits;
+      desc = "hidden gems";
+      break;
+    case "early_visit":
+      current = stats.visitDates.some((date) => date.getHours() < 7) ? 1 : 0;
+      desc = "early visit";
+      break;
+    case "late_visit":
+      current = stats.visitDates.some((date) => date.getHours() >= 22) ? 1 : 0;
+      desc = "late visit";
+      break;
+    default:
+      current = 0;
+      desc = "condition";
+  }
+  return { current: Math.min(current, value), desc };
 }
 
 function normalizeHotspot(joinedHotspot: UserHotspotRow["hotspots"]): Hotspot | null {
@@ -50,7 +198,11 @@ export default function ProfilePage() {
   const [visited, setVisited] = useState<Hotspot[]>([]);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [favoriteCount, setFavoriteCount] = useState(0);
-  const [allBadges, setAllBadges] = useState<Badge[]>([]);
+  const [earnedBadges, setEarnedBadges] = useState<UserBadgeRow[]>([]);
+  const [allBadgesFull, setAllBadgesFull] = useState<BadgeFull[]>([]);
+  const [userVisits, setUserVisits] = useState<UserVisitRow[]>([]);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [showUnearned, setShowUnearned] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -69,7 +221,6 @@ export default function ProfilePage() {
         .single();
 
       if (userError) {
-        // If user doesn't exist, create them
         if (userError.code === "PGRST116") {
           const { error: insertError } = await supabase
             .from("users")
@@ -82,7 +233,6 @@ export default function ProfilePage() {
             });
           
           if (!insertError) {
-            // User created, fetch again
             const { data: newUserData } = await supabase
               .from("users")
               .select("xp_points, username")
@@ -104,14 +254,12 @@ export default function ProfilePage() {
 
       const { data: userHotspots, error: hotspotError } = await supabase
         .from("user_hotspots")
-        .select(
-          `
+        .select(`
             visited,
             wishlist,
             favorite,
             hotspots(id, name, province)
-          `
-        )
+          `)
         .eq("user_id", authUser.id);
 
       if (hotspotError) {
@@ -129,33 +277,65 @@ export default function ProfilePage() {
       setWishlistCount(normalizedRows.filter((row) => row.wishlist).length);
       setFavoriteCount(normalizedRows.filter((row) => row.favorite).length);
 
-      const { data: allBadgesData, error: badgesError } = await supabase
-        .from("badges")
-        .select("id, name, icon");
-
-      if (badgesError) {
-        console.error("Badge catalog load error:", badgesError);
-      }
-
-      const { data: userBadgesData, error: userBadgesError } = await supabase
+      // New badge queries
+      const { data: earnedData, error: earnedError } = await supabase
         .from("user_badges")
-        .select("badge_id")
-        .eq("user_id", authUser.id);
+        .select(`
+          awarded_at,
+          badges (
+            id,
+            name,
+            description,
+            icon,
+            condition_type,
+            condition_value,
+            condition_meta
+          )
+        `)
+        .eq("user_id", authUser.id)
+        .order("awarded_at", { ascending: false });
 
-      if (userBadgesError) {
-        console.error("User badges load error:", userBadgesError);
+      if (earnedError) {
+        console.error("Earned badges error:", earnedError);
+      } else {
+        setEarnedBadges((earnedData ?? []) as unknown as UserBadgeRow[]);
       }
 
-      const ownedIds = new Set(
-        (userBadgesData ?? []).map((entry: { badge_id: string }) => entry.badge_id)
-      );
+      const { data: allData, error: allError } = await supabase
+        .from("badges")
+        .select("id, name, description, icon, condition_type, condition_value, condition_meta");
 
-      const mergedBadges = ((allBadgesData ?? []) as BadgeRow[]).map((badge) => ({
-        ...badge,
-        unlocked: ownedIds.has(badge.id),
-      }));
+      if (allError) {
+        console.error("All badges error:", allError);
+      } else {
+        setAllBadgesFull((allData ?? []) as BadgeFull[]);
+      }
 
-      setAllBadges(mergedBadges);
+      const { data: visitData, error: visitError } = await supabase
+        .from("user_hotspots")
+        .select(`
+          hotspot_id,
+          visited_at,
+          hotspots (
+            id,
+            province,
+            category,
+            country,
+            is_hidden
+          )
+        `)
+        .eq("user_id", authUser.id)
+        .eq("visited", true);
+
+      if (visitError) {
+        console.error("User visits error:", visitError);
+      } else {
+        const visits = (visitData ?? []) as unknown as UserVisitRow[];
+
+        setUserVisits(visits);
+        const stats = computeUserStats(visits);
+        setUserStats(stats);
+      }
     };
 
     fetchUser();
@@ -199,7 +379,6 @@ export default function ProfilePage() {
       return;
     }
 
-    // Use UUID for secure random path
     const uniqueId = crypto.randomUUID();
     const filePath = `${userId}/${uniqueId}`;
 
@@ -299,22 +478,73 @@ export default function ProfilePage() {
 
       <div>
         <h3 className="font-semibold mb-3">Badge Collection</h3>
+        <div className="space-y-2">
+          {earnedBadges.length === 0 ? (
+            <p className="text-gray-500 text-sm">
+              You did not yet earn a badge. Keep discovering to earn your first badge(s).
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-3">
+                {earnedBadges.map(({ badges: badge, awarded_at }) => {
+                  const progress = userStats ? getProgress(badge, userStats) : { current: 0, desc: '' };
 
-        <div className="flex flex-wrap gap-3">
-          {allBadges.length === 0 && (
-            <p className="text-gray-500 text-sm">No badges found.</p>
+                  return (
+                    <div key={badge.id} className="relative group">
+                      <div className="px-3 py-2 rounded-full text-sm bg-yellow-100 hover:shadow-md cursor-help">
+                        {badge.icon} {badge.name}
+                      </div>
+
+                      <div className="absolute hidden group-hover:block z-10 bg-gray-900 text-white text-xs rounded-md p-3 w-56 -top-2 left-1/2 -translate-x-1/2 -translate-y-full shadow-lg">
+                        <div className="font-bold">{badge.description}</div>
+                        <div className="mt-1">Awarded at {awarded_at}</div>
+                        <div>{progress.current}/{badge.condition_value}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {(() => {
+                const unearnedBadges = allBadgesFull.filter(b => !earnedBadges.some(e => e.badges.id === b.id));
+                if (unearnedBadges.length === 0) return null;
+                return (
+                  <p 
+                    className="text-blue-600 cursor-pointer hover:underline text-sm mt-2"
+                    onClick={() => setShowUnearned(!showUnearned)}
+                  >
+                    {showUnearned ? 'Hide' : 'Show'} available badges ({unearnedBadges.length})
+                  </p>
+                );
+              })()}
+              {showUnearned && userStats && (() => {
+                const unearnedBadges = allBadgesFull.filter(
+                  (b) => !earnedBadges.some((e) => e.badges.id === b.id)
+                );
+
+                return (
+                  <div className="flex flex-wrap gap-3 mt-2 pt-2 border-t border-gray-200">
+                    {unearnedBadges.map((badge) => {
+                      const progress = getProgress(badge, userStats);
+
+                      return (
+                        <div key={badge.id} className="relative group">
+                          <div className="px-3 py-2 rounded-full text-sm bg-gray-200 opacity-70 hover:shadow-md cursor-help">
+                            {badge.icon} {badge.name}
+                          </div>
+
+                          {/* Custom tooltip */}
+                          <div className="absolute hidden group-hover:block z-10 bg-gray-900 text-white text-xs rounded-md p-3 w-56 -top-2 left-1/2 -translate-x-1/2 -translate-y-full shadow-lg">
+                            <div className="font-bold">{badge.description}</div>
+                            <div className="mt-1">{progress.current}/{badge.condition_value}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </>
           )}
-
-          {allBadges.map((badge) => (
-            <div
-              key={badge.id}
-              className={`px-3 py-2 rounded-full text-sm ${
-                badge.unlocked ? "bg-yellow-100" : "bg-gray-200 opacity-50"
-              }`}
-            >
-              {badge.icon} {badge.name}
-            </div>
-          ))}
         </div>
       </div>
 

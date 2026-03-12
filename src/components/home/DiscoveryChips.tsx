@@ -14,7 +14,7 @@ import {
   Mountain
 } from "lucide-react";
 
-interface DiscoveryChipsProps {
+interface CategoryExplorerProps {
   selectedCategory: string;
   onCategoryChange: (category: string) => void;
 }
@@ -27,22 +27,20 @@ interface Category {
 }
 
 const categories: Category[] = [
-  { id: "", label: "All", icon: Sparkles, color: "bg-gradient-to-r from-emerald-500 to-teal-500" },
-  { id: "Nature", label: "Nature", icon: Trees, color: "bg-emerald-500" },
-  { id: "Bars", label: "Bars", icon: GlassWater, color: "bg-amber-500" },
-  { id: "Castles", label: "Castles", icon: Castle, color: "bg-purple-500" },
-  { id: "Waterfalls", label: "Waterfalls", icon: Mountain, color: "bg-cyan-500" },
-  { id: "Viewpoints", label: "Viewpoints", icon: Compass, color: "bg-blue-500" },
-  { id: "Food", label: "Food", icon: UtensilsCrossed, color: "bg-orange-500" },
-  { id: "Culture", label: "Culture", icon: Landmark, color: "bg-rose-500" },
-  { id: "Activity", label: "Activity", icon: Zap, color: "bg-yellow-500" },
-  { id: "Sunset", label: "Sunset Spots", icon: Sun, color: "bg-gradient-to-r from-orange-500 to-pink-500" },
+  { id: "Nature", label: "🏔 Nature", icon: Trees, color: "bg-emerald-500" },
+  { id: "Bars", label: "🍻 Bars", icon: GlassWater, color: "bg-amber-500" },
+  { id: "Castles", label: "🏰 Castles", icon: Castle, color: "bg-purple-500" },
+  { id: "Waterfalls", label: "🌊 Waterfalls", icon: Mountain, color: "bg-cyan-500" },
+  { id: "Viewpoints", label: "📸 Viewpoints", icon: Compass, color: "bg-blue-500" },
+  { id: "Food", label: "🍴 Food", icon: UtensilsCrossed, color: "bg-orange-500" },
+  { id: "Culture", label: "🏛 Culture", icon: Landmark, color: "bg-rose-500" },
+  { id: "Sunset", label: "🌅 Sunset Spots", icon: Sun, color: "bg-gradient-to-r from-orange-500 to-pink-500" },
 ];
 
-export default function DiscoveryChips({ 
+export default function CategoryExplorer({ 
   selectedCategory, 
   onCategoryChange 
-}: DiscoveryChipsProps) {
+}: CategoryExplorerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(true);

@@ -33,6 +33,16 @@ export default function SidebarLayout({
 
   const isAuthPage = pathname === "/auth";
 
+  // Listen for mobile sidebar toggle from StickyHeader
+  useEffect(() => {
+    const handleToggleSidebar = () => {
+      setMobileMenuOpen((prev) => !prev);
+    };
+
+    window.addEventListener('toggle-mobile-sidebar', handleToggleSidebar);
+    return () => window.removeEventListener('toggle-mobile-sidebar', handleToggleSidebar);
+  }, []);
+
   useEffect(() => {
     let active = true;
 
@@ -115,18 +125,14 @@ export default function SidebarLayout({
 
       <div
         className={`hidden md:block transition-all duration-300 ${
-          collapsed ? "w-20" : "w-72"
+          collapsed ? "w-16" : "w-64"
         }`}
       >
         <Sidebar collapsed={collapsed} />
       </div>
 
       <div className="flex-1 flex min-w-0 flex-col overflow-hidden">
-      <header className={`h-16 sticky top-0 z-50 flex items-center justify-between px-4 md:px-6 transition-all duration-300 ${
-        pathname === "/" 
-          ? "bg-transparent backdrop-blur-none border-none" 
-          : "backdrop-blur-xl bg-white/75 border-b border-white/30"
-      }`}>
+        <header className="h-16 sticky top-0 z-50 flex items-center justify-between px-4 md:px-6 backdrop-blur-xl bg-white/95 border-b border-slate-200 shadow-sm transition-all duration-300">
           <div className="flex items-center gap-3 md:gap-4 min-w-0">
             <button
               onClick={() => setMobileMenuOpen(true)}

@@ -137,13 +137,13 @@ export default function AdventuresNearYou({
         <div className="flex items-center gap-2 mb-2">
           <Sparkles className="w-5 h-5 text-emerald-600" />
           <h2 className="text-xl md:text-2xl font-bold text-slate-900">
-            Adventures Near You
+            🎯 Adventures Near You
           </h2>
         </div>
         
         <p className="text-sm text-slate-600 mb-4">
           {userPosition 
-            ? "Personalized recommendations based on your location" 
+            ? "Personalized recommendations based on your location - start exploring!" 
             : "Enable location for personalized nearby discoveries"}
         </p>
 

@@ -10,13 +10,19 @@ interface FeaturedHotspotsProps {
   hotspots: Hotspot[];
   wishlistIds?: string[];
   onWishlistToggle?: (hotspotId: string) => void;
+  selectedCategory?: string;
 }
 
 export default function FeaturedHotspots({ 
   hotspots, 
   wishlistIds = [],
-  onWishlistToggle 
+  onWishlistToggle,
+  selectedCategory = ""
 }: FeaturedHotspotsProps) {
+  // Filter hotspots by category if selected
+  const filteredHotspots = selectedCategory 
+    ? hotspots.filter(h => h.category === selectedCategory)
+    : hotspots;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
@@ -80,10 +86,10 @@ export default function FeaturedHotspots({
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-slate-900">
-              Featured Gems
+              ✨ Hidden gems worth exploring
             </h2>
             <p className="text-sm text-slate-600 mt-1">
-              Handpicked spots worth exploring
+              Handpicked adventures across Belgium.
             </p>
           </div>
           

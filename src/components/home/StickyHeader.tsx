@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Search, Bell, User, Menu, MapPin, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Search, Bell, User, Menu, MapPin, X, Sidebar } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useSearch } from "@/context/SearchContext";
+import { fetchUnreadNotificationCount } from "@/lib/services/activity";
 
 interface StickyHeaderProps {
   onMenuToggle?: () => void;
@@ -15,9 +16,33 @@ export default function StickyHeader({ onMenuToggle }: StickyHeaderProps) {
   const { user } = useAuth();
   const { searchQuery, setSearchQuery } = useSearch();
   const pathname = usePathname();
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [notificationsCount] = useState(3);
+  const [notificationsCount, setNotificationsCount] = useState(0);
+
+  // Fetch real notification count
+  useEffect(() => {
+    let active = true;
+
+    const loadNotifications = async () => {
+      if (!user?.id) {
+        if (active) setNotificationsCount(0);
+        return;
+      }
+
+      const count = await fetchUnreadNotificationCount(user.id);
+      if (active) {
+        setNotificationsCount(count);
+      }
+    };
+
+    void loadNotifications();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -27,6 +52,11 @@ export default function StickyHeader({ onMenuToggle }: StickyHeaderProps) {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Show notification bell click handler
+  const handleNotificationClick = useCallback(() => {
+    router.push("/activity");
+  }, [router]);
 
   if (!user || pathname !== "/") return null;
 
@@ -40,6 +70,15 @@ export default function StickyHeader({ onMenuToggle }: StickyHeaderProps) {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 gap-4">
+          {/* Hamburger Menu Button */}
+          <button
+            onClick={onMenuToggle}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors active:scale-95"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5 text-slate-600" />
+          </button>
+
           <Link href="/" className="flex items-center gap-2 flex-shrink-0">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
               <MapPin className="w-5 h-5 text-white" />
@@ -61,30 +100,33 @@ export default function StickyHeader({ onMenuToggle }: StickyHeaderProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Mobile Search Toggle */}
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+              className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors active:scale-95"
               aria-label="Search"
             >
               <Search className="w-5 h-5 text-slate-600" />
             </button>
 
-            <Link
-              href="/activity"
-              className="relative w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+            {/* Dynamic Notification Bell */}
+            <button
+              onClick={handleNotificationClick}
+              className="relative w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors active:scale-95"
               aria-label="Notifications"
             >
               <Bell className="w-5 h-5 text-slate-600" />
               {notificationsCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {notificationsCount}
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                  {notificationsCount > 99 ? "99+" : notificationsCount}
                 </span>
               )}
-            </Link>
+            </button>
 
+            {/* Profile Link */}
             <Link
               href="/profile"
-              className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+              className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors active:scale-95"
             >
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
                 {user.user_metadata?.avatar_url ? (
@@ -101,19 +143,10 @@ export default function StickyHeader({ onMenuToggle }: StickyHeaderProps) {
                 {user.user_metadata?.full_name || user.email?.split("@")[0]}
               </span>
             </Link>
-
-            {onMenuToggle && (
-              <button
-                onClick={onMenuToggle}
-                className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
-                aria-label="Menu"
-              >
-                <Menu className="w-5 h-5 text-slate-600" />
-              </button>
-            )}
           </div>
         </div>
 
+        {/* Mobile Search */}
         {showSearch && (
           <div className="md:hidden pb-3 animate-in slide-in-from-top-2">
             <div className="relative">
@@ -139,4 +172,3 @@ export default function StickyHeader({ onMenuToggle }: StickyHeaderProps) {
     </header>
   );
 }
-

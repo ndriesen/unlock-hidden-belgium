@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import {
   ExploreHotspot,
@@ -13,6 +14,27 @@ import {
 import { toggleHotspotLike, toggleHotspotSave } from "@/lib/services/hotspotSocial";
 import { toggleTripLike, toggleTripSave } from "@/lib/services/tripBuilder";
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
+import { Hotspot } from "@/types/hotspot";
+
+const MapContainer = dynamic(
+  () =>
+    import("@/components/Map/MapContainer").then(
+      (mod) => mod.default as React.ComponentType<{
+        viewMode?: "markers" | "heatmap";
+        mapStyle?: "default" | "satellite" | "retro" | "terrain";
+        searchQuery?: string;
+        categoryFilter?: string;
+        provinceFilter?: string;
+        visitedIds?: string[];
+        wishlistIds?: string[];
+        favoriteIds?: string[];
+        onSelect?: (hotspot: Hotspot) => void;
+        onVisit?: (hotspotId: string) => void;
+        onToast?: (message: string) => void;
+      }>
+    ),
+  { ssr: false }
+);
 
 type ExploreSortMode = "popular" | "reviews" | "rating";
 
@@ -279,6 +301,19 @@ export default function ExplorePage() {
             <option value="reviews">Most reviewed</option>
             <option value="rating">Highest rated</option>
           </select>
+</div>
+      </section>
+
+      {/* Interactive Map Section */}
+      <section className="rounded-2xl overflow-hidden shadow-xl border border-slate-200">
+        <div className="h-[400px] md:h-[500px]">
+          <MapContainer
+            viewMode="markers"
+            mapStyle="default"
+            searchQuery={searchQuery}
+            categoryFilter={categoryFilter}
+            provinceFilter={provinceFilter}
+          />
         </div>
       </section>
 
