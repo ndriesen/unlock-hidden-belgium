@@ -22,7 +22,7 @@ interface HotspotRow {
   saves_count?: number | null;
 }
 
-interface MapContainerProps {
+export interface MapContainerProps {
   selectedCategory?: string;
 
   searchQuery?: string;
