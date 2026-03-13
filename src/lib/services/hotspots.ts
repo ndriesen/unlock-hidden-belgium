@@ -29,18 +29,45 @@ function parseImages(images: unknown): string[] | undefined {
   return undefined;
 }
 
+function parseTags(tags: unknown): string[] | undefined {
+  if (!tags) return undefined;
+  
+  if (Array.isArray(tags)) {
+    return tags.filter((item): item is string => typeof item === "string");
+  }
+  
+  if (typeof tags === "string") {
+    try {
+      const parsed = JSON.parse(tags);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is string => typeof item === "string");
+      }
+    } catch {
+      return undefined;
+    }
+  }
+  
+  return undefined;
+}
+
 export async function fetchHotspots() {
   const { data, error } = await supabase
     .from("hotspots")
-    .select("*")
+  .select(`
+      *,
+      wikipedia_intro,
+      tags,
+      tourism_type
+    `)
     .eq("status", "approved");
   if (error) throw error;
   
-  // Process images to ensure they're proper arrays
+  // Process arrays to ensure they're proper arrays
   if (data) {
     return data.map(hotspot => ({
       ...hotspot,
-      images: parseImages(hotspot.images)
+      images: parseImages(hotspot.images),
+      tags: parseTags(hotspot.tags)
     }));
   }
   

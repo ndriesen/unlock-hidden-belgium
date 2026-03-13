@@ -58,7 +58,7 @@ export default function MapPreviewSection({
           {/* Map Container */}
           <div className="absolute inset-0">
             <MapContainer
-              hotspots={hotspots}
+              //hotspots={hotspots}
               viewMode={viewMode}
               mapStyle={mapStyle}
               visitedIds={visitedIds}

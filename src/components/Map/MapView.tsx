@@ -21,6 +21,7 @@ interface Props {
   autoLocate?: boolean;
   autoFit?: boolean;
   enableClustering?: boolean;
+  preventZoom?: boolean;
   onVisit?: (id: string) => void;
   onSelect?: (hotspot: Hotspot) => void;
 }
@@ -147,6 +148,7 @@ export default function MapView({
   autoLocate = true,
   autoFit = false,
   enableClustering = true,
+  preventZoom = false,
   onVisit,
   onSelect,
 }: Props) {
@@ -174,19 +176,19 @@ export default function MapView({
   const useCanvas = hotspots.length > 1500;
   const tile = useMemo(() => mapTileConfig(mapStyle, isDark), [mapStyle, isDark]);
 
-  const handleSelect = useCallback(
+    const handleSelect = useCallback(
     (hotspot: Hotspot) => {
       setSelectedId(hotspot.id);
       onSelect?.(hotspot);
 
       const coords = getCoordinates(hotspot);
-      if (!coords || !mapRef.current) return;
+      if (!coords || !mapRef.current || preventZoom) return;
 
       mapRef.current.flyTo(coords, 14, {
         duration: 0.8,
       });
     },
-    [onSelect]
+    [onSelect, preventZoom]
   );
 
   return (

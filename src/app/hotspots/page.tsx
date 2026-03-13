@@ -15,6 +15,7 @@ import { toggleHotspotLike, toggleHotspotSave } from "@/lib/services/hotspotSoci
 import { toggleTripLike, toggleTripSave } from "@/lib/services/tripBuilder";
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
 import { Hotspot } from "@/types/hotspot";
+import HotspotPanel from "@/components/HotspotPanel";
 
 const MapContainer = dynamic(
   () =>
@@ -28,6 +29,7 @@ const MapContainer = dynamic(
         visitedIds?: string[];
         wishlistIds?: string[];
         favoriteIds?: string[];
+        preventZoom?: boolean;
         onSelect?: (hotspot: Hotspot) => void;
         onVisit?: (hotspotId: string) => void;
         onToast?: (message: string) => void;
@@ -52,8 +54,8 @@ export default function ExplorePage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [provinceFilter, setProvinceFilter] = useState("");
   const [sortMode, setSortMode] = useState<ExploreSortMode>("popular");
-
-  const [actionMessage, setActionMessage] = useState("");
+  const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
+  const [actionMessage, setActionMessage] = useState(""); 
 
   const loadExplore = useCallback(async () => {
     setLoading(true);
@@ -232,7 +234,7 @@ export default function ExplorePage() {
     );
   };
 
-  return (
+  return 
     <div className="space-y-6">
       <section className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 p-5 shadow-sm">
         <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Explore</p>
@@ -313,9 +315,34 @@ export default function ExplorePage() {
             searchQuery={searchQuery}
             categoryFilter={categoryFilter}
             provinceFilter={provinceFilter}
+            preventZoom={false}
+            visitedIds={[]}
+            wishlistIds={[]}
+            favoriteIds={[]}
+            onSelect={(hotspot) => setSelectedHotspot(hotspot)}
+            onToast={setActionMessage}
           />
         </div>
       </section>
+
+      selectedHotspot && 
+        <HotspotPanel
+          hotspot={selectedHotspot}
+          onClose={() => setSelectedHotspot(null)}
+          onVisit={() => {}}
+          onWishlist={() => {}}
+          onFavorite={() => {}}
+          onAddToTrip={() => {}}
+          isVisited={false}
+          isWishlist={false}
+          isFavorite={false}
+          canGoPrevious={false}         
+          canGoNext={true}              
+          onPrevious={() => {}}         
+          onNext={() => {}}             
+          positionLabel="1 / 10"      
+        />
+       
 
       {actionMessage && (
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
@@ -562,7 +589,7 @@ export default function ExplorePage() {
         </div>
       </section>
     </div>
-  );
+  ;
 }
 
 

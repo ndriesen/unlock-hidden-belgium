@@ -6,10 +6,106 @@ interface HotspotRow {
   category: string | null;
   province: string | null;
   description: string | null;
-  images: string[] | null;
+  wikipedia_intro: string | null;
+  tags?: string[];        // <-- make optional
+  tourism_type: string | null;
+  heritage: boolean | null;
+  images?: string[];      // <-- make optional
   visit_count: number | null;
   likes_count: number | null;
   saves_count: number | null;
+
+  // Enrichment fields
+  latitude?: number | null;
+  longitude?: number | null;
+  website?: string;
+  opening_hours?: string[];
+  entry_fee?: number | null;
+  address?: string;
+  municipality?: string;
+  difficulty_level?: number | null;
+  last_updated?: string;
+}
+
+export interface ExploreHotspot {
+  id: string;
+  name: string;
+  category: string;
+  province: string;
+  description: string;
+  wikipedia_intro?: string;
+  tags?: string[];
+  tourism_type?: string;
+  heritage?: boolean;
+  imageUrl: string;
+  visitCount: number;
+  reviewCount: number;
+  averageRating: number;
+  likesCount: number;
+  savesCount: number;
+  likedByMe: boolean;
+  savedByMe: boolean;
+  visited: boolean;
+  wishlist: boolean;
+  favorite: boolean;
+}
+
+const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+
+// ------------------------
+// Helper functions
+// ------------------------
+
+// Safely parse arrays from Supabase
+function parseArray(arr: unknown): string[] | null {
+  if (!arr) return null;
+  if (Array.isArray(arr)) return arr.filter(i => typeof i === "string");
+  if (typeof arr === "string") {
+    try { return JSON.parse(arr); } catch { return null; }
+  }
+  return null;
+}
+
+// Fetch Wikipedia intro for a hotspot
+async function fetchWikipediaIntro(name: string): Promise<string | null> {
+  try {
+    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    return data.extract ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Fetch Google Place data for enrichment
+async function fetchGooglePlace(name: string, municipality: string) {
+  const query = encodeURIComponent(`${name} ${municipality}`);
+  const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=place_id,name,geometry,types,formatted_address,photos,opening_hours,website,price_level,rating&key=${GOOGLE_API_KEY}`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.candidates?.length > 0) {
+      const place = data.candidates[0];
+      return {
+        description: place.description,
+        latitude: place.geometry?.location?.lat ?? null,
+        longitude: place.geometry?.location?.lng ?? null,
+        category: place.types?.[0] ?? null,
+        address: place.formatted_address ?? null,
+        website: place.website ?? null,
+        opening_hours: place.opening_hours?.weekday_text ?? null,
+        entry_fee: place.price_level ?? null,
+        images: place.photos?.map(
+          (p: any) => `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${p.photo_reference}&key=${GOOGLE_API_KEY}`
+        ) ?? null,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -36,6 +132,29 @@ function parseImages(images: unknown): string[] | null {
       }
     } catch {
       // Not a valid JSON string, return null
+      return null;
+    }
+  }
+  
+  return null;
+}
+
+function parseTags(tags: unknown): string[] | null {
+  if (!tags) return null;
+  
+  if (Array.isArray(tags)) {
+    const filtered = tags.filter((item): item is string => typeof item === "string");
+    return filtered.length > 0 ? filtered : null;
+  }
+  
+  if (typeof tags === "string") {
+    try {
+      const parsed = JSON.parse(tags);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((item): item is string => typeof item === "string");
+        return filtered.length > 0 ? filtered : null;
+      }
+    } catch {
       return null;
     }
   }
@@ -91,6 +210,10 @@ export interface ExploreHotspot {
   category: string;
   province: string;
   description: string;
+  wikipedia_intro?: string;
+  tags?: string[];
+  tourism_type?: string;
+  heritage?: boolean;
   imageUrl: string;
   visitCount: number;
   reviewCount: number;
@@ -102,6 +225,15 @@ export interface ExploreHotspot {
   visited: boolean;
   wishlist: boolean;
   favorite: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  website?: string;
+  opening_hours?: string[];  // Google returns weekday_text array
+  entry_fee?: number | null;
+  address?: string;
+  municipality?: string;
+  difficulty_level?: number | null;
+  last_updated?: string;
 }
 
 export interface PopularTrip {
@@ -157,33 +289,31 @@ function buildReviewStats(rows: ReviewRow[]): Map<string, { count: number; avg: 
 }
 
 export async function fetchExploreHotspots(userId?: string | null): Promise<ExploreHotspot[]> {
+  // 1️⃣ Load approved hotspots
   const { data: hotspotData, error: hotspotError } = await supabase
     .from("hotspots")
-    .select("id,name,category,province,description,images,visit_count,likes_count,saves_count")
+    .select("*")
     .eq("status", "approved");
 
-  if (hotspotError || !hotspotData) {
-    throw hotspotError ?? new Error("Could not load hotspots");
-  }
+  if (hotspotError || !hotspotData) throw hotspotError ?? new Error("Could not load hotspots");
 
-  // Parse images to ensure they're proper arrays
   const rows = (hotspotData as HotspotRow[]).map(row => ({
     ...row,
-    images: parseImages(row.images)
+    images: parseImages(row.images),
+    tags: parseTags(row.tags),
   }));
-  const hotspotIds = rows.map((row) => row.id);
 
-  if (!hotspotIds.length) {
-    return [];
-  }
+  const hotspotIds = rows.map((r) => r.id);
+  if (!hotspotIds.length) return [];
 
+  // 2️⃣ Fetch review stats
   const { data: reviewData } = await supabase
     .from("reviews")
     .select("hotspot_id,rating")
     .in("hotspot_id", hotspotIds);
-
   const reviewStats = buildReviewStats((reviewData ?? []) as ReviewRow[]);
 
+  // 3️⃣ Fetch user flags, likes & saves
   const flagMap = new Map<string, { visited: boolean; wishlist: boolean; favorite: boolean }>();
   const likedByMe = new Set<string>();
   const savedByMe = new Set<string>();
@@ -208,36 +338,65 @@ export async function fetchExploreHotspots(userId?: string | null): Promise<Expl
         .in("hotspot_id", hotspotIds),
     ]);
 
-    (userFlags ?? []).forEach((entry) => {
-      const row = entry as UserFlagRow;
+    (userFlags ?? []).forEach((row: UserFlagRow) =>
       flagMap.set(row.hotspot_id, {
-        visited: Boolean(row.visited),
-        wishlist: Boolean(row.wishlist),
-        favorite: Boolean(row.favorite),
-      });
-    });
-
-    if (!likesResult.error) {
-      (likesResult.data ?? []).forEach((row) => {
-        likedByMe.add((row as HotspotReactionRow).hotspot_id);
-      });
-    }
-
-    if (!savesResult.error) {
-      (savesResult.data ?? []).forEach((row) => {
-        savedByMe.add((row as HotspotReactionRow).hotspot_id);
-      });
-    }
+        visited: !!row.visited,
+        wishlist: !!row.wishlist,
+        favorite: !!row.favorite,
+      })
+    );
+    if (!likesResult.error) (likesResult.data ?? []).forEach((r: HotspotReactionRow) => likedByMe.add(r.hotspot_id));
+    if (!savesResult.error) (savesResult.data ?? []).forEach((r: HotspotReactionRow) => savedByMe.add(r.hotspot_id));
   }
 
-  return rows
+  function normalizeArray(arr: string[] | null | undefined): string[] | undefined {
+      if (!arr || arr.length === 0) return undefined; // null or empty → undefined
+      return arr;
+    }
+
+  // 4️⃣ Enrich with external sources (Google Places + Wikipedia)
+  async function enrichHotspot(row: HotspotRow): Promise<HotspotRow> {
+    const googleData = await fetchGooglePlace(row.name, row.province ?? "");
+    const wikiIntro = await fetchWikipediaIntro(row.name);
+
+      const normalizedRows = (hotspotData as HotspotRow[]).map(row => ({
+        ...row,
+        images: parseImages(row.images) ?? undefined, // normalize null → undefined
+        tags: parseTags(row.tags) ?? undefined,      // normalize null → undefined
+      }));
+
+    return {
+        ...row,
+      description: googleData?.description ?? row.description,
+      latitude: googleData?.latitude ?? row.latitude,
+      longitude: googleData?.longitude ?? row.longitude,
+      category: googleData?.category ?? row.category,
+      difficulty_level: row.difficulty_level ?? 1,
+      website: googleData?.website ?? row.website,
+      opening_hours: googleData?.opening_hours ?? row.opening_hours,
+      entry_fee: googleData?.entry_fee ?? row.entry_fee,
+      address: googleData?.address ?? row.address,
+      municipality: googleData?.address ? googleData.address.split(",")[1]?.trim() : row.municipality,
+      images: googleData?.images ? [...(row.images ?? []), ...googleData.images] : row.images,
+      wikipedia_intro: wikiIntro ?? row.wikipedia_intro,
+      last_updated: new Date().toISOString(),
+    };
+  }
+
+
+  const normalizedRows = (hotspotData as HotspotRow[]).map(row => ({
+    ...row,
+    images: parseImages(row.images) ?? undefined, // normalize null → undefined
+    tags: parseTags(row.tags) ?? undefined,      // normalize null → undefined
+  }));
+
+  const enrichedRows = await Promise.all(normalizedRows.map(enrichHotspot));
+
+  // 5️⃣ Map to ExploreHotspot for frontend
+  return enrichedRows
     .map((row) => {
       const review = reviewStats.get(row.id) ?? { count: 0, avg: 0 };
-      const flags = flagMap.get(row.id) ?? {
-        visited: false,
-        wishlist: false,
-        favorite: false,
-      };
+      const flags = flagMap.get(row.id) ?? { visited: false, wishlist: false, favorite: false };
 
       return {
         id: row.id,
@@ -245,6 +404,10 @@ export async function fetchExploreHotspots(userId?: string | null): Promise<Expl
         category: row.category ?? "Unknown",
         province: row.province ?? "Unknown",
         description: row.description ?? "No description yet.",
+        wikipedia_intro: row.wikipedia_intro ?? undefined,
+        tags: row.tags,
+        tourism_type: row.tourism_type ?? undefined,
+        heritage: row.heritage ?? undefined,
         imageUrl: safeImage(row.images),
         visitCount: row.visit_count ?? 0,
         reviewCount: review.count,
@@ -256,6 +419,15 @@ export async function fetchExploreHotspots(userId?: string | null): Promise<Expl
         visited: flags.visited,
         wishlist: flags.wishlist,
         favorite: flags.favorite,
+        latitude: row.latitude ?? null,
+        longitude: row.longitude ?? null,
+        website: row.website ?? undefined,
+        opening_hours: row.opening_hours ?? undefined,
+        entry_fee: row.entry_fee ?? undefined,
+        address: row.address ?? undefined,
+        municipality: row.municipality ?? undefined,
+        difficulty_level: row.difficulty_level ?? undefined,
+        last_updated: row.last_updated ?? undefined,
       };
     })
     .sort(

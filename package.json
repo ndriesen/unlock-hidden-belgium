@@ -17,6 +17,7 @@
     "dotenv": "^17.3.1",
     "framer-motion": "^12.34.3",
     "fuse.js": "^7.1.0",
+    "json2csv": "^6.0.0-alpha.2",
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0",
     "leaflet.markercluster": "^1.5.3",

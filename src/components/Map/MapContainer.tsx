@@ -30,14 +30,15 @@ export interface MapContainerProps {
   provinceFilter?: string;
   viewMode: "markers" | "heatmap";
   mapStyle?: "default" | "satellite" | "retro" | "terrain";
+  preventZoom?: boolean;
 
   visitedIds: string[];
   wishlistIds: string[];
   favoriteIds: string[];
 
-  onSelect: (hotspot: Hotspot) => void;
-  onVisit: (id: string) => void;
-  onToast: (msg: string) => void;
+  onSelect?: (hotspot: Hotspot) => void;
+  onVisit?: (id: string) => void;
+  onToast?: (msg: string) => void;
 }
 
 export default function MapContainer({
@@ -46,6 +47,7 @@ export default function MapContainer({
   viewMode,
   searchQuery,
   mapStyle = "default",
+  preventZoom = false,
   visitedIds,
   wishlistIds,
   favoriteIds,
@@ -147,8 +149,9 @@ export default function MapContainer({
       favoriteIds={favoriteIds}
       viewMode={viewMode}
       mapStyle={mapStyle}
+      preventZoom={preventZoom}
       onSelect={onSelect}
-      onVisit={onVisit}
+      onVisit={onVisit ?? undefined}
     />
   );
 }

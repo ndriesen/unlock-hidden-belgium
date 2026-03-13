@@ -6,6 +6,10 @@
   category: string;
   province: string;
   description?: string;
+  wikipedia_intro?: string;
+  tags?: string[];
+  tourism_type?: string;
+  heritage?: boolean;
   images?: string[];
   opening_hours?: string;
   combine_with?: string[];
