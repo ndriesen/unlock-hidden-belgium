@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { motion, AnimatePresence } from "framer-motion";
 import HotspotDetail from "./HotspotDetail";
@@ -94,6 +94,7 @@ export default function HotspotSheet({
           showTripSelector={showTripSelector}
           onShowTripSelector={onShowTripSelector}
           onTripUpdated={onTripUpdated}
+          showFavoriteInDetail={true}
         />
       </motion.div>
     </AnimatePresence>

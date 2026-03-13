@@ -556,9 +556,10 @@ export default function Home() {
         />
 
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <CategoryExplorer 
+          <CategoryExplorer
             selectedCategory={selectedCategory}
             onCategoryChange={handleCategoryChange}
+            categories={categories}
           />
         </div>
 
@@ -686,4 +687,7 @@ export default function Home() {
 
   return renderLoggedInHomepage();
 }
+
+
+
 

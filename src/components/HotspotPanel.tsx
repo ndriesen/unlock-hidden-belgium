@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { motion, AnimatePresence } from "framer-motion";
 import HotspotDetail from "./HotspotDetail";
@@ -14,11 +14,14 @@ interface HotspotPanelProps {
   isWishlist: boolean;
   onFavorite: (id: string) => void;
   onWishlist: (id: string) => void;
-  canGoPrevious: boolean;        
-  canGoNext: boolean;              
-  onPrevious: (id: string) => void;        
-  onNext: (id: string) => void;             
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+  onPrevious: (id: string) => void;
+  onNext: (id: string) => void;
   positionLabel: string;
+  showTripSelector?: boolean;
+  onShowTripSelector?: (show: boolean) => void;
+  onTripUpdated?: () => void;
 }
 
 export default function HotspotPanel({
@@ -36,6 +39,9 @@ export default function HotspotPanel({
   onPrevious,
   onNext,
   positionLabel,
+  showTripSelector,
+  onShowTripSelector,
+  onTripUpdated,
 }: HotspotPanelProps) {
   if (!hotspot) return null;
 
@@ -70,7 +76,7 @@ export default function HotspotPanel({
                   disabled={!canGoPrevious}
                   className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
                 >
-                  ←
+                  <span aria-hidden="true">&larr;</span>
                 </button>
 
                 <button
@@ -78,7 +84,7 @@ export default function HotspotPanel({
                   disabled={!canGoNext}
                   className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
                 >
-                  →
+                  <span aria-hidden="true">&rarr;</span>
                 </button>
 
               </div>
@@ -89,7 +95,7 @@ export default function HotspotPanel({
                 onClick={onClose}
                 className="p-1 rounded-md hover:bg-gray-100"
               >
-                ✕
+                <span aria-hidden="true">&times;</span>
               </button>
 
             </div>
@@ -101,10 +107,13 @@ export default function HotspotPanel({
                 onVisit={onVisit}
                 onWishlist={onWishlist}
                 onFavorite={onFavorite}
-                onAddToTrip={onAddToTrip}
                 isVisited={isVisited}
                 isWishlist={isWishlist}
                 isFavorite={isFavorite}
+                showTripSelector={showTripSelector}
+                onShowTripSelector={onShowTripSelector}
+                onTripUpdated={onTripUpdated}
+                showFavoriteInDetail={false}
               />
             </div>
 
@@ -136,7 +145,15 @@ export default function HotspotPanel({
                   isFavorite ? "text-red-500" : "text-gray-700"
                 }`}
               >
-                {isFavorite ? "★ Favorited" : "☆ Favorite"}
+                {isFavorite ? (
+                  <>
+                    <span aria-hidden="true">♡</span> Favorited
+                  </>
+                ) : (
+                  <>
+                    <span aria-hidden="true">♥</span> Favorite
+                  </>
+                )}
               </button>
             </div>
           </motion.aside>

@@ -1,6 +1,7 @@
-import { supabase } from "@/lib/Supabase/browser-client";
+﻿import { supabase } from "@/lib/Supabase/browser-client";
 import { evaluateBadges } from "./badgeEngine";
 import { addXp } from "./xpEngine";
+import { recordActivity } from "./activity";
 
 async function upsertBooleanFlag(
   userId: string,
@@ -40,6 +41,25 @@ export async function markVisited(userId: string, hotspotId: string) {
   await addXp(userId, 50);
 
   const unlockedBadges = await evaluateBadges(userId);
+
+  if (unlockedBadges.length) {
+    await Promise.all(
+      unlockedBadges.map((badge) =>
+        recordActivity({
+          actorId: userId,
+          activityType: "badge_earned",
+          entityType: "badge",
+          entityId: badge.id,
+          message: `earned the badge ${badge.name}`,
+          metadata: { badgeId: badge.id, badgeName: badge.name },
+          visibility: "private",
+          notifyUserIds: [userId],
+          notifyActor: true,
+        })
+      )
+    );
+  }
+
   return unlockedBadges;
 }
 

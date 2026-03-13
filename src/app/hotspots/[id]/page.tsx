@@ -10,11 +10,7 @@ import TripMemoriesGallery from "@/components/TripMemoriesGallery";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { fetchHotspotMedia, fetchOrganizedHotspotMedia, uploadHotspotPhoto } from "@/lib/services/hotspotMedia";
-import {
-  fetchHotspotReactionState,
-  toggleHotspotLike,
-  toggleHotspotSave,
-} from "@/lib/services/hotspotSocial";
+import { toggleFavorite, toggleWishlist } from "@/lib/services/gamification";
 import { MediaVisibility } from "@/lib/services/media";
 import { Hotspot } from "@/types/hotspot";
 
@@ -40,8 +36,6 @@ interface HotspotRow {
   opening_hours: string | null;
   combine_with: string[] | null;
   visit_count: number | null;
-  likes_count: number | null;
-  saves_count: number | null;
   latitude: number | string | null;
   longitude: number | string | null;
 }
@@ -53,13 +47,13 @@ interface HotspotRow {
  */
 function parseImages(images: unknown): string[] {
   if (!images) return [];
-  
+
   // If it's already an array of strings
   if (Array.isArray(images)) {
     const filtered = images.filter((item): item is string => typeof item === "string");
     return filtered;
   }
-  
+
   // If it's a string (stringified JSON array)
   if (typeof images === "string") {
     try {
@@ -73,7 +67,7 @@ function parseImages(images: unknown): string[] {
       return [];
     }
   }
-  
+
   return [];
 }
 
@@ -87,11 +81,11 @@ export default function HotspotDetailPage() {
   const [combineWith, setCombineWith] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [likedByMe, setLikedByMe] = useState(false);
-  const [savedByMe, setSavedByMe] = useState(false);
+  const [wishlistedByMe, setWishlistedByMe] = useState(false);
+  const [favoritedByMe, setFavoritedByMe] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
-  
+
   // Organized media for Polarsteps-like display
   const [personalPhotos, setPersonalPhotos] = useState<{id: string; signedUrl: string; caption: string; visibility: string; createdAt: string; uploadedBy: string}[]>([]);
   const [communityPhotos, setCommunityPhotos] = useState<{id: string; signedUrl: string; caption: string; visibility: string; createdAt: string; uploadedBy: string}[]>([]);
@@ -112,7 +106,7 @@ export default function HotspotDetailPage() {
       const { data, error } = await supabase
         .from("hotspots")
         .select(
-          "id,name,category,province,description,images,opening_hours,combine_with,visit_count,likes_count,saves_count,latitude,longitude"
+          "id,name,category,province,description,images,opening_hours,combine_with,visit_count,latitude,longitude"
         )
         .eq("id", hotspotId)
         .maybeSingle();
@@ -145,8 +139,6 @@ export default function HotspotDetailPage() {
         opening_hours: row.opening_hours ?? undefined,
         combine_with: row.combine_with ?? undefined,
         visit_count: row.visit_count ?? 0,
-        likes_count: row.likes_count ?? 0,
-        saves_count: row.saves_count ?? 0,
         latitude,
         longitude,
       };
@@ -158,7 +150,14 @@ export default function HotspotDetailPage() {
       const [media, organizedMedia, reaction] = await Promise.all([
         fetchHotspotMedia({ hotspotId: row.id, userId: user?.id ?? null, limit: 16 }),
         fetchOrganizedHotspotMedia({ hotspotId: row.id, userId: user?.id ?? null, limit: 50 }),
-        user?.id ? fetchHotspotReactionState(user.id, row.id) : Promise.resolve({ liked: false, saved: false }),
+        user?.id
+          ? supabase
+              .from("user_hotspots")
+              .select("wishlist,favorite")
+              .eq("user_id", user.id)
+              .eq("hotspot_id", row.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
       ]);
 
       if (!active) return;
@@ -167,19 +166,23 @@ export default function HotspotDetailPage() {
       const personalUrls = organizedMedia.personal.map(p => p.signedUrl);
       const communityUrls = organizedMedia.community.map(c => c.signedUrl);
       const baseImages = parseImages(row.images); // Database filler images
-      
-      // Priority order: personal → community → inspiration
+
+      // Priority order: personal -> community -> inspiration
       const priorityUrls = [...personalUrls, ...communityUrls, ...baseImages];
       const dedup = Array.from(new Set([...priorityUrls]));
-      
+
       setMediaUrls(dedup);
-      
+
       // Set organized media
       setPersonalPhotos(organizedMedia.personal);
       setCommunityPhotos(organizedMedia.community);
-      
-      setLikedByMe(reaction.liked);
-      setSavedByMe(reaction.saved);
+
+      if (reaction?.error) {
+        console.error("Failed to load wishlist/favorite state:", reaction.error);
+      }
+
+      setWishlistedByMe(Boolean(reaction?.data?.wishlist));
+      setFavoritedByMe(Boolean(reaction?.data?.favorite));
       setLoading(false);
     };
 
@@ -196,54 +199,38 @@ export default function HotspotDetailPage() {
   }, [hotspot]);
 
   // Fallback image if no images available
-  const fallbackImage = hotspot?.images && hotspot.images.length > 0 
-    ? hotspot.images 
+  const fallbackImage = hotspot?.images && hotspot.images.length > 0
+    ? hotspot.images
     : ["https://images.unsplash.com/photo-1469474968028-56623f02e42e"];
 
-  const handleToggleLike = async () => {
+  const handleToggleWishlist = async () => {
     if (!user || !hotspot) {
       setUploadMessage("Login required.");
       return;
     }
 
-    const next = await toggleHotspotLike({
-      userId: user.id,
-      hotspotId: hotspot.id,
-      hotspotName: hotspot.name,
-    });
-
-    setLikedByMe(next);
-    setHotspot((prev) =>
-      prev
-        ? {
-            ...prev,
-            likes_count: Math.max((prev.likes_count ?? 0) + (next ? 1 : -1), 0),
-          }
-        : prev
-    );
+    try {
+      const next = await toggleWishlist(user.id, hotspot.id);
+      setWishlistedByMe(next);
+    } catch (error) {
+      console.error("Wishlist toggle failed:", error);
+      setUploadMessage("Could not update wishlist.");
+    }
   };
 
-  const handleToggleSave = async () => {
+  const handleToggleFavorite = async () => {
     if (!user || !hotspot) {
       setUploadMessage("Login required.");
       return;
     }
 
-    const next = await toggleHotspotSave({
-      userId: user.id,
-      hotspotId: hotspot.id,
-      hotspotName: hotspot.name,
-    });
-
-    setSavedByMe(next);
-    setHotspot((prev) =>
-      prev
-        ? {
-            ...prev,
-            saves_count: Math.max((prev.saves_count ?? 0) + (next ? 1 : -1), 0),
-          }
-        : prev
-    );
+    try {
+      const next = await toggleFavorite(user.id, hotspot.id);
+      setFavoritedByMe(next);
+    } catch (error) {
+      console.error("Favorite toggle failed:", error);
+      setUploadMessage("Could not update favorite.");
+    }
   };
 
   const handleUpload = async () => {
@@ -319,7 +306,7 @@ export default function HotspotDetailPage() {
             showCounter={true}
             showArrows={true}
           />
-          
+
           {/* Text overlay on top of carousel */}
           <div className="absolute bottom-4 left-4 right-4 pointer-events-none">
             <h1 className="text-2xl font-bold text-white drop-shadow-lg">{hotspot.name}</h1>
@@ -338,12 +325,12 @@ export default function HotspotDetailPage() {
               <p className="font-semibold text-slate-900">{hotspot.visit_count ?? 0}</p>
             </div>
             <div className="rounded-xl border border-slate-200 p-3">
-              <p className="text-xs text-slate-500">Likes</p>
-              <p className="font-semibold text-slate-900">{hotspot.likes_count ?? 0}</p>
+              <p className="text-xs text-slate-500">Wishlist</p>
+              <p className="font-semibold text-slate-900">{wishlistedByMe ? "Yes" : "No"}</p>
             </div>
             <div className="rounded-xl border border-slate-200 p-3">
-              <p className="text-xs text-slate-500">Saves</p>
-              <p className="font-semibold text-slate-900">{hotspot.saves_count ?? 0}</p>
+              <p className="text-xs text-slate-500">Favorite</p>
+              <p className="font-semibold text-slate-900">{favoritedByMe ? "Yes" : "No"}</p>
             </div>
             <div className="rounded-xl border border-slate-200 p-3">
               <p className="text-xs text-slate-500">Opening hours</p>
@@ -366,20 +353,20 @@ export default function HotspotDetailPage() {
 
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={handleToggleLike}
+              onClick={handleToggleWishlist}
               className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-                likedByMe ? "bg-rose-100 text-rose-700" : "bg-slate-900 text-white"
+                wishlistedByMe ? "bg-amber-100 text-amber-700" : "bg-slate-900 text-white"
               }`}
             >
-              {likedByMe ? "Liked" : "Like"}
+              {wishlistedByMe ? "Wishlisted" : "Wishlist"}
             </button>
             <button
-              onClick={handleToggleSave}
+              onClick={handleToggleFavorite}
               className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-                savedByMe ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-900"
+                favoritedByMe ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-900"
               }`}
             >
-              {savedByMe ? "Saved" : "Save"}
+              {favoritedByMe ? "Favorited" : "Favorite"}
             </button>
             <a
               href={routeUrl}
@@ -482,4 +469,3 @@ export default function HotspotDetailPage() {
     </div>
   );
 }
-

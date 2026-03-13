@@ -1,13 +1,12 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/Supabase/browser-client";
 
 export default function AuthCallback() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
+  
   useEffect(() => {
     const handleAuthCallback = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -29,7 +28,7 @@ export default function AuthCallback() {
     };
 
     handleAuthCallback();
-  }, [router, searchParams]);
+  }, [router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
@@ -40,3 +39,4 @@ export default function AuthCallback() {
     </div>
   );
 }
+

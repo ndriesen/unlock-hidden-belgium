@@ -1,9 +1,9 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef, forwardRef, useImperativeHandle } from "react";
 import { fetchHotspots } from "@/lib/services/hotspots";
 import { supabase } from "@/lib/Supabase/browser-client";
-import MapView from "./MapView";
+import MapView, { MapViewHandle } from "./MapView";
 import { Hotspot } from "@/types/hotspot";
 
 interface HotspotRow {
@@ -24,6 +24,9 @@ interface HotspotRow {
 
 export interface MapContainerProps {
   selectedCategory?: string;
+  hotspots?: Hotspot[];
+  selectedHotspotId?: string | null;
+  loading?: boolean;
 
   searchQuery?: string;
   categoryFilter?: string;
@@ -41,7 +44,23 @@ export interface MapContainerProps {
   onToast?: (msg: string) => void;
 }
 
-export default function MapContainer({
+export interface MapContainerHandle {
+  flyTo: (lat: number, lng: number, zoom?: number) => void;
+}
+
+function getCoordinates(hotspot: Hotspot): [number, number] | null {
+  const lat = hotspot.lat ?? hotspot.latitude;
+  const lng = hotspot.lng ?? hotspot.longitude;
+
+  if (typeof lat !== "number" || typeof lng !== "number") {
+    return null;
+  }
+
+  return [lat, lng];
+}
+
+// Wrap MapContainer with forwardRef to expose flyTo method
+const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({
   categoryFilter,
   provinceFilter,
   viewMode,
@@ -54,9 +73,13 @@ export default function MapContainer({
   onSelect,
   onVisit,
   onToast,
-}: MapContainerProps) {
-  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
-  const [loading, setLoading] = useState(true);
+  hotspots: providedHotspots,
+  selectedHotspotId,
+  loading: loadingOverride,
+}, ref) => {
+  const [internalHotspots, setInternalHotspots] = useState<Hotspot[]>([]);
+  const [loading, setLoading] = useState(!providedHotspots);
+  const mapViewRef = useRef<MapViewHandle | null>(null);
   const onToastRef = useRef(onToast);
 
   useEffect(() => {
@@ -64,13 +87,14 @@ export default function MapContainer({
   }, [onToast]);
 
   const loadHotspots = useCallback(async () => {
-    setLoading(true);
+    if (providedHotspots) return;
 
+    setLoading(true);
     try {
       const data = (await fetchHotspots()) as HotspotRow[] | null;
 
       if (!data) {
-        setHotspots([]);
+        setInternalHotspots([]);
         return;
       }
 
@@ -92,20 +116,27 @@ export default function MapContainer({
           saves_count: hotspot.saves_count ?? 0,
         }));
 
-      setHotspots(mapped);
+      setInternalHotspots(mapped);
     } catch (error) {
       console.error("Failed to load hotspots:", error);
-      onToastRef.current("Unable to load hotspots.");
+      onToastRef.current?.("Unable to load hotspots.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [providedHotspots]);
 
   useEffect(() => {
+    if (providedHotspots) {
+      setLoading(false);
+      return;
+    }
+
     void loadHotspots();
-  }, [loadHotspots]);
+  }, [loadHotspots, providedHotspots]);
 
   useEffect(() => {
+    if (providedHotspots) return;
+
     const channel = supabase
       .channel("hotspots-live")
       .on(
@@ -113,7 +144,7 @@ export default function MapContainer({
         { event: "*", schema: "public", table: "hotspots" },
         async () => {
           await loadHotspots();
-          onToastRef.current("Map updated.");
+          onToastRef.current?.("Map updated.");
         }
       )
       .subscribe();
@@ -121,12 +152,17 @@ export default function MapContainer({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loadHotspots]);
+  }, [loadHotspots, providedHotspots]);
 
+  const activeHotspots = providedHotspots ?? internalHotspots;
+
+  // Filter hotspots based on search & filters (skip if provided list is already filtered)
   const filtered = useMemo(() => {
+    if (providedHotspots) return activeHotspots;
+
     const q = searchQuery?.trim().toLowerCase();
 
-    return hotspots.filter((hotspot) => {
+    return activeHotspots.filter((hotspot) => {
       if (categoryFilter && hotspot.category !== categoryFilter) return false;
       if (provinceFilter && hotspot.province !== provinceFilter) return false;
 
@@ -138,12 +174,33 @@ export default function MapContainer({
         hotspot.province.toLowerCase().includes(q)
       );
     });
-  }, [hotspots, categoryFilter, provinceFilter, searchQuery]);
+  }, [activeHotspots, categoryFilter, provinceFilter, searchQuery, providedHotspots]);
+
+  useImperativeHandle(ref, () => ({
+    flyTo: (lat: number, lng: number, zoom = 16) => {
+      mapViewRef.current?.flyTo([lat, lng], zoom);
+    },
+  }));
+
+  useEffect(() => {
+    if (!selectedHotspotId || preventZoom) return;
+
+    const selected = filtered.find((hotspot) => hotspot.id === selectedHotspotId);
+    if (!selected) return;
+
+    const coords = getCoordinates(selected);
+    if (!coords) return;
+
+    mapViewRef.current?.flyTo(coords, 16);
+  }, [filtered, preventZoom, selectedHotspotId]);
+
+  const isLoading = typeof loadingOverride === "boolean" ? loadingOverride : loading;
 
   return (
     <MapView
+      ref={mapViewRef}
       hotspots={filtered}
-      loading={loading}
+      loading={isLoading}
       visitedIds={visitedIds}
       wishlistIds={wishlistIds}
       favoriteIds={favoriteIds}
@@ -152,7 +209,9 @@ export default function MapContainer({
       preventZoom={preventZoom}
       onSelect={onSelect}
       onVisit={onVisit ?? undefined}
+      selectedHotspotId={selectedHotspotId ?? null}
     />
   );
-}
+});
 
+export default MapContainer;

@@ -94,6 +94,7 @@ export async function recordActivity(params: {
   metadata?: Record<string, unknown>;
   visibility?: "private" | "friends" | "public";
   notifyUserIds?: string[];
+  notifyActor?: boolean;
 }): Promise<void> {
   const { data: inserted, error } = await supabase
     .from("activities")
@@ -124,8 +125,10 @@ export async function recordActivity(params: {
     .filter((id) => id !== params.actorId);
 
   const explicitIds = params.notifyUserIds ?? [];
+  const includeActor = params.notifyActor ?? false;
+
   const targetIds = Array.from(new Set([...followerIds, ...explicitIds])).filter(
-    (id) => id !== params.actorId
+    (id) => (includeActor ? true : id !== params.actorId)
   );
 
   if (!targetIds.length) {
@@ -229,4 +232,3 @@ export async function fetchUnreadNotificationCount(userId: string): Promise<numb
 
   return count ?? 0;
 }
-

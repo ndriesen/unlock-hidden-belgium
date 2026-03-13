@@ -6,11 +6,6 @@ import { Hotspot } from "@/types/hotspot";
 import ReviewsSection from "./ReviewsSection";
 import { useAuth } from "@/context/AuthContext";
 import { fetchHotspotMedia } from "@/lib/services/hotspotMedia";
-import {
-  fetchHotspotReactionState,
-  toggleHotspotLike,
-  toggleHotspotSave,
-} from "@/lib/services/hotspotSocial";
 import GalleryCarousel from "./GalleryCarousel";
 import TripSelectorModal from "./trips/TripSelectorModal";
 
@@ -27,6 +22,7 @@ interface Props {
   showTripSelector?: boolean;
   onShowTripSelector?: (show: boolean) => void;
   onTripUpdated?: () => void;
+  showFavoriteInDetail?: boolean;
 }
 
 type DetailTab = "overview" | "plan" | "reviews";
@@ -44,14 +40,10 @@ export default function HotspotDetail({
   showTripSelector,
   onShowTripSelector,
   onTripUpdated,
+  showFavoriteInDetail = true,
 }: Props) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  const [likedByMe, setLikedByMe] = useState(false);
-  const [savedByMe, setSavedByMe] = useState(false);
-  const [likesCount, setLikesCount] = useState(0);
-  const [savesCount, setSavesCount] = useState(0);
-  const [actionMessage, setActionMessage] = useState("");
   const router = useRouter();
   const { user } = useAuth();
 
@@ -60,27 +52,17 @@ export default function HotspotDetail({
 
     let active = true;
 
-    const loadMediaAndReactions = async () => {
-      const [media, reactions] = await Promise.all([
-        fetchHotspotMedia({ hotspotId: hotspot.id, userId: user?.id ?? null, limit: 8 }),
-        user?.id
-          ? fetchHotspotReactionState(user.id, hotspot.id)
-          : Promise.resolve({ liked: false, saved: false }),
-      ]);
+    const loadMedia = async () => {
+      const media = await fetchHotspotMedia({ hotspotId: hotspot.id, userId: user?.id ?? null, limit: 8 });
 
       if (!active) return;
 
       const uploaded = media.map((item) => item.signedUrl);
       const merged = Array.from(new Set([...(uploaded ?? []), ...(hotspot.images ?? [])]));
       setGalleryImages(merged);
-      setLikedByMe(reactions.liked);
-      setSavedByMe(reactions.saved);
-      setLikesCount(hotspot.likes_count ?? 0);
-      setSavesCount(hotspot.saves_count ?? 0);
-      setActionMessage("");
     };
 
-    void loadMediaAndReactions();
+    void loadMedia();
 
     return () => {
       active = false;
@@ -92,8 +74,8 @@ export default function HotspotDetail({
   const routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${hotspot.latitude},${hotspot.longitude}`;
 
   // Fallback image if no images available
-  const fallbackImage = hotspot?.images && hotspot.images.length > 0 
-    ? hotspot.images 
+  const fallbackImage = hotspot?.images && hotspot.images.length > 0
+    ? hotspot.images
     : ["https://images.unsplash.com/photo-1469474968028-56623f02e42e"];
 
   const shareHotspot = async () => {
@@ -106,38 +88,6 @@ export default function HotspotDetail({
     }
 
     await navigator.clipboard.writeText(`${text}\n${url}`);
-  };
-
-  const handleLike = async () => {
-    if (!user) {
-      setActionMessage("Login required.");
-      return;
-    }
-
-    const next = await toggleHotspotLike({
-      userId: user.id,
-      hotspotId: hotspot.id,
-      hotspotName: hotspot.name,
-    });
-
-    setLikedByMe(next);
-    setLikesCount((prev) => Math.max(prev + (next ? 1 : -1), 0));
-  };
-
-  const handleSave = async () => {
-    if (!user) {
-      setActionMessage("Login required.");
-      return;
-    }
-
-    const next = await toggleHotspotSave({
-      userId: user.id,
-      hotspotId: hotspot.id,
-      hotspotName: hotspot.name,
-    });
-
-    setSavedByMe(next);
-    setSavesCount((prev) => Math.max(prev + (next ? 1 : -1), 0));
   };
 
   return (
@@ -173,33 +123,30 @@ export default function HotspotDetail({
           </p>
         </div>
       </div>
-<div className="px-4 pt-4 space-y-3">
 
-  {/* Social + utility actions */}
-  <div className="flex items-center justify-between"></div>
-      <div className="flex items-center gap-4">
+      <div className="px-4 pt-4 space-y-3">
+        {/* Social + utility actions */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => onWishlist?.(hotspot.id)}
+            className={`text-sm font-medium ${
+              isWishlist ? "text-amber-600" : "text-slate-700"
+            }`}
+          >
+            <span aria-hidden="true">☆</span> Wishlist
+          </button>
 
-  <button
-    onClick={handleLike}
-    className={`text-sm font-medium ${
-      likedByMe ? "text-rose-600" : "text-slate-700"
-    }`}
-  >
-    ♥ {likesCount}
-  </button>
-
-  <button
-    onClick={() => onWishlist?.(hotspot.id)}
-    className={`text-sm font-medium ${
-      isWishlist ? "text-amber-600" : "text-slate-700"
-    }`}
-  >
-    ☆ Wishlist
-  </button>
-
-</div>
-
-        {actionMessage && <p className="text-xs text-slate-600">{actionMessage}</p>}
+          {showFavoriteInDetail && (
+            <button
+              onClick={() => onFavorite?.(hotspot.id)}
+              className={`text-sm font-medium ${
+                isFavorite ? "text-rose-600" : "text-slate-700"
+              }`}
+            >
+              <span aria-hidden="true">♡</span> Favorite
+            </button>
+          )}
+        </div>
 
         <div className="mt-1 grid grid-cols-3 gap-2">
           <button
@@ -319,4 +266,3 @@ export default function HotspotDetail({
     </div>
   );
 }
-

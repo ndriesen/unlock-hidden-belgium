@@ -7,10 +7,10 @@ interface HotspotRow {
   province: string | null;
   description: string | null;
   wikipedia_intro: string | null;
-  tags?: string[];        // <-- make optional
+  tags?: string[];
   tourism_type: string | null;
   heritage: boolean | null;
-  images?: string[];      // <-- make optional
+  images?: string[];
   visit_count: number | null;
   likes_count: number | null;
   saves_count: number | null;
@@ -48,64 +48,30 @@ export interface ExploreHotspot {
   visited: boolean;
   wishlist: boolean;
   favorite: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  website?: string;
+  opening_hours?: string[];
+  entry_fee?: number | null;
+  address?: string;
+  municipality?: string;
+  difficulty_level?: number | null;
+  last_updated?: string;
 }
 
-const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
-
-// ------------------------
-// Helper functions
-// ------------------------
-
-// Safely parse arrays from Supabase
-function parseArray(arr: unknown): string[] | null {
-  if (!arr) return null;
-  if (Array.isArray(arr)) return arr.filter(i => typeof i === "string");
-  if (typeof arr === "string") {
-    try { return JSON.parse(arr); } catch { return null; }
-  }
-  return null;
-}
-
-// Fetch Wikipedia intro for a hotspot
-async function fetchWikipediaIntro(name: string): Promise<string | null> {
-  try {
-    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    return data.extract ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// Fetch Google Place data for enrichment
-async function fetchGooglePlace(name: string, municipality: string) {
-  const query = encodeURIComponent(`${name} ${municipality}`);
-  const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=place_id,name,geometry,types,formatted_address,photos,opening_hours,website,price_level,rating&key=${GOOGLE_API_KEY}`;
-
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.candidates?.length > 0) {
-      const place = data.candidates[0];
-      return {
-        description: place.description,
-        latitude: place.geometry?.location?.lat ?? null,
-        longitude: place.geometry?.location?.lng ?? null,
-        category: place.types?.[0] ?? null,
-        address: place.formatted_address ?? null,
-        website: place.website ?? null,
-        opening_hours: place.opening_hours?.weekday_text ?? null,
-        entry_fee: place.price_level ?? null,
-        images: place.photos?.map(
-          (p: any) => `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${p.photo_reference}&key=${GOOGLE_API_KEY}`
-        ) ?? null,
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
+export interface PopularTrip {
+  id: string;
+  title: string;
+  description: string;
+  coverImage: string;
+  likesCount: number;
+  savesCount: number;
+  viewsCount: number;
+  stopCount: number;
+  score: number;
+  authorName: string;
+  likedByMe: boolean;
+  savedByMe: boolean;
 }
 
 /**
@@ -115,13 +81,13 @@ async function fetchGooglePlace(name: string, municipality: string) {
  */
 function parseImages(images: unknown): string[] | null {
   if (!images) return null;
-  
+
   // If it's already an array of strings
   if (Array.isArray(images)) {
     const filtered = images.filter((item): item is string => typeof item === "string");
     return filtered.length > 0 ? filtered : null;
   }
-  
+
   // If it's a string (stringified JSON array)
   if (typeof images === "string") {
     try {
@@ -135,18 +101,18 @@ function parseImages(images: unknown): string[] | null {
       return null;
     }
   }
-  
+
   return null;
 }
 
 function parseTags(tags: unknown): string[] | null {
   if (!tags) return null;
-  
+
   if (Array.isArray(tags)) {
     const filtered = tags.filter((item): item is string => typeof item === "string");
     return filtered.length > 0 ? filtered : null;
   }
-  
+
   if (typeof tags === "string") {
     try {
       const parsed = JSON.parse(tags);
@@ -158,7 +124,7 @@ function parseTags(tags: unknown): string[] | null {
       return null;
     }
   }
-  
+
   return null;
 }
 
@@ -204,53 +170,6 @@ interface TripReactionRow {
   trip_id: string;
 }
 
-export interface ExploreHotspot {
-  id: string;
-  name: string;
-  category: string;
-  province: string;
-  description: string;
-  wikipedia_intro?: string;
-  tags?: string[];
-  tourism_type?: string;
-  heritage?: boolean;
-  imageUrl: string;
-  visitCount: number;
-  reviewCount: number;
-  averageRating: number;
-  likesCount: number;
-  savesCount: number;
-  likedByMe: boolean;
-  savedByMe: boolean;
-  visited: boolean;
-  wishlist: boolean;
-  favorite: boolean;
-  latitude?: number | null;
-  longitude?: number | null;
-  website?: string;
-  opening_hours?: string[];  // Google returns weekday_text array
-  entry_fee?: number | null;
-  address?: string;
-  municipality?: string;
-  difficulty_level?: number | null;
-  last_updated?: string;
-}
-
-export interface PopularTrip {
-  id: string;
-  title: string;
-  description: string;
-  coverImage: string;
-  likesCount: number;
-  savesCount: number;
-  viewsCount: number;
-  stopCount: number;
-  score: number;
-  authorName: string;
-  likedByMe: boolean;
-  savedByMe: boolean;
-}
-
 function safeImage(images: string[] | null | undefined): string {
   return images?.[0] ?? "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
 }
@@ -289,7 +208,7 @@ function buildReviewStats(rows: ReviewRow[]): Map<string, { count: number; avg: 
 }
 
 export async function fetchExploreHotspots(userId?: string | null): Promise<ExploreHotspot[]> {
-  // 1️⃣ Load approved hotspots
+  // Load approved hotspots
   const { data: hotspotData, error: hotspotError } = await supabase
     .from("hotspots")
     .select("*")
@@ -297,23 +216,23 @@ export async function fetchExploreHotspots(userId?: string | null): Promise<Expl
 
   if (hotspotError || !hotspotData) throw hotspotError ?? new Error("Could not load hotspots");
 
-  const rows = (hotspotData as HotspotRow[]).map(row => ({
+  const rows = (hotspotData as HotspotRow[]).map((row) => ({
     ...row,
-    images: parseImages(row.images),
-    tags: parseTags(row.tags),
+    images: parseImages(row.images) ?? undefined,
+    tags: parseTags(row.tags) ?? undefined,
   }));
 
   const hotspotIds = rows.map((r) => r.id);
   if (!hotspotIds.length) return [];
 
-  // 2️⃣ Fetch review stats
+  // Fetch review stats
   const { data: reviewData } = await supabase
     .from("reviews")
     .select("hotspot_id,rating")
     .in("hotspot_id", hotspotIds);
   const reviewStats = buildReviewStats((reviewData ?? []) as ReviewRow[]);
 
-  // 3️⃣ Fetch user flags, likes & saves
+  // Fetch user flags, likes and saves
   const flagMap = new Map<string, { visited: boolean; wishlist: boolean; favorite: boolean }>();
   const likedByMe = new Set<string>();
   const savedByMe = new Set<string>();
@@ -345,54 +264,19 @@ export async function fetchExploreHotspots(userId?: string | null): Promise<Expl
         favorite: !!row.favorite,
       })
     );
-    if (!likesResult.error) (likesResult.data ?? []).forEach((r: HotspotReactionRow) => likedByMe.add(r.hotspot_id));
-    if (!savesResult.error) (savesResult.data ?? []).forEach((r: HotspotReactionRow) => savedByMe.add(r.hotspot_id));
-  }
 
-  function normalizeArray(arr: string[] | null | undefined): string[] | undefined {
-      if (!arr || arr.length === 0) return undefined; // null or empty → undefined
-      return arr;
+    if (!likesResult.error) {
+      (likesResult.data ?? []).forEach((r: HotspotReactionRow) => likedByMe.add(r.hotspot_id));
     }
-
-  // 4️⃣ Enrich with external sources (Google Places + Wikipedia)
-  async function enrichHotspot(row: HotspotRow): Promise<HotspotRow> {
-    const googleData = await fetchGooglePlace(row.name, row.province ?? "");
-    const wikiIntro = await fetchWikipediaIntro(row.name);
-
-      const normalizedRows = (hotspotData as HotspotRow[]).map(row => ({
-        ...row,
-        images: parseImages(row.images) ?? undefined, // normalize null → undefined
-        tags: parseTags(row.tags) ?? undefined,      // normalize null → undefined
-      }));
-
-    return {
-        ...row,
-      description: googleData?.description ?? row.description,
-      latitude: googleData?.latitude ?? row.latitude,
-      longitude: googleData?.longitude ?? row.longitude,
-      category: googleData?.category ?? row.category,
-      difficulty_level: row.difficulty_level ?? 1,
-      website: googleData?.website ?? row.website,
-      opening_hours: googleData?.opening_hours ?? row.opening_hours,
-      entry_fee: googleData?.entry_fee ?? row.entry_fee,
-      address: googleData?.address ?? row.address,
-      municipality: googleData?.address ? googleData.address.split(",")[1]?.trim() : row.municipality,
-      images: googleData?.images ? [...(row.images ?? []), ...googleData.images] : row.images,
-      wikipedia_intro: wikiIntro ?? row.wikipedia_intro,
-      last_updated: new Date().toISOString(),
-    };
+    if (!savesResult.error) {
+      (savesResult.data ?? []).forEach((r: HotspotReactionRow) => savedByMe.add(r.hotspot_id));
+    }
   }
 
+  // External enrichment is handled by offline scripts (e.g., npm run enrich_hotspots).
+  const enrichedRows = rows;
 
-  const normalizedRows = (hotspotData as HotspotRow[]).map(row => ({
-    ...row,
-    images: parseImages(row.images) ?? undefined, // normalize null → undefined
-    tags: parseTags(row.tags) ?? undefined,      // normalize null → undefined
-  }));
-
-  const enrichedRows = await Promise.all(normalizedRows.map(enrichHotspot));
-
-  // 5️⃣ Map to ExploreHotspot for frontend
+  // Map to ExploreHotspot for frontend
   return enrichedRows
     .map((row) => {
       const review = reviewStats.get(row.id) ?? { count: 0, avg: 0 };

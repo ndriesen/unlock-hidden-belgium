@@ -95,7 +95,7 @@ export default function ActivityPage() {
         <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Activity</p>
         <h1 className="text-2xl font-bold text-slate-900">Updates from your network</h1>
         <p className="text-sm text-slate-600">
-          Track new likes, saves, trips and photo updates from people you follow.
+          Track new wishlist and favorite updates, trips and photo updates from people you follow.
         </p>
 
         <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
@@ -206,4 +206,5 @@ export default function ActivityPage() {
     </div>
   );
 }
+
 
