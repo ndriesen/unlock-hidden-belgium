@@ -173,61 +173,31 @@ export default function HotspotDetail({
           </p>
         </div>
       </div>
+<div className="px-4 pt-4 space-y-3">
 
-      <div className="px-4 pt-4 space-y-2">
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => onVisit?.(hotspot.id)}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-              isVisited ? "bg-emerald-100 text-emerald-800" : "bg-emerald-600 text-white"
-            }`}
-          >
-            {isVisited ? "Visited" : "Mark visited"}
-          </button>
+  {/* Social + utility actions */}
+  <div className="flex items-center justify-between"></div>
+      <div className="flex items-center gap-4">
 
-          <button
-            onClick={() => onShowTripSelector?.(true)}
-            className="rounded-xl px-3 py-2 text-sm font-semibold border border-slate-200 bg-slate-50 text-slate-800"
-          >
-            Add to trip
-          </button>
+  <button
+    onClick={handleLike}
+    className={`text-sm font-medium ${
+      likedByMe ? "text-rose-600" : "text-slate-700"
+    }`}
+  >
+    ♥ {likesCount}
+  </button>
 
-          <button
-            onClick={handleLike}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-              likedByMe ? "bg-rose-100 text-rose-800" : "bg-slate-900 text-white"
-            }`}
-          >
-            {likedByMe ? "Liked" : "Like"} ({likesCount})
-          </button>
+  <button
+    onClick={() => onWishlist?.(hotspot.id)}
+    className={`text-sm font-medium ${
+      isWishlist ? "text-amber-600" : "text-slate-700"
+    }`}
+  >
+    ☆ Wishlist
+  </button>
 
-          <button
-            onClick={handleSave}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-              savedByMe ? "bg-amber-100 text-amber-800" : "bg-amber-400 text-slate-900"
-            }`}
-          >
-            {savedByMe ? "Saved" : "Save"} ({savesCount})
-          </button>
-
-          <button
-            onClick={() => onWishlist?.(hotspot.id)}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-              isWishlist ? "bg-amber-100 text-amber-800" : "bg-amber-400 text-slate-900"
-            }`}
-          >
-            {isWishlist ? "In wishlist" : "Wishlist"}
-          </button>
-
-          <button
-            onClick={() => onFavorite?.(hotspot.id)}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-              isFavorite ? "bg-fuchsia-100 text-fuchsia-800" : "bg-fuchsia-600 text-white"
-            }`}
-          >
-            {isFavorite ? "Favorited" : "Favorite"}
-          </button>
-        </div>
+</div>
 
         {actionMessage && <p className="text-xs text-slate-600">{actionMessage}</p>}
 

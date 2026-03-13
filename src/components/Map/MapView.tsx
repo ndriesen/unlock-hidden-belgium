@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 import "leaflet.heat";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from "react";
 
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
@@ -16,6 +16,7 @@ interface Props {
   visitedIds?: string[];
   wishlistIds?: string[];
   favoriteIds?: string[];
+  selectedHotspotId?: string | null;
   viewMode: "markers" | "heatmap";
   mapStyle: "default" | "satellite" | "retro" | "terrain";
   autoLocate?: boolean;
@@ -57,6 +58,10 @@ interface HeatLayerFactory {
     points: [number, number, number][],
     options: HeatLayerOptions
   ) => L.Layer;
+}
+
+export interface MapViewHandle {
+  flyTo: (coords: [number, number], zoom?: number) => void;
 }
 
 function getCoordinates(
@@ -137,12 +142,13 @@ function FitToHotspots({ hotspots, enabled }: { hotspots: Hotspot[]; enabled: bo
   return null;
 }
 
-export default function MapView({
+const MapView = forwardRef<MapViewHandle, Props>(function MapView({
   hotspots = [],
   loading,
   visitedIds = [],
   wishlistIds = [],
   favoriteIds = [],
+  selectedHotspotId,
   viewMode = "markers",
   mapStyle = "default",
   autoLocate = true,
@@ -151,7 +157,7 @@ export default function MapView({
   preventZoom = false,
   onVisit,
   onSelect,
-}: Props) {
+}: Props, ref) {
   const mapRef = useRef<L.Map | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(
@@ -159,6 +165,18 @@ export default function MapView({
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches
   );
+
+  useImperativeHandle(ref, () => ({
+    flyTo: (coords: [number, number], zoom = 14) => {
+      if (!mapRef.current) return;
+      mapRef.current.flyTo(coords, zoom, { duration: 0.8 });
+    },
+  }));
+
+  useEffect(() => {
+    if (selectedHotspotId === undefined) return;
+    setSelectedId(selectedHotspotId);
+  }, [selectedHotspotId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -176,7 +194,7 @@ export default function MapView({
   const useCanvas = hotspots.length > 1500;
   const tile = useMemo(() => mapTileConfig(mapStyle, isDark), [mapStyle, isDark]);
 
-    const handleSelect = useCallback(
+  const handleSelect = useCallback(
     (hotspot: Hotspot) => {
       setSelectedId(hotspot.id);
       onSelect?.(hotspot);
@@ -209,7 +227,7 @@ export default function MapView({
         {viewMode === "markers" && enableClustering && hotspots.length > 1 && (
           <MarkerClusterGroup
             chunkedLoading
-            maxClusterRadius={60}
+            maxClusterRadius={19}
             iconCreateFunction={(cluster: ClusterLike) => {
               const count = cluster.getChildCount();
               const size = count < 10 ? 26 : count < 50 ? 36 : 54;
@@ -281,7 +299,9 @@ export default function MapView({
       )}
     </div>
   );
-}
+});
+
+export default MapView;
 
 function ZoomAwareMarkers({
   hotspots,
@@ -313,7 +333,7 @@ function ZoomAwareMarkers({
   // Staggered marker loading - progressively show more markers
   useEffect(() => {
     if (visibleCount >= hotspots.length) return;
-    
+
     const timeout = setTimeout(() => {
       setVisibleCount((prev) => Math.min(prev + 50, hotspots.length));
     }, 100);
@@ -322,8 +342,8 @@ function ZoomAwareMarkers({
   }, [visibleCount, hotspots.length]);
 
   // Only show markers up to visibleCount for performance
-  const visibleHotspots = useMemo(() => 
-    hotspots.slice(0, visibleCount), 
+  const visibleHotspots = useMemo(
+    () => hotspots.slice(0, visibleCount),
     [hotspots, visibleCount]
   );
 
@@ -501,4 +521,3 @@ function UserLocation({ hotspots, onVisit }: UserLocationProps) {
 
   return <Marker position={position} icon={icon} />;
 }
-

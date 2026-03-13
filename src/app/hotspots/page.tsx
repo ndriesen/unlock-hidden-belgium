@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -11,11 +12,12 @@ import {
   fetchExploreHotspots,
   fetchPopularTrips,
 } from "@/lib/services/explore";
-import { toggleHotspotLike, toggleHotspotSave } from "@/lib/services/hotspotSocial";
 import { toggleTripLike, toggleTripSave } from "@/lib/services/tripBuilder";
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
+import { toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
 import HotspotPanel from "@/components/HotspotPanel";
+import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
 
 const MapContainer = dynamic(
   () =>
@@ -30,6 +32,9 @@ const MapContainer = dynamic(
         wishlistIds?: string[];
         favoriteIds?: string[];
         preventZoom?: boolean;
+        hotspots?: Hotspot[];
+        selectedHotspotId?: string | null;
+        loading?: boolean;
         onSelect?: (hotspot: Hotspot) => void;
         onVisit?: (hotspotId: string) => void;
         onToast?: (message: string) => void;
@@ -38,10 +43,52 @@ const MapContainer = dynamic(
   { ssr: false }
 );
 
+function hasCoordinates(
+  hotspot: ExploreHotspot
+): hotspot is ExploreHotspot & { latitude: number; longitude: number } {
+  return typeof hotspot.latitude === "number" && typeof hotspot.longitude === "number";
+}
+
+function mapExploreToHotspot(
+  hotspot: ExploreHotspot & { latitude: number; longitude: number }
+): Hotspot {
+  return {
+    id: hotspot.id,
+    name: hotspot.name,
+    latitude: hotspot.latitude,
+    longitude: hotspot.longitude,
+    lat: hotspot.latitude,
+    lng: hotspot.longitude,
+    category: hotspot.category,
+    province: hotspot.province,
+    description: hotspot.description,
+    images: hotspot.imageUrl ? [hotspot.imageUrl] : undefined,
+    visit_count: hotspot.visitCount,
+    likes_count: hotspot.likesCount,
+    saves_count: hotspot.savesCount,
+  };
+}
+
+function findAdjacentHotspot(
+  hotspots: ExploreHotspot[],
+  startIndex: number,
+  direction: 1 | -1
+): (ExploreHotspot & { latitude: number; longitude: number }) | null {
+  for (let i = startIndex + direction; i >= 0 && i < hotspots.length; i += direction) {
+    const candidate = hotspots[i];
+    if (hasCoordinates(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 type ExploreSortMode = "popular" | "reviews" | "rating";
 
 export default function ExplorePage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
 
   const [hotspots, setHotspots] = useState<ExploreHotspot[]>([]);
   const [trips, setTrips] = useState<PopularTrip[]>([]);
@@ -54,8 +101,11 @@ export default function ExplorePage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [provinceFilter, setProvinceFilter] = useState("");
   const [sortMode, setSortMode] = useState<ExploreSortMode>("popular");
+
+  const [actionMessage, setActionMessage] = useState("");
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
-  const [actionMessage, setActionMessage] = useState(""); 
+  const [mapFocusId, setMapFocusId] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const loadExplore = useCallback(async () => {
     setLoading(true);
@@ -83,6 +133,13 @@ export default function ExplorePage() {
   useEffect(() => {
     void loadExplore();
   }, [loadExplore]);
+
+  useEffect(() => {
+    const categoryParam = searchParams.get("category");
+    if (!categoryParam) return;
+
+    setCategoryFilter((prev) => (prev ? prev : categoryParam));
+  }, [searchParams]);
 
   const categories = useMemo(
     () =>
@@ -125,8 +182,8 @@ export default function ExplorePage() {
         return b.averageRating - a.averageRating || b.reviewCount - a.reviewCount;
       }
 
-      const scoreA = a.visitCount + a.likesCount * 1.8 + a.savesCount * 1.5;
-      const scoreB = b.visitCount + b.likesCount * 1.8 + b.savesCount * 1.5;
+      const scoreA = a.visitCount + a.reviewCount * 2 + a.averageRating * 5;
+      const scoreB = b.visitCount + b.reviewCount * 2 + b.averageRating * 5;
 
       return scoreB - scoreA;
     });
@@ -134,55 +191,133 @@ export default function ExplorePage() {
     return output;
   }, [categoryFilter, hotspots, provinceFilter, searchQuery, sortMode]);
 
-  const toggleHotspotLikeInUi = async (item: ExploreHotspot) => {
-    if (!user?.id) {
-      setActionMessage("Login required.");
-      return;
+  const mapHotspots = useMemo(
+    () => filteredHotspots.filter(hasCoordinates).map(mapExploreToHotspot),
+    [filteredHotspots]
+  );
+
+  const selectedMeta = useMemo(() => {
+    if (!selectedHotspot) return null;
+    return hotspots.find((hotspot) => hotspot.id === selectedHotspot.id) ?? null;
+  }, [hotspots, selectedHotspot]);
+
+  useEffect(() => {
+    if (selectedHotspot && !filteredHotspots.find((hotspot) => hotspot.id === selectedHotspot.id)) {
+      setSelectedHotspot(null);
+    }
+  }, [filteredHotspots, selectedHotspot]);
+
+  useEffect(() => {
+    if (mapFocusId && !filteredHotspots.find((hotspot) => hotspot.id === mapFocusId)) {
+      setMapFocusId(null);
+    }
+  }, [filteredHotspots, mapFocusId]);
+
+  const handleMapSelect = useCallback((hotspot: Hotspot) => {
+    setSelectedHotspot(hotspot);
+    setMapFocusId(null);
+  }, []);
+
+  const handleNextHotspot = useCallback(() => {
+    if (!selectedHotspot) return;
+
+    const currentIndex = filteredHotspots.findIndex(
+      (hotspot) => hotspot.id === selectedHotspot.id
+    );
+
+    if (currentIndex < 0) return;
+
+    const nextHotspot = findAdjacentHotspot(filteredHotspots, currentIndex, 1);
+    if (!nextHotspot) return;
+
+    setSelectedHotspot(mapExploreToHotspot(nextHotspot));
+    setMapFocusId(null);
+  }, [filteredHotspots, selectedHotspot]);
+
+  const handlePreviousHotspot = useCallback(() => {
+    if (!selectedHotspot) return;
+
+    const currentIndex = filteredHotspots.findIndex(
+      (hotspot) => hotspot.id === selectedHotspot.id
+    );
+
+    if (currentIndex < 0) return;
+
+    const prevHotspot = findAdjacentHotspot(filteredHotspots, currentIndex, -1);
+    if (!prevHotspot) return;
+
+    setSelectedHotspot(mapExploreToHotspot(prevHotspot));
+    setMapFocusId(null);
+  }, [filteredHotspots, selectedHotspot]);
+
+  const navigationState = useMemo(() => {
+    if (!selectedHotspot) {
+      return { canGoPrevious: false, canGoNext: false, positionLabel: "" };
     }
 
-    const next = await toggleHotspotLike({
-      userId: user.id,
-      hotspotId: item.id,
-      hotspotName: item.name,
-    });
-
-    setHotspots((prev) =>
-      prev.map((hotspot) =>
-        hotspot.id === item.id
-          ? {
-              ...hotspot,
-              likedByMe: next,
-              likesCount: Math.max(hotspot.likesCount + (next ? 1 : -1), 0),
-            }
-          : hotspot
-      )
+    const currentIndex = filteredHotspots.findIndex(
+      (hotspot) => hotspot.id === selectedHotspot.id
     );
-  };
 
-  const toggleHotspotSaveInUi = async (item: ExploreHotspot) => {
-    if (!user?.id) {
-      setActionMessage("Login required.");
-      return;
+    if (currentIndex < 0) {
+      return { canGoPrevious: false, canGoNext: false, positionLabel: "" };
     }
 
-    const next = await toggleHotspotSave({
-      userId: user.id,
-      hotspotId: item.id,
-      hotspotName: item.name,
-    });
+    const canGoPrevious = !!findAdjacentHotspot(filteredHotspots, currentIndex, -1);
+    const canGoNext = !!findAdjacentHotspot(filteredHotspots, currentIndex, 1);
 
-    setHotspots((prev) =>
-      prev.map((hotspot) =>
-        hotspot.id === item.id
-          ? {
-              ...hotspot,
-              savedByMe: next,
-              savesCount: Math.max(hotspot.savesCount + (next ? 1 : -1), 0),
-            }
-          : hotspot
-      )
-    );
-  };
+    return {
+      canGoPrevious,
+      canGoNext,
+      positionLabel: `${currentIndex + 1} / ${filteredHotspots.length}`,
+    };
+  }, [filteredHotspots, selectedHotspot]);
+
+  const toggleWishlistInUi = useCallback(
+    async (hotspotId: string) => {
+      if (!user?.id) {
+        setActionMessage("Login required.");
+        return;
+      }
+
+      try {
+        const next = await toggleWishlist(user.id, hotspotId);
+
+        setHotspots((prev) =>
+          prev.map((hotspot) =>
+            hotspot.id === hotspotId ? { ...hotspot, wishlist: next } : hotspot
+          )
+        );
+      } catch (error) {
+        console.error("Wishlist toggle failed:", error);
+        setActionMessage("Could not update wishlist.");
+      }
+    },
+    [user?.id]
+  );
+
+  const toggleFavoriteInUi = useCallback(
+    async (hotspotId: string) => {
+      if (!user?.id) {
+        setActionMessage("Login required.");
+        return;
+      }
+
+      try {
+        const next = await toggleFavorite(user.id, hotspotId);
+
+        setHotspots((prev) =>
+          prev.map((hotspot) =>
+            hotspot.id === hotspotId ? { ...hotspot, favorite: next } : hotspot
+          )
+        );
+      } catch (error) {
+        console.error("Favorite toggle failed:", error);
+        setActionMessage("Could not update favorites.");
+      }
+    },
+    [user?.id]
+  );
 
   const toggleTripLikeInUi = async (item: PopularTrip) => {
     if (!user?.id) {
@@ -190,20 +325,11 @@ export default function ExplorePage() {
       return;
     }
 
-    const next = await toggleTripLike({
-      userId: user.id,
-      tripId: item.id,
-      tripTitle: item.title,
-    });
-
+    const next = await toggleTripLike({ userId: user.id, tripId: item.id, tripTitle: item.title });
     setTrips((prev) =>
       prev.map((trip) =>
         trip.id === item.id
-          ? {
-              ...trip,
-              likedByMe: next,
-              likesCount: Math.max(trip.likesCount + (next ? 1 : -1), 0),
-            }
+          ? { ...trip, likedByMe: next, likesCount: Math.max(trip.likesCount + (next ? 1 : -1), 0) }
           : trip
       )
     );
@@ -215,26 +341,17 @@ export default function ExplorePage() {
       return;
     }
 
-    const next = await toggleTripSave({
-      userId: user.id,
-      tripId: item.id,
-      tripTitle: item.title,
-    });
-
+    const next = await toggleTripSave({ userId: user.id, tripId: item.id, tripTitle: item.title });
     setTrips((prev) =>
       prev.map((trip) =>
         trip.id === item.id
-          ? {
-              ...trip,
-              savedByMe: next,
-              savesCount: Math.max(trip.savesCount + (next ? 1 : -1), 0),
-            }
+          ? { ...trip, savedByMe: next, savesCount: Math.max(trip.savesCount + (next ? 1 : -1), 0) }
           : trip
       )
     );
   };
 
-  return 
+  return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 p-5 shadow-sm">
         <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Explore</p>
@@ -260,6 +377,12 @@ export default function ExplorePage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-2 font-semibold text-emerald-700 hover:bg-emerald-100"
+        >
+          + Add Hotspot
+        </button>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <input
             value={searchQuery}
@@ -303,7 +426,7 @@ export default function ExplorePage() {
             <option value="reviews">Most reviewed</option>
             <option value="rating">Highest rated</option>
           </select>
-</div>
+        </div>
       </section>
 
       {/* Interactive Map Section */}
@@ -312,37 +435,35 @@ export default function ExplorePage() {
           <MapContainer
             viewMode="markers"
             mapStyle="default"
-            searchQuery={searchQuery}
-            categoryFilter={categoryFilter}
-            provinceFilter={provinceFilter}
             preventZoom={false}
+            hotspots={mapHotspots}
+            selectedHotspotId={selectedHotspot?.id ?? mapFocusId ?? null}
             visitedIds={[]}
             wishlistIds={[]}
             favoriteIds={[]}
-            onSelect={(hotspot) => setSelectedHotspot(hotspot)}
+            loading={loading}
+            onSelect={handleMapSelect}
             onToast={setActionMessage}
           />
         </div>
       </section>
 
-      selectedHotspot && 
-        <HotspotPanel
-          hotspot={selectedHotspot}
-          onClose={() => setSelectedHotspot(null)}
-          onVisit={() => {}}
-          onWishlist={() => {}}
-          onFavorite={() => {}}
-          onAddToTrip={() => {}}
-          isVisited={false}
-          isWishlist={false}
-          isFavorite={false}
-          canGoPrevious={false}         
-          canGoNext={true}              
-          onPrevious={() => {}}         
-          onNext={() => {}}             
-          positionLabel="1 / 10"      
-        />
-       
+      <HotspotPanel
+        hotspot={selectedHotspot}
+        onClose={() => setSelectedHotspot(null)}
+        onVisit={() => {}}
+        onWishlist={toggleWishlistInUi}
+        onFavorite={toggleFavoriteInUi}
+        onAddToTrip={() => {}}
+        isVisited={false}
+        isWishlist={selectedMeta?.wishlist ?? false}
+        isFavorite={selectedMeta?.favorite ?? false}
+        canGoPrevious={navigationState.canGoPrevious}
+        canGoNext={navigationState.canGoNext}
+        onPrevious={handlePreviousHotspot}
+        onNext={handleNextHotspot}
+        positionLabel={navigationState.positionLabel}
+      />
 
       {actionMessage && (
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
@@ -397,7 +518,7 @@ export default function ExplorePage() {
                 <div className="space-y-3 p-3">
                   <p className="line-clamp-2 text-sm text-slate-700">{hotspot.description}</p>
 
-                  <div className="grid grid-cols-5 gap-2 text-center text-xs">
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
                     <div className="rounded-lg border border-slate-200 p-2">
                       <p className="text-slate-500">Visits</p>
                       <p className="font-semibold text-slate-900">{hotspot.visitCount}</p>
@@ -409,14 +530,6 @@ export default function ExplorePage() {
                     <div className="rounded-lg border border-slate-200 p-2">
                       <p className="text-slate-500">Rating</p>
                       <p className="font-semibold text-slate-900">{hotspot.averageRating.toFixed(1)}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 p-2">
-                      <p className="text-slate-500">Likes</p>
-                      <p className="font-semibold text-slate-900">{hotspot.likesCount}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 p-2">
-                      <p className="text-slate-500">Saves</p>
-                      <p className="font-semibold text-slate-900">{hotspot.savesCount}</p>
                     </div>
                   </div>
 
@@ -435,23 +548,23 @@ export default function ExplorePage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => {
-                        void toggleHotspotLikeInUi(hotspot);
+                        void toggleWishlistInUi(hotspot.id);
                       }}
                       className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                        hotspot.likedByMe ? "bg-rose-100 text-rose-700" : "border border-slate-200 text-slate-700"
+                        hotspot.wishlist ? "bg-amber-100 text-amber-700" : "border border-slate-200 text-slate-700"
                       }`}
                     >
-                      {hotspot.likedByMe ? "Liked" : "Like"}
+                      {hotspot.wishlist ? "Wishlisted" : "Wishlist"}
                     </button>
                     <button
                       onClick={() => {
-                        void toggleHotspotSaveInUi(hotspot);
+                        void toggleFavoriteInUi(hotspot.id);
                       }}
                       className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                        hotspot.savedByMe ? "bg-amber-100 text-amber-700" : "border border-slate-200 text-slate-700"
+                        hotspot.favorite ? "bg-rose-100 text-rose-700" : "border border-slate-200 text-slate-700"
                       }`}
                     >
-                      {hotspot.savedByMe ? "Saved" : "Save"}
+                      {hotspot.favorite ? "Favorited" : "Favorite"}
                     </button>
                   </div>
 
@@ -462,12 +575,19 @@ export default function ExplorePage() {
                     >
                       Open details
                     </Link>
-                    <Link
-                      href="/"
+                    <button
+                      onClick={() => {
+                        if (!hasCoordinates(hotspot)) {
+                          setActionMessage("This hotspot has no coordinates yet.");
+                          return;
+                        }
+                        setMapFocusId(hotspot.id);
+                        setSelectedHotspot(null);
+                      }}
                       className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white"
                     >
                       Open map
-                    </Link>
+                    </button>
                   </div>
                 </div>
               </article>
@@ -588,8 +708,15 @@ export default function ExplorePage() {
           ))}
         </div>
       </section>
+
+      <AddHotspotModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdded={() => {
+          setIsAddModalOpen(false);
+          void loadExplore();
+        }}
+      />
     </div>
-  ;
+  );
 }
-
-

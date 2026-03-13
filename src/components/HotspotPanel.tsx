@@ -10,18 +10,15 @@ interface HotspotPanelProps {
   onVisit: (id: string) => void;
   onAddToTrip: (hotspot: Hotspot) => void;
   isVisited: boolean;
-  isWishlist: boolean;
   isFavorite: boolean;
-  onWishlist: (id: string) => void;
+  isWishlist: boolean;
   onFavorite: (id: string) => void;
-  canGoPrevious: boolean;
-  canGoNext: boolean;
-  onPrevious: () => void;
-  onNext: () => void;
+  onWishlist: (id: string) => void;
+  canGoPrevious: boolean;        
+  canGoNext: boolean;              
+  onPrevious: (id: string) => void;        
+  onNext: (id: string) => void;             
   positionLabel: string;
-  showTripSelector?: boolean;
-  onShowTripSelector?: (show: boolean) => void;
-  onTripUpdated?: () => void;
 }
 
 export default function HotspotPanel({
@@ -30,78 +27,117 @@ export default function HotspotPanel({
   onVisit,
   onAddToTrip,
   isVisited,
-  isWishlist,
   isFavorite,
-  onWishlist,
+  isWishlist,
   onFavorite,
+  onWishlist,
   canGoPrevious,
   canGoNext,
   onPrevious,
   onNext,
   positionLabel,
-  showTripSelector,
-  onShowTripSelector,
-  onTripUpdated,
 }: HotspotPanelProps) {
+  if (!hotspot) return null;
+
   return (
     <AnimatePresence>
       {hotspot && (
         <>
-          <motion.button
-            type="button"
-            aria-label="Close hotspot panel"
+          {/* Subtle backdrop */}
+          <motion.div
             onClick={onClose}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={{ opacity: 0.1 }}
             exit={{ opacity: 0 }}
-            className="hidden md:block fixed inset-0 z-[990] bg-slate-900/25"
+            className="fixed inset-0 z-[990] bg-black"
           />
 
+          {/* Side panel */}
           <motion.aside
             initial={{ x: 460 }}
             animate={{ x: 0 }}
             exit={{ x: 460 }}
             transition={{ duration: 0.25 }}
-            className="hidden md:flex fixed right-0 top-0 z-[1000] h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-2xl"
+            className="hidden md:flex fixed right-0 top-0 z-[1000] h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-xl rounded-l-[28px] overflow-hidden"
           >
-            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
-              <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                {positionLabel}
-              </div>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={onPrevious}
-                  disabled={!canGoPrevious}
-                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={onNext}
-                  disabled={!canGoNext}
-                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
 
-            <div className="flex-1 overflow-hidden">
-            <HotspotDetail
+                <button
+                  onClick={() => onPrevious(hotspot.id)}
+                  disabled={!canGoPrevious}
+                  className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
+                >
+                  ←
+                </button>
+
+                <button
+                  onClick={ () => onNext(hotspot.id)}
+                  disabled={!canGoNext}
+                  className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
+                >
+                  →
+                </button>
+
+              </div>
+
+              <span className="text-sm text-gray-500">{positionLabel}</span>
+
+              <button
+                onClick={onClose}
+                className="p-1 rounded-md hover:bg-gray-100"
+              >
+                ✕
+              </button>
+
+            </div>
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+              {/* Only display hotspot info; remove action buttons from here */}
+              <HotspotDetail
                 hotspot={hotspot}
                 onVisit={onVisit}
+                onWishlist={onWishlist}
+                onFavorite={onFavorite}
                 onAddToTrip={onAddToTrip}
                 isVisited={isVisited}
                 isWishlist={isWishlist}
                 isFavorite={isFavorite}
-                onWishlist={onWishlist}
-                onFavorite={onFavorite}
-                onClose={onClose}
-                showTripSelector={showTripSelector}
-                onShowTripSelector={onShowTripSelector}
-                onTripUpdated={onTripUpdated}
               />
+            </div>
+
+            {/* Sticky Footer with primary actions */}
+            <div className="border-t border-gray-200 bg-white px-4 py-3 flex flex-col gap-2">
+              {/* Visit */}
+              <button
+                onClick={() => onVisit(hotspot.id)}
+                className={`w-full py-2 rounded-lg text-white font-semibold ${
+                  isVisited ? "bg-gray-400 cursor-default" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+                disabled={isVisited}
+              >
+                {isVisited ? "Visited" : "Mark as Visited"}
+              </button>
+
+              {/* Add to Trip */}
+              <button
+                onClick={() => onAddToTrip(hotspot)}
+                className="w-full py-2 rounded-lg bg-blue-100 text-blue-700 font-semibold hover:bg-blue-200"
+              >
+                Add to Trip
+              </button>
+
+              {/* Favorite */}
+              <button
+                onClick={() => onFavorite(hotspot.id)}
+                className={`w-full py-2 rounded-lg border border-gray-200 font-medium flex justify-center items-center ${
+                  isFavorite ? "text-red-500" : "text-gray-700"
+                }`}
+              >
+                {isFavorite ? "★ Favorited" : "☆ Favorite"}
+              </button>
             </div>
           </motion.aside>
         </>
