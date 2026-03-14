@@ -162,11 +162,7 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
 }: Props, ref) {
   const mapRef = useRef<L.Map | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isDark, setIsDark] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches
-  );
+  const [isDark, setIsDark] = useState(false);
 
   useImperativeHandle(ref, () => ({
     flyTo: (coords: [number, number], zoom = 14) => {

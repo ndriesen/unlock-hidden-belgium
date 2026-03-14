@@ -1,6 +1,17 @@
 "use client";
 
-import FixedMobileMap, { type ExampleMarker } from '@/components/Map/FixedMobileMap';
+import { type ExampleMarker } from '@/components/Map/FixedMobileMap';
+import dynamic from 'next/dynamic';
+
+const DynamicFixedMobileMap = dynamic(
+  () => import('@/components/Map/FixedMobileMap'),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full bg-gradient-to-br from-emerald-50/90 to-blue-50/90 backdrop-blur-sm rounded-2xl border border-emerald-200/50">
+    <div className="text-emerald-600 animate-pulse">
+      <div className="w-12 h-12 border-4 border-emerald-300/50 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4"></div>
+      <p className="font-medium">Loading interactive map...</p>
+    </div>
+  </div> }
+);
 
 export default function MapTestPage() {
   const handleMarkerClick = (marker: ExampleMarker) => {
@@ -31,13 +42,13 @@ export default function MapTestPage() {
         {/* Mobile-responsive heights */}
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           <div className="h-[400px] md:h-[600px]">
-            <FixedMobileMap 
+            <DynamicFixedMobileMap 
               height="100%"
               onMarkerClick={handleMarkerClick}
             />
           </div>
           <div className="h-[400px] md:h-[600px]">
-            <FixedMobileMap 
+            <DynamicFixedMobileMap 
               center={[50.85, 4.35]} // Belgium center
               zoom={8}
               height="100%"
