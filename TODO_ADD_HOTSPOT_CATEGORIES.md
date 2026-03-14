@@ -1,18 +1,33 @@
-# Add Hotspot Categories Combobox - TODO
+# Hotspot Categories Standardization
 
-## Plan Summary
-Replace categories text field in AddHotspotModal with shadcn-ui Combobox:
-- Fetch unique categories from DB
-- Allow selection + free typing
-- Use shadcn-ui for polished UI matching project style
+## Current Implementation
+`getCategoryDisplay()` in `src/types/hotspot.ts` handles display names with fallback.
 
-## Steps
-✅ 1. Check/install shadcn-ui combobox dependency (skipped, using custom)
-✅ 2. Update AddHotspotModal.tsx with states, supabase query, custom Combobox component
-- [ ] 3. Test: load categories, select/type, submit form
-- [ ] 4. Verify: new categories save correctly, UI responsive
+## Suggested DB Enum / Standardized Values
+```
+museum, museums
+castle, castles  
+park, parks
+church, churches
+viewpoint, viewpoints
+beach, beaches
+monument, monuments
+restaurant, restaurants
+nature_reserve, nature_reserves
+forest, forests
+lake, lakes
+river, rivers
+cave, caves
+waterfall, waterfalls
+abbey, abbeys
+brewery, breweries
+bakery, bakeries
+market, markets
+street_art, street art
+```
 
-## Progress
-Ready to implement step-by-step.
-
-
+## Next Steps
+1. Add `category` enum to hotspots table migration
+2. Backfill existing hotspots  
+3. Update `AddHotspotModal` with select dropdown
+4. Extend `getCategoryDisplay` mapping

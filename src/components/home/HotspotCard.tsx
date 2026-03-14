@@ -17,7 +17,10 @@ interface HotspotCardProps {
   priority?: boolean;
 }
 
-function getCategoryColor(category: string): string {
+import { getSafeDisplay } from "@/types/hotspot";
+
+function getCategoryColor(category: Hotspot['category']): string {
+const displayName = getSafeDisplay(category);
   const colors: Record<string, string> = {
     Nature: "bg-emerald-500",
     Bars: "bg-amber-500",
@@ -28,16 +31,17 @@ function getCategoryColor(category: string): string {
     Culture: "bg-rose-500",
     Activity: "bg-yellow-500",
     Sunset: "bg-gradient-to-r from-orange-500 to-pink-500",
+    Schedule: "bg-indigo-500",
     Unknown: "bg-slate-500",
   };
-  return colors[category] || colors.Unknown;
+  return colors[displayName] || colors.Unknown;
 }
 
 function getFirstImage(hotspot: Hotspot): string {
   if (hotspot.images && hotspot.images.length > 0) {
     return hotspot.images[0];
   }
-  return "/branding/spotly-logo.svg";
+  return "/images/placeholder-image.jfif";
 }
 
 function formatDistance(distanceKm: number | undefined): string {
@@ -113,7 +117,7 @@ export default function HotspotCard({
             
             {/* Category Badge */}
             <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-medium text-white shadow-lg ${categoryColor}`}>
-              {hotspot.category}
+{getSafeDisplay(hotspot.category)}
             </div>
 
             {/* Wishlist Button */}

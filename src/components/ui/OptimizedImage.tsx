@@ -14,7 +14,7 @@ const MAX_RETRIES = 3;
 /**
  * Default fallback image
  */
-const DEFAULT_FALLBACK = "/branding/spotly-logo.svg";
+const DEFAULT_FALLBACK = "/images/placeholder-image.jfif";
 
 export interface OptimizedImageProps extends Omit<ImageProps, "onError" | "onLoad"> {
   /**

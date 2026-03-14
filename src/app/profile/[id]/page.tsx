@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { supabase } from "@/lib/Supabase/browser-client";
 
 interface PublicProfile {
@@ -52,7 +52,8 @@ function normalizeStyle(value: string | null | undefined): string {
   return "Balanced";
 }
 
-export default function PublicProfilePage({ params }: { params: { id: string } }) {
+export default function PublicProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const id = use(params).id;
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -63,11 +64,11 @@ export default function PublicProfilePage({ params }: { params: { id: string } }
     const loadProfile = async () => {
       setLoading(true);
       setError("");
-
+  
       const { data: buddyData } = await supabase
         .from("buddy_profiles")
         .select("user_id,display_name,city,interests,travel_style,availability,bio,avatar_url")
-        .eq("user_id", params.id)
+        .eq("user_id", id)
         .maybeSingle();
 
       if (!active) return;
@@ -92,7 +93,7 @@ export default function PublicProfilePage({ params }: { params: { id: string } }
       const { data: userData } = await supabase
         .from("users")
         .select("id,username,email,city,interests,travel_style,availability,bio,avatar_url,xp_points")
-        .eq("id", params.id)
+        .eq("id", id)
         .maybeSingle();
 
       if (!active) return;
@@ -125,7 +126,7 @@ export default function PublicProfilePage({ params }: { params: { id: string } }
     return () => {
       active = false;
     };
-  }, [params.id]);
+  }, [id]);
 
   if (loading) {
     return <div className="p-6 text-slate-600">Loading profile...</div>;

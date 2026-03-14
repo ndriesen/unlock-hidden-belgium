@@ -569,13 +569,13 @@ export default function ExplorePage() {
             <p className="text-sm text-slate-600">No hotspots found for this filter set.</p>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             {visibleHotspots.map((hotspot, index) => (
               <article
                 key={hotspot.id}
                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
               >
-                <div className="relative h-36 w-full">
+                <div className="relative h-32 w-full">
                   <Link href={`/hotspots/${hotspot.id}`} className="block h-full">
                     <Image
                       src={hotspot.imageUrl}
@@ -612,7 +612,7 @@ export default function ExplorePage() {
                 <div className="space-y-2 p-3">
                   <p className="line-clamp-2 text-xs text-slate-700">{hotspot.description}</p>
 
-                  <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+                  <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
                     <div className="rounded-lg border border-slate-200 p-2">
                       <p className="text-slate-500">Visits</p>
                       <p className="font-semibold text-slate-900">{hotspot.visitCount}</p>
@@ -653,7 +653,7 @@ export default function ExplorePage() {
                       onClick={() => {
                         void toggleWishlistInUi(hotspot.id);
                       }}
-                      className={`flex-1 rounded-lg px-3 py-2 font-medium ${
+                      className={`flex-1 rounded-lg px-3 py-1.5 font-medium ${
                         hotspot.wishlist
                           ? "bg-amber-100 text-amber-700"
                           : "border border-slate-200 text-slate-700"
@@ -701,10 +701,10 @@ export default function ExplorePage() {
           <p className="text-sm text-slate-600">No public trips yet.</p>
         )}
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {trips.map((trip, index) => (
             <article key={trip.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="relative h-28">
+              <div className="relative h-24">
                 <Link href={`/trips/${trip.id}`} className="block h-full">
                   <Image
                     src={trip.coverImage}
@@ -720,7 +720,7 @@ export default function ExplorePage() {
               <div className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-slate-900">#{index + 1} {trip.title}</p>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
                     Score {trip.score}
                   </span>
                 </div>
@@ -733,7 +733,7 @@ export default function ExplorePage() {
                 </p>
                 <p className="line-clamp-2 text-xs text-slate-700">{trip.description || "No description."}</p>
 
-                <div className="grid grid-cols-4 gap-2 text-center text-[11px]">
+                <div className="grid grid-cols-4 gap-1.5 text-center text-xs">
                   <div className="rounded-lg border border-slate-200 p-1.5">
                     <p className="text-slate-500">Stops</p>
                     <p className="font-semibold text-slate-900">{trip.stopCount}</p>
@@ -757,7 +757,7 @@ export default function ExplorePage() {
                     onClick={() => {
                       void toggleTripLikeInUi(trip);
                     }}
-                    className={`rounded-lg px-3 py-2 text-xs font-medium ${
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
                       trip.likedByMe ? "bg-rose-100 text-rose-700" : "border border-slate-200 text-slate-700"
                     }`}
                   >
@@ -767,7 +767,7 @@ export default function ExplorePage() {
                     onClick={() => {
                       void toggleTripSaveInUi(trip);
                     }}
-                    className={`rounded-lg px-3 py-2 text-xs font-medium ${
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
                       trip.savedByMe ? "bg-amber-100 text-amber-700" : "border border-slate-200 text-slate-700"
                     }`}
                   >

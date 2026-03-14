@@ -26,7 +26,7 @@ async function upsertBooleanFlag(
 export async function awardXP(
   userId: string, 
   actionKey: string, 
-  context: { hotspotId?: string, entityId?: string } = {}
+  context: { hotspotId?: string, entityId?: string, photoPath?: string } = {}
 ): Promise<{
   xpGained: number;
   oldXp: number;
@@ -36,6 +36,7 @@ export async function awardXP(
   badges: any[];
   message: string;
 }> {
+  // Add new triggers like addReview etc. call awardXP internally
   // 1. Anti-abuse checks
   if (actionKey === 'visit_hotspot_xp' && context.hotspotId) {
     const { data } = await supabase

@@ -138,8 +138,7 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
         visibility,
       });
 
-      // Award XP for adding hotspot
-      await awardXP(user.id, 'xp_adding_hotspot');
+      // XP already triggered in addHotspot service
 
       // Show appropriate feedback
       if (result.approved) {
@@ -298,7 +297,7 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
                   alt="Preview"
                   fill
                   className="object-cover"
-                  fallbackUrl="/branding/spotly-logo.svg"
+                  fallbackUrl="/images/placeholder-image.jfif"
                 />
               </div>
             )}

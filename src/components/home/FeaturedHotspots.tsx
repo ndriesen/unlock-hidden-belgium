@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { MapPin, ChevronRight } from "lucide-react";
-import { Hotspot } from "@/types/hotspot";
+import { Hotspot, getSafeDisplay } from "@/types/hotspot";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 
 interface FeaturedHotspotsProps {
@@ -55,15 +55,17 @@ export default function FeaturedHotspots({
     setLoadedImages(prev => new Set(prev).add(hotspotId));
   }, []);
 
-  const getCategoryColor = (category: string): string => {
+const getCategoryColor = (category: Hotspot['category']): string => {
+const displayName = getSafeDisplay(category);
     const colors: Record<string, string> = {
       Culture: "bg-rose-500",
       Nature: "bg-emerald-500",
       Food: "bg-amber-500",
       Activity: "bg-blue-500",
+      Schedule: "bg-indigo-500",
       Unknown: "bg-slate-500",
     };
-    return colors[category] || colors.Unknown;
+    return colors[displayName] || colors.Unknown;
   };
 
   const getFirstImage = (hotspot: Hotspot): string => {
@@ -72,7 +74,7 @@ export default function FeaturedHotspots({
       return hotspot.images[0];
     }
     // Fallback to placeholder - avoids 429 rate limiting from external sources
-    return "/branding/spotly-logo.svg";
+    return "/images//images/placeholder-image.jfif";
   };
 
   if (!hotspots || hotspots.length === 0) {
@@ -159,7 +161,7 @@ export default function FeaturedHotspots({
                       
                       {/* Category Badge */}
                       <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(hotspot.category)}`}>
-                        {hotspot.category}
+{getSafeDisplay(hotspot.category)}
                       </div>
 
                       {/* Wishlist Button */}

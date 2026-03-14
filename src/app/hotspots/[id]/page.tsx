@@ -1,4 +1,4 @@
-﻿"use client";
+﻿﻿"use client";
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -9,10 +9,12 @@ import GalleryCarousel from "@/components/GalleryCarousel";
 import TripMemoriesGallery from "@/components/TripMemoriesGallery";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/Supabase/browser-client";
+import OpeningHoursDisplay from "@/components/ui/OpeningHoursDisplay";
 import { fetchHotspotMedia, fetchOrganizedHotspotMedia, uploadHotspotPhoto } from "@/lib/services/hotspotMedia";
 import { toggleFavorite, toggleWishlist } from "@/lib/services/gamification";
+
 import { MediaVisibility } from "@/lib/services/media";
-import { Hotspot } from "@/types/hotspot";
+import { Hotspot, getSafeDisplay } from "@/types/hotspot";
 
 const MapView = dynamic(() => import("@/components/Map/MapView"), {
   ssr: false,
@@ -311,7 +313,7 @@ export default function HotspotDetailPage() {
           <div className="absolute bottom-4 left-4 right-4 pointer-events-none">
             <h1 className="text-2xl font-bold text-white drop-shadow-lg">{hotspot.name}</h1>
             <p className="text-sm text-white/90 drop-shadow">
-              {hotspot.category} - {hotspot.province}
+              {getSafeDisplay(hotspot.category)} - {hotspot.province}
             </p>
           </div>
         </div>
@@ -334,8 +336,9 @@ export default function HotspotDetailPage() {
             </div>
             <div className="rounded-xl border border-slate-200 p-3">
               <p className="text-xs text-slate-500">Opening hours</p>
-              <p className="font-semibold text-slate-900">{openingHours}</p>
+              <OpeningHoursDisplay openingHours={hotspot?.opening_hours} />
             </div>
+
             <div className="rounded-xl border border-slate-200 p-3">
               <p className="text-xs text-slate-500">Coordinates</p>
               <p className="font-semibold text-slate-900">

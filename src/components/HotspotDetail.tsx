@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Hotspot } from "@/types/hotspot";
+import { Hotspot, getSafeDisplay, getCategoryDisplay, formatOpeningHours } from "@/types/hotspot";
+
 import ReviewsSection from "./ReviewsSection";
 import { useAuth } from "@/context/AuthContext";
 import { fetchHotspotMedia } from "@/lib/services/hotspotMedia";
 import GalleryCarousel from "./GalleryCarousel";
+import OpeningHoursDisplay from "@/components/ui/OpeningHoursDisplay";
+
 import TripSelectorModal from "./trips/TripSelectorModal";
+
 
 interface Props {
   hotspot: Hotspot | null;
@@ -122,8 +126,8 @@ export default function HotspotDetail({
 
         <div className="absolute bottom-4 left-4 right-4">
           <h2 className="text-2xl font-bold text-white leading-tight">{hotspot.name}</h2>
-          <p className="text-sm text-white/85 mt-1">
-            {hotspot.category} - {hotspot.province}
+            <p className="text-sm text-white/85 mt-1">
+            {getCategoryDisplay(hotspot.category)} - {hotspot.province}
           </p>
         </div>
       </div>
@@ -205,7 +209,7 @@ export default function HotspotDetail({
 
             <div className="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 space-y-1">
               <p>
-                <span className="font-semibold">Category:</span> {hotspot.category}
+                <span className="font-semibold">Category:</span> {getCategoryDisplay(hotspot.category)}
               </p>
               <p>
                 <span className="font-semibold">Province:</span> {hotspot.province}
@@ -222,11 +226,11 @@ export default function HotspotDetail({
             <div className="rounded-xl border border-slate-200 p-3 space-y-2">
               <p className="font-semibold text-slate-900">Visit planning</p>
               <p>
-                Best for: {hotspot.category} lovers exploring {hotspot.province}.
+                Best for: {getSafeDisplay(hotspot.category)} lovers exploring {hotspot.province}.
               </p>
-              <p>
-                Opening hours: {hotspot.opening_hours || "Not provided"}
-              </p>
+              <OpeningHoursDisplay openingHours={hotspot.opening_hours} className="mt-1" />
+
+
             </div>
 
             <div className="rounded-xl border border-slate-200 p-3 space-y-2">

@@ -333,10 +333,10 @@ export default function MyHotspotsPage() {
       )}
 
       {!loading && !errorMessage && filteredEntries.length > 0 && (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
           {filteredEntries.map((entry, index) => (
             <article key={entry.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="relative h-36 w-full">
+              <div className="relative h-32 w-full">
                 <Link href={`/hotspots/${entry.id}`} className="block h-full">
                   <Image
                     src={entry.imageUrl}
@@ -371,7 +371,7 @@ export default function MyHotspotsPage() {
               <div className="space-y-2 p-3">
                 <p className="line-clamp-2 text-xs text-slate-700">{entry.description}</p>
 
-                <div className="grid grid-cols-5 gap-2 text-center text-[11px]">
+                <div className="grid grid-cols-5 gap-1.5 text-center text-xs">
                   <div className="rounded-lg border border-slate-200 p-1.5">
                     <p className="text-slate-500">Visits</p>
                     <p className="font-semibold text-slate-900">{entry.visitCount}</p>

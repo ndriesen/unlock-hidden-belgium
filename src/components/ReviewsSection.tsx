@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { awardXP } from "@/lib/services/gamification";
 import { useAuth } from "@/context/AuthContext";
+import { addReview } from "@/lib/services/reviews";
 
 interface Review {
   id: string;
@@ -123,8 +124,9 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
       return;
     }
 
-    // Award XP for review
-    await awardXP(user!.id, 'xp_writing_review');
+    // Use new reviews service
+    await addReview(user!.id, hotspotId, rating, comment);
+
 
     setComment("");
     setRating(5);

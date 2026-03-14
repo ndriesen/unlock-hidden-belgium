@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/Supabase/browser-client";
 import Fuse from "fuse.js";
+import { awardXP } from "./gamification";
 
 interface AddHotspotInput {
   userId: string;
@@ -89,16 +90,17 @@ export async function addHotspot(input: AddHotspotInput): Promise<AddHotspotResu
     latitude,
     longitude,
     category,
+    visibility = "shared",
   } = input;
 
   let score = 0;
 
   // 1) Fuzzy duplicate check
-  const { data: existingHotspots, error: fetchError } = await supabase
+  const { data: existingHotspots } = await supabase
     .from("hotspots")
     .select("id, name, province, latitude, longitude");
 
-  if (!fetchError && existingHotspots && existingHotspots.length > 0) {
+  if (existingHotspots && existingHotspots.length > 0) {
     const fuse = new Fuse(existingHotspots, {
       keys: ["name", "province"],
       threshold: 0.3,
@@ -129,7 +131,6 @@ export async function addHotspot(input: AddHotspotInput): Promise<AddHotspotResu
   // 4) Coordinates validation or geocoding
   let finalLat = latitude;
   let finalLng = longitude;
-  let osmMatched = false;
 
   if (latitude && longitude && isValidBelgiumCoordinates(latitude, longitude)) {
     score += 1;
@@ -140,14 +141,13 @@ export async function addHotspot(input: AddHotspotInput): Promise<AddHotspotResu
       finalLat = osmResult.lat;
       finalLng = osmResult.lng;
       score += 1;
-      osmMatched = true;
     }
   }
 
   // 5) Auto approval based on score
   const status: "private" | "pending" | "approved" = score >= 4 ? "approved" : "pending";
 
-  // 6) Insert hotspot in central table
+  // 6) Insert hotspot
   const { data: hotspot, error: hotspotError } = await supabase
     .from("hotspots")
     .insert([
@@ -173,8 +173,8 @@ export async function addHotspot(input: AddHotspotInput): Promise<AddHotspotResu
     throw new Error(hotspotError?.message || "Error adding hotspot");
   }
 
-  // 7) Link user to hotspot in user_hotspots table
-  const { error: userLinkError } = await supabase
+  // 7) Link user to hotspot
+  await supabase
     .from("user_hotspots")
     .insert([
       {
@@ -186,10 +186,8 @@ export async function addHotspot(input: AddHotspotInput): Promise<AddHotspotResu
       },
     ]);
 
-  if (userLinkError) {
-    console.error("User hotspot link error:", userLinkError);
-    // Don't throw here - the hotspot was created successfully
-  }
+  // Trigger badge/XP check
+  await awardXP(userId, 'xp_adding_hotspot', { hotspotId: hotspot.id });
 
   return {
     id: hotspot.id,
@@ -204,3 +202,4 @@ export async function addHotspot(input: AddHotspotInput): Promise<AddHotspotResu
     approved: hotspot.status === "approved",
   };
 }
+
