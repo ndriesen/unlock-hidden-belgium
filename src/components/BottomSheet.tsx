@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Hotspot } from "@/types/hotspot";
+import { Hotspot, getCategoryDisplay } from "@/types/hotspot";
 
 interface BottomSheetProps {
   selected: Hotspot | null;
@@ -27,7 +27,7 @@ export default function BottomSheet({ selected }: BottomSheetProps) {
         />
 
         <h2 className="text-xl font-bold">{selected.name}</h2>
-        <p className="text-gray-500">{selected.category}</p>
+<p className="text-gray-500">{getCategoryDisplay(selected.category)}</p>
 
         <button
           onClick={() =>

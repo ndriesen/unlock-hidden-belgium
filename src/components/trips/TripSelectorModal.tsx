@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { fetchTrips, addHotspotToTrip, createTrip, Trip } from "@/lib/services/tripBuilder";
-import { Hotspot } from "@/types/hotspot";
+import { Hotspot, getCategoryDisplay } from "@/types/hotspot";
 
 interface TripSelectorModalProps {
   isOpen: boolean;
@@ -134,7 +134,7 @@ export default function TripSelectorModal({
         {hotspot && (
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
             <p className="font-medium text-slate-900">{hotspot.name}</p>
-            <p className="text-sm text-slate-500">{hotspot.category} • {hotspot.province}</p>
+{getCategoryDisplay(hotspot.category)} • {hotspot.province}
           </div>
         )}
 

@@ -9,6 +9,14 @@ import {
   xpRequiredForLevel,
   totalXpForLevel,
 } from "@/lib/services/gamificationLevels";
+import { useAuth } from "@/context/AuthContext";
+import {
+  BUDDY_INTEREST_OPTIONS,
+  TravelStyle,
+  BuddyProfile,
+  fetchOwnBuddyProfile,
+  upsertOwnBuddyProfile,
+} from "@/lib/services/buddies";
 
 interface Hotspot {
   id: string;
@@ -189,10 +197,21 @@ function normalizeHotspot(joinedHotspot: UserHotspotRow["hotspots"]): Hotspot | 
 }
 
 export default function ProfilePage() {
+  const { user: authUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<'stats' | 'edit'>('stats');
+
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Edit state
+  const [editName, setEditName] = useState("");
+  const [editCity, setEditCity] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [editAvailability, setEditAvailability] = useState("Flexible");
+  const [editStyle, setEditStyle] = useState<TravelStyle>("balanced");
+  const [editInterests, setEditInterests] = useState<string[]>([]);
 
   const [xpPoints, setXpPoints] = useState(0);
   const [visited, setVisited] = useState<Hotspot[]>([]);
@@ -203,6 +222,8 @@ export default function ProfilePage() {
   const [userVisits, setUserVisits] = useState<UserVisitRow[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [showUnearned, setShowUnearned] = useState(false);
+  const [buddyProfile, setBuddyProfile] = useState<BuddyProfile | null>(null);
+  const [message, setMessage] = useState(""); 
 
   useEffect(() => {
     const fetchUser = async () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { NearbyQuest } from "@/lib/services/quests";
+import { getCategoryDisplay } from "@/types/hotspot";
 
 interface NearbyQuestsProps {
   quests: NearbyQuest[];
@@ -46,7 +47,7 @@ export default function NearbyQuests({
           >
             <p className="font-semibold text-slate-900">{quest.hotspot.name}</p>
             <p className="text-xs text-slate-600">
-              {quest.hotspot.category} - {quest.hotspot.province}
+              {getCategoryDisplay(quest.hotspot.category)} - {quest.hotspot.province}
             </p>
             <p className="text-xs text-emerald-700 font-semibold">
               {formatDistance(quest.distanceKm)} away

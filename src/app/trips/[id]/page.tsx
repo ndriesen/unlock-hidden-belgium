@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { Hotspot } from "@/types/hotspot";
+import { Hotspot, getCategoryDisplay } from "@/types/hotspot";
 import { fetchHotspots } from "@/lib/services/hotspots";
 import { Trip, fetchTrips, removeStopFromTrip, updateStopNote, updateStopVisitedAt, toggleTripLike, toggleTripSave, addHotspotToTrip, updateTripMeta, setTripCoverImage, toggleTripMediaHighlight } from "@/lib/services/tripBuilder";
 import { getTripLocations, startLocationTracking, stopLocationTracking, isLocationTracking, LocationUpdate, calculateDistance, isWithinRadius } from "@/lib/services/tripLocationTracking";
@@ -380,7 +380,7 @@ export default function TripDetailPage() {
                       {searchResults.map(hotspot => (
                         <button key={hotspot.id} onClick={() => handleAddStop(hotspot)} className="w-full p-2 rounded-lg border border-slate-100 hover:border-[#2A7FFF] flex items-center gap-2 text-left">
 {hotspot.images?.[0] && <div className="relative w-10 h-10 rounded overflow-hidden"><Image src={hotspot.images[0]} alt={hotspot.name} fill className="object-cover" sizes="40px" /></div>}
-                          <div><p className="font-medium text-sm">{hotspot.name}</p><p className="text-xs text-slate-500">{hotspot.category}</p></div>
+<p className="text-xs text-slate-500">{getCategoryDisplay(hotspot.category)}</p>
                         </button>
                       ))}
                     </div>

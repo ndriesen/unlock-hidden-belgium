@@ -1,4 +1,4 @@
-import { Hotspot } from "@/types/hotspot";
+import { Hotspot, getCategoryDisplay } from "@/types/hotspot";
 
 const STORAGE_KEY = "uhb_trips_v1";
 
@@ -139,7 +139,7 @@ export function hotspotToStop(hotspot: Hotspot): TripStop {
     hotspotId: hotspot.id,
     name: hotspot.name,
     province: hotspot.province,
-    category: hotspot.category,
+    category: getCategoryDisplay(hotspot.category),
     lat: hotspot.latitude,
     lng: hotspot.longitude,
     note: "",

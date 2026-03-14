@@ -48,7 +48,7 @@ export default function HeroSection({ hotspots }: HeroSectionProps) {
         x: Math.cos(theta) * radius,
         y: y,
         z: Math.sin(theta) * radius,
-        category: hotspot.category,
+        category: typeof hotspot.category === 'string' ? hotspot.category : Object.keys(hotspot.category)[0] || 'Unknown',
       };
     });
     

@@ -4,6 +4,7 @@ import { addXp } from "./xpEngine";
 interface Hotspot {
   id: string;
   province: string;
+  municipality: string;
   category?: string;
   country?: string;
   is_hidden?: boolean;
@@ -176,7 +177,7 @@ async function computeUserStats(userId: string, visits: UserHotspot[]): Promise<
     if (!hotspot) return;
 
     provinces.add(hotspot.province || '');
-    cities.add(hotspot.city || hotspot.province || '');
+    cities.add(hotspot.municipality || '');
     countries.add(hotspot.country || '');
 
     if (hotspot.category) {

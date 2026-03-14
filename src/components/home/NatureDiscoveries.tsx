@@ -32,12 +32,14 @@ export default function NatureDiscoveries({
   const natureCategories = ['Nature', 'Waterfalls', 'Viewpoints'];
   
   // Filter by selected category first, then by nature categories
+  const getCategoryString = (cat: string | Record<string, any>) => typeof cat === 'string' ? cat : '';
+
   const filteredByCategory = selectedCategory 
-    ? hotspots.filter(h => h.category === selectedCategory)
+    ? hotspots.filter(h => getCategoryString(h.category) === selectedCategory)
     : hotspots;
     
   const natureHotspots = filteredByCategory
-    .filter(h => natureCategories.includes(h.category))
+    .filter(h => natureCategories.includes(getCategoryString(h.category)))
     .slice(0, 6);
 
   const checkScroll = useCallback(() => {
