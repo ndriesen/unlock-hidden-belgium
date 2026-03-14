@@ -1,6 +1,7 @@
 import { getLegalDocuments, LegalDoc } from "@/lib/legal";
 import LegalCenter from "@/components/legal/LegalCenter";
 import { Metadata } from "next";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "Legal Center - Unlock Hidden Belgium",
@@ -28,6 +29,14 @@ export default async function LegalPage() {
     );
   }
 
-  return <LegalCenter documents={documents} />;
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center p-8 min-h-[400px]">
+        <div className="text-lg text-slate-600 animate-pulse">Loading legal documents...</div>
+      </div>
+    }>
+      <LegalCenter documents={documents} />
+    </Suspense>
+  );
 }
 
