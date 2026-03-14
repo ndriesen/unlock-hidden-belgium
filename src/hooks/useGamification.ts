@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import BadgeCelebration from '@/components/BadgeCelebration';
 import LevelUpModal from '@/components/levelUpModal';
 import BadgeUnlockModal from '@/components/badgeUnlockModal';
-import { useToast } from '@/components/Toast'; // assume exists or use context
+import { useToast } from "@/context/ToastContext";
 
 interface GamificationResult {
   xpGained: number;
