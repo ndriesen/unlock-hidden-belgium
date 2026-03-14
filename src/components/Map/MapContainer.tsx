@@ -23,6 +23,7 @@ interface HotspotRow {
 }
 
 export interface MapContainerProps {
+  compact?: boolean;
   selectedCategory?: string;
   hotspots?: Hotspot[];
   selectedHotspotId?: string | null;
@@ -61,6 +62,7 @@ function getCoordinates(hotspot: Hotspot): [number, number] | null {
 
 // Wrap MapContainer with forwardRef to expose flyTo method
 const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({
+  compact = false,
   categoryFilter,
   provinceFilter,
   viewMode,
@@ -201,6 +203,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({
       ref={mapViewRef}
       hotspots={filtered}
       loading={isLoading}
+      compact={compact}
       visitedIds={visitedIds}
       wishlistIds={wishlistIds}
       favoriteIds={favoriteIds}

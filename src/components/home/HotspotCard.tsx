@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
-import { MapPin, Heart, Star, Navigation, Sparkles } from "lucide-react";
+import { MapPin, Star, Navigation } from "lucide-react";
 import { Hotspot } from "@/types/hotspot";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 
@@ -128,17 +128,13 @@ export default function HotspotCard({
                 `}
                 aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
               >
-                <Heart 
-                  className={`w-4 h-4 transition-colors ${isWishlisted ? 'fill-rose-500 text-rose-500' : 'text-slate-600'}`} 
-                />
-              </button>
+                <span aria-hidden="true" className={`text-[16px] leading-none ${isWishlisted ? "text-amber-600" : "text-slate-600"}`}>⟟</span></button>
             )}
 
             {/* Visited Badge */}
             {isVisited && (
               <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-full text-xs font-medium text-white bg-emerald-500 shadow-lg flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
-                Visited
+                <span aria-hidden="true" className="text-[14px] leading-none">✓</span> Visited
               </div>
             )}
           </div>

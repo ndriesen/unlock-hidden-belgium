@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
+import { useSearch } from "@/context/SearchContext";
 import {
   ExploreHotspot,
   PopularTrip,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/services/explore";
 import { toggleTripLike, toggleTripSave } from "@/lib/services/tripBuilder";
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
-import { toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
+import { markVisited, toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
 import HotspotPanel from "@/components/HotspotPanel";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
@@ -97,15 +98,17 @@ export default function ExplorePage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const { searchQuery, setSearchQuery } = useSearch();
   const [categoryFilter, setCategoryFilter] = useState("");
   const [provinceFilter, setProvinceFilter] = useState("");
   const [sortMode, setSortMode] = useState<ExploreSortMode>("popular");
+  const [showAllHotspots, setShowAllHotspots] = useState(false);
 
   const [actionMessage, setActionMessage] = useState("");
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
   const [mapFocusId, setMapFocusId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [showTripSelector, setShowTripSelector] = useState(false);
 
   const loadExplore = useCallback(async () => {
     setLoading(true);
@@ -190,6 +193,28 @@ export default function ExplorePage() {
 
     return output;
   }, [categoryFilter, hotspots, provinceFilter, searchQuery, sortMode]);
+
+  const canShowAllHotspots = filteredHotspots.length > 6;
+
+  const visibleHotspots = useMemo(
+    () => (showAllHotspots ? filteredHotspots : filteredHotspots.slice(0, 6)),
+    [filteredHotspots, showAllHotspots]
+  );
+
+  const visitedIds = useMemo(
+    () => filteredHotspots.filter((hotspot) => hotspot.visited).map((hotspot) => hotspot.id),
+    [filteredHotspots]
+  );
+
+  const wishlistIds = useMemo(
+    () => filteredHotspots.filter((hotspot) => hotspot.wishlist).map((hotspot) => hotspot.id),
+    [filteredHotspots]
+  );
+
+  const favoriteIds = useMemo(
+    () => filteredHotspots.filter((hotspot) => hotspot.favorite).map((hotspot) => hotspot.id),
+    [filteredHotspots]
+  );
 
   const mapHotspots = useMemo(
     () => filteredHotspots.filter(hasCoordinates).map(mapExploreToHotspot),
@@ -319,6 +344,39 @@ export default function ExplorePage() {
     [user?.id]
   );
 
+  const handleVisit = useCallback(
+    async (hotspotId: string) => {
+      if (!user?.id) {
+        setActionMessage("Login required.");
+        return;
+      }
+
+      const alreadyVisited = hotspots.find((hotspot) => hotspot.id === hotspotId)?.visited;
+      if (alreadyVisited) {
+        setActionMessage("Already marked as visited.");
+        return;
+      }
+
+      try {
+        await markVisited(user.id, hotspotId);
+
+        setHotspots((prev) =>
+          prev.map((hotspot) =>
+            hotspot.id === hotspotId
+              ? { ...hotspot, visited: true, visitCount: hotspot.visitCount + 1 }
+              : hotspot
+          )
+        );
+
+        setActionMessage("Visited hotspot. +50 XP earned.");
+      } catch (error) {
+        console.error("Visit update failed:", error);
+        setActionMessage("Could not mark visited.");
+      }
+    },
+    [hotspots, user?.id]
+  );
+
   const toggleTripLikeInUi = async (item: PopularTrip) => {
     if (!user?.id) {
       setActionMessage("Login required.");
@@ -438,9 +496,9 @@ export default function ExplorePage() {
             preventZoom={false}
             hotspots={mapHotspots}
             selectedHotspotId={selectedHotspot?.id ?? mapFocusId ?? null}
-            visitedIds={[]}
-            wishlistIds={[]}
-            favoriteIds={[]}
+            visitedIds={visitedIds}
+            wishlistIds={wishlistIds}
+            favoriteIds={favoriteIds}
             loading={loading}
             onSelect={handleMapSelect}
             onToast={setActionMessage}
@@ -451,11 +509,11 @@ export default function ExplorePage() {
       <HotspotPanel
         hotspot={selectedHotspot}
         onClose={() => setSelectedHotspot(null)}
-        onVisit={() => {}}
+        onVisit={handleVisit}
         onWishlist={toggleWishlistInUi}
         onFavorite={toggleFavoriteInUi}
-        onAddToTrip={() => {}}
-        isVisited={false}
+        onAddToTrip={() => setShowTripSelector(true)}
+        isVisited={selectedMeta?.visited ?? false}
         isWishlist={selectedMeta?.wishlist ?? false}
         isFavorite={selectedMeta?.favorite ?? false}
         canGoPrevious={navigationState.canGoPrevious}
@@ -463,6 +521,9 @@ export default function ExplorePage() {
         onPrevious={handlePreviousHotspot}
         onNext={handleNextHotspot}
         positionLabel={navigationState.positionLabel}
+        showTripSelector={showTripSelector}
+        onShowTripSelector={setShowTripSelector}
+        onTripUpdated={() => setActionMessage("Trip updated.")}
       />
 
       {actionMessage && (
@@ -481,44 +542,77 @@ export default function ExplorePage() {
 
       {!loading && !errorMessage && (
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Hotspots ({filteredHotspots.length})</h2>
-            <Link href="/hotspots/my" className="text-sm font-medium text-emerald-700">
-              Go to My Hotspots
-            </Link>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">
+                All hotspots ({filteredHotspots.length})
+              </h2>
+              <p className="text-xs text-slate-500">Browse the full community collection.</p>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              {canShowAllHotspots && !showAllHotspots && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllHotspots(true)}
+                  className="font-medium text-emerald-700"
+                >
+                  Show all hotspots
+                </button>
+              )}
+              <Link href="/hotspots/my" className="font-medium text-emerald-700">
+                Go to My Hotspots
+              </Link>
+            </div>
           </div>
 
           {filteredHotspots.length === 0 && (
             <p className="text-sm text-slate-600">No hotspots found for this filter set.</p>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredHotspots.map((hotspot, index) => (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleHotspots.map((hotspot, index) => (
               <article
                 key={hotspot.id}
                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
               >
-                <div className="relative h-44 w-full">
-                  <Image
-                    src={hotspot.imageUrl}
-                    alt={hotspot.name}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover"
-                    priority={index < 6}
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                    <p className="font-semibold text-white">{hotspot.name}</p>
-                    <p className="text-xs text-white/85">
-                      {hotspot.category} - {hotspot.province}
-                    </p>
-                  </div>
+                <div className="relative h-36 w-full">
+                  <Link href={`/hotspots/${hotspot.id}`} className="block h-full">
+                    <Image
+                      src={hotspot.imageUrl}
+                      alt={hotspot.name}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                      className="object-cover"
+                      priority={index < 6}
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                      <p className="text-sm font-semibold text-white">{hotspot.name}</p>
+                      <p className="text-[11px] text-white/85">
+                        {hotspot.category} - {hotspot.province}
+                      </p>
+                    </div>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void toggleFavoriteInUi(hotspot.id);
+                    }}
+                    className={`absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm ${
+                      hotspot.favorite ? "text-rose-600" : "text-slate-600"
+                    }`}
+                    aria-label={hotspot.favorite ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <span aria-hidden="true" className="text-[16px] leading-none">♡</span>
+                  </button>
                 </div>
 
-                <div className="space-y-3 p-3">
-                  <p className="line-clamp-2 text-sm text-slate-700">{hotspot.description}</p>
+                <div className="space-y-2 p-3">
+                  <p className="line-clamp-2 text-xs text-slate-700">{hotspot.description}</p>
 
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
                     <div className="rounded-lg border border-slate-200 p-2">
                       <p className="text-slate-500">Visits</p>
                       <p className="font-semibold text-slate-900">{hotspot.visitCount}</p>
@@ -533,48 +627,41 @@ export default function ExplorePage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 text-xs">
+                  <div className="flex flex-wrap gap-1.5 text-[11px]">
                     {hotspot.visited && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">Visited</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">
+                        <span aria-hidden="true" className="text-[13px] leading-none">✓</span>
+                        Visited
+                      </span>
                     )}
                     {hotspot.wishlist && (
-                      <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">Wishlist</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">
+                        <span aria-hidden="true" className="text-[13px] leading-none">⟟</span>
+                        Wishlist
+                      </span>
                     )}
                     {hotspot.favorite && (
-                      <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">Favorite</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">
+                        <span aria-hidden="true" className="text-[13px] leading-none">♡</span>
+                        Favorite
+                      </span>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex gap-2 text-xs">
                     <button
                       onClick={() => {
                         void toggleWishlistInUi(hotspot.id);
                       }}
-                      className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                        hotspot.wishlist ? "bg-amber-100 text-amber-700" : "border border-slate-200 text-slate-700"
+                      className={`flex-1 rounded-lg px-3 py-2 font-medium ${
+                        hotspot.wishlist
+                          ? "bg-amber-100 text-amber-700"
+                          : "border border-slate-200 text-slate-700"
                       }`}
                     >
+                      <span aria-hidden="true" className="text-[14px] leading-none">⟟</span>{" "}
                       {hotspot.wishlist ? "Wishlisted" : "Wishlist"}
                     </button>
-                    <button
-                      onClick={() => {
-                        void toggleFavoriteInUi(hotspot.id);
-                      }}
-                      className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                        hotspot.favorite ? "bg-rose-100 text-rose-700" : "border border-slate-200 text-slate-700"
-                      }`}
-                    >
-                      {hotspot.favorite ? "Favorited" : "Favorite"}
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Link
-                      href={`/hotspots/${hotspot.id}`}
-                      className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-center text-sm font-medium text-slate-800"
-                    >
-                      Open details
-                    </Link>
                     <button
                       onClick={() => {
                         if (!hasCoordinates(hotspot)) {
@@ -584,7 +671,7 @@ export default function ExplorePage() {
                         setMapFocusId(hotspot.id);
                         setSelectedHotspot(null);
                       }}
-                      className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white"
+                      className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 font-medium text-white"
                     >
                       Open map
                     </button>
@@ -598,7 +685,7 @@ export default function ExplorePage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Popular user trips</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Popular Community Trips</h2>
           <Link href="/trips" className="text-sm font-medium text-emerald-700">
             Open trip builder
           </Link>
@@ -616,59 +703,77 @@ export default function ExplorePage() {
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {trips.map((trip, index) => (
-            <article key={trip.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-900">
-                  #{index + 1} {trip.title}
+            <article key={trip.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="relative h-28">
+                <Link href={`/trips/${trip.id}`} className="block h-full">
+                  <Image
+                    src={trip.coverImage}
+                    alt={trip.title}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    className="object-cover"
+                    priority={index < 4}
+                  />
+                </Link>
+              </div>
+
+              <div className="space-y-2 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">#{index + 1} {trip.title}</p>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                    Score {trip.score}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600">
+                  By{' '}
+                  <Link href={`/profile/${trip.authorId}`} className="font-semibold text-emerald-700">
+                    {trip.authorName}
+                  </Link>
                 </p>
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                  Score {trip.score}
-                </span>
-              </div>
+                <p className="line-clamp-2 text-xs text-slate-700">{trip.description || "No description."}</p>
 
-              <p className="text-xs text-slate-600">By {trip.authorName}</p>
-              <p className="line-clamp-2 text-sm text-slate-700">{trip.description || "No description."}</p>
+                <div className="grid grid-cols-4 gap-2 text-center text-[11px]">
+                  <div className="rounded-lg border border-slate-200 p-1.5">
+                    <p className="text-slate-500">Stops</p>
+                    <p className="font-semibold text-slate-900">{trip.stopCount}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-1.5">
+                    <p className="text-slate-500">Likes</p>
+                    <p className="font-semibold text-slate-900">{trip.likesCount}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-1.5">
+                    <p className="text-slate-500">Saves</p>
+                    <p className="font-semibold text-slate-900">{trip.savesCount}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-1.5">
+                    <p className="text-slate-500">Views</p>
+                    <p className="font-semibold text-slate-900">{trip.viewsCount}</p>
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                <div className="rounded-lg border border-slate-200 p-1.5">
-                  <p className="text-slate-500">Stops</p>
-                  <p className="font-semibold text-slate-900">{trip.stopCount}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      void toggleTripLikeInUi(trip);
+                    }}
+                    className={`rounded-lg px-3 py-2 text-xs font-medium ${
+                      trip.likedByMe ? "bg-rose-100 text-rose-700" : "border border-slate-200 text-slate-700"
+                    }`}
+                  >
+                    {trip.likedByMe ? "Liked" : "Like"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      void toggleTripSaveInUi(trip);
+                    }}
+                    className={`rounded-lg px-3 py-2 text-xs font-medium ${
+                      trip.savedByMe ? "bg-amber-100 text-amber-700" : "border border-slate-200 text-slate-700"
+                    }`}
+                  >
+                    {trip.savedByMe ? "Saved" : "Save"}
+                  </button>
                 </div>
-                <div className="rounded-lg border border-slate-200 p-1.5">
-                  <p className="text-slate-500">Likes</p>
-                  <p className="font-semibold text-slate-900">{trip.likesCount}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 p-1.5">
-                  <p className="text-slate-500">Saves</p>
-                  <p className="font-semibold text-slate-900">{trip.savesCount}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 p-1.5">
-                  <p className="text-slate-500">Views</p>
-                  <p className="font-semibold text-slate-900">{trip.viewsCount}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => {
-                    void toggleTripLikeInUi(trip);
-                  }}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                    trip.likedByMe ? "bg-rose-100 text-rose-700" : "border border-slate-200 text-slate-700"
-                  }`}
-                >
-                  {trip.likedByMe ? "Liked" : "Like"}
-                </button>
-                <button
-                  onClick={() => {
-                    void toggleTripSaveInUi(trip);
-                  }}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                    trip.savedByMe ? "bg-amber-100 text-amber-700" : "border border-slate-200 text-slate-700"
-                  }`}
-                >
-                  {trip.savedByMe ? "Saved" : "Save"}
-                </button>
               </div>
             </article>
           ))}
@@ -720,4 +825,10 @@ export default function ExplorePage() {
     </div>
   );
 }
+
+
+
+
+
+
 

@@ -127,7 +127,10 @@ export default function HotspotPanel({
                 }`}
                 disabled={isVisited}
               >
-                {isVisited ? "Visited" : "Mark as Visited"}
+                <span className="inline-flex items-center justify-center gap-2">
+                  <span aria-hidden="true" className="text-[18px] leading-none">✓</span>
+                  {isVisited ? "Visited" : "Mark as Visited"}
+                </span>
               </button>
 
               {/* Add to Trip */}
@@ -147,11 +150,11 @@ export default function HotspotPanel({
               >
                 {isFavorite ? (
                   <>
-                    <span aria-hidden="true">♡</span> Favorited
+                    <span aria-hidden="true" className="text-[18px] leading-none">♡</span> Favorited
                   </>
                 ) : (
                   <>
-                    <span aria-hidden="true">♥</span> Favorite
+                    <span aria-hidden="true" className="text-[18px] leading-none">♡</span> Favorite
                   </>
                 )}
               </button>
@@ -162,3 +165,4 @@ export default function HotspotPanel({
     </AnimatePresence>
   );
 }
+

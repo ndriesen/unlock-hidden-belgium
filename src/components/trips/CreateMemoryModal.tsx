@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MediaVisibility } from "@/lib/services/media";
 import { uploadTripStopPhoto } from "@/lib/services/tripBuilder";
+import { awardXP } from "@/lib/services/gamification";
 
 interface CreateMemoryModalProps {
   isOpen: boolean;
@@ -65,6 +66,9 @@ export default function CreateMemoryModal({
           return;
         }
       }
+
+      // Award XP for photo upload
+      await awardXP(userId, 'xp_uploading_photo');
 
       // Reset form and close
       setFiles([]);

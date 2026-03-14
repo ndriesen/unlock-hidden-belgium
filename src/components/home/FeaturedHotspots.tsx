@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { MapPin, Heart, ChevronRight } from "lucide-react";
+import { MapPin, ChevronRight } from "lucide-react";
 import { Hotspot } from "@/types/hotspot";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 
@@ -172,10 +172,7 @@ export default function FeaturedHotspots({
                           className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 backdrop-blur flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 shadow-md"
                           aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
                         >
-                          <Heart 
-                            className={`w-4 h-4 transition-colors ${isWishlisted ? 'fill-rose-500 text-rose-500' : 'text-slate-600'}`} 
-                          />
-                        </button>
+                          <span aria-hidden="true" className={`text-[16px] leading-none ${isWishlisted ? "text-amber-600" : "text-slate-600"}`}>⟟</span></button>
                       )}
                     </div>
 

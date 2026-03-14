@@ -106,26 +106,35 @@ export default function TrendingHotspots({
         <p className="text-sm text-slate-600 mb-4">
           Places explorers are discovering this week.
         </p>
+        {/* View All + Scroll Controls */}
+        <div className="flex items-center justify-between mb-4">
+          <Link 
+            href="/hotspots?sort=popular"
+            className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+          >
+            See all trending
+            <ChevronRight className="w-4 h-4" />
+          </Link>
 
-        {/* Scroll Controls */}
-        {trendingHotspots.length > 3 && (
-          <div className="hidden md:flex gap-2 mb-4 justify-end">
-            <button
-              onClick={() => scroll('left')}
-              className={`w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm ${!showLeftArrow ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={!showLeftArrow}
-            >
-              <ChevronRight className="w-5 h-5 rotate-180 text-slate-600" />
-            </button>
-            <button
-              onClick={() => scroll('right')}
-              className={`w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm ${!showRightArrow ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={!showRightArrow}
-            >
-              <ChevronRight className="w-5 h-5 text-slate-600" />
-            </button>
-          </div>
-        )}
+          {trendingHotspots.length > 3 && (
+            <div className="hidden md:flex gap-2">
+              <button
+                onClick={() => scroll('left')}
+                className={`w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm ${!showLeftArrow ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={!showLeftArrow}
+              >
+                <ChevronRight className="w-5 h-5 rotate-180 text-slate-600" />
+              </button>
+              <button
+                onClick={() => scroll('right')}
+                className={`w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm ${!showRightArrow ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={!showRightArrow}
+              >
+                <ChevronRight className="w-5 h-5 text-slate-600" />
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Horizontal Scroll Container */}
         <div 
@@ -147,17 +156,6 @@ export default function TrendingHotspots({
               priority={index < 3}
             />
           ))}
-        </div>
-
-        {/* View All Link */}
-        <div className="mt-4 text-center">
-          <Link 
-            href="/hotspots?sort=popular"
-            className="inline-flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
-          >
-            See all trending
-            <ChevronRight className="w-4 h-4" />
-          </Link>
         </div>
       </div>
 

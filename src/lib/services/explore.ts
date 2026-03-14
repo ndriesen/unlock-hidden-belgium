@@ -70,6 +70,7 @@ export interface PopularTrip {
   stopCount: number;
   score: number;
   authorName: string;
+  authorId: string;
   likedByMe: boolean;
   savedByMe: boolean;
 }
@@ -421,6 +422,7 @@ export async function fetchPopularTrips(
         stopCount,
         score: Math.round(score * 10) / 10,
         authorName: userMap.get(trip.created_by) ?? "Explorer",
+        authorId: trip.created_by,
         likedByMe: likedTripIds.has(trip.id),
         savedByMe: savedTripIds.has(trip.id),
       };

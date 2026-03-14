@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import {
   BUDDY_INTEREST_OPTIONS,
@@ -38,6 +39,7 @@ export default function BuddiesPage() {
 
   const [profiles, setProfiles] = useState<BuddyProfile[]>([]);
   const [requests, setRequests] = useState<BuddyRequest[]>([]);
+  const [buddySearch, setBuddySearch] = useState("");
   const [sourceWarning, setSourceWarning] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(Boolean(user));
@@ -94,8 +96,14 @@ export default function BuddiesPage() {
       }),
     }));
 
-    return ranked.sort((a, b) => b.score - a.score).slice(0, 12);
-  }, [city, profiles, selectedInterests, style]);
+    const sorted = ranked.sort((a, b) => b.score - a.score);
+    const query = buddySearch.trim().toLowerCase();
+    const filtered = query
+      ? sorted.filter((match) => match.name.toLowerCase().includes(query))
+      : sorted;
+
+    return filtered.slice(0, 12);
+  }, [buddySearch, city, profiles, selectedInterests, style]);
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests((prev) =>
@@ -274,7 +282,15 @@ export default function BuddiesPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
-        <h2 className="font-semibold text-slate-900">Top matches</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-slate-900">Top matches</h2>
+          <input
+            value={buddySearch}
+            onChange={(event) => setBuddySearch(event.target.value)}
+            placeholder="Search by name"
+            className="w-full sm:w-60 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          />
+        </div>
 
         {loading && <p className="text-sm text-slate-600">Loading matches...</p>}
         {!loading && matches.length === 0 && (
@@ -285,7 +301,11 @@ export default function BuddiesPage() {
           {matches.map((match) => (
             <article key={match.userId} className="rounded-xl border border-slate-200 p-4 space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-slate-900">{match.name}</p>
+                <p className="font-semibold text-slate-900">
+                  <Link href={`/profile/${match.userId}`} className="hover:text-emerald-700">
+                    {match.name}
+                  </Link>
+                </p>
                 <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
                   {match.score}% match
                 </span>
@@ -295,9 +315,17 @@ export default function BuddiesPage() {
               <p className="text-xs text-slate-600">
                 {(match.interests.length ? match.interests : ["No interests added"]).join(" - ")}
               </p>
-              <button className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm">
-                Invite to plan
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href={`/profile/${match.userId}`}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-center text-sm"
+                >
+                  View profile
+                </Link>
+                <button className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm">
+                  Invite to plan
+                </button>
+              </div>
             </article>
           ))}
         </div>

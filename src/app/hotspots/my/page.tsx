@@ -1,12 +1,14 @@
-﻿"use client";
+"use client";
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useSearch } from "@/context/SearchContext";
 
 import { fetchMyHotspots, MyHotspotEntry } from "@/lib/services/myHotspots";
+import { toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
 
@@ -50,7 +52,7 @@ export default function MyHotspotsPage() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const { searchQuery, setSearchQuery } = useSearch();
   const [provinceFilter, setProvinceFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [showMap, setShowMap] = useState(false);
@@ -176,6 +178,24 @@ export default function MyHotspotsPage() {
   const favoriteIds = useMemo(
     () => filteredEntries.filter((entry) => entry.favorite).map((entry) => entry.id),
     [filteredEntries]
+  );
+
+  const toggleFavoriteInUi = useCallback(
+    async (hotspotId: string) => {
+      if (!user?.id) return;
+
+      try {
+        const next = await toggleFavorite(user.id, hotspotId);
+        setEntries((prev) =>
+          prev.map((entry) =>
+            entry.id === hotspotId ? { ...entry, favorite: next } : entry
+          )
+        );
+      } catch (error) {
+        console.error("Favorite toggle failed:", error);
+      }
+    },
+    [user?.id]
   );
 
   if (!user) {
@@ -313,67 +333,92 @@ export default function MyHotspotsPage() {
       )}
 
       {!loading && !errorMessage && filteredEntries.length > 0 && (
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredEntries.map((entry, index) => (
             <article key={entry.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="relative h-40 w-full">
-                <Image
-                  src={entry.imageUrl}
-                  alt={entry.name}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                  className="object-cover"
-                  priority={index < 6}
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                  <p className="font-semibold text-white">{entry.name}</p>
-                  <p className="text-xs text-white/85">{entry.category} - {entry.province}</p>
-                </div>
+              <div className="relative h-36 w-full">
+                <Link href={`/hotspots/${entry.id}`} className="block h-full">
+                  <Image
+                    src={entry.imageUrl}
+                    alt={entry.name}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    className="object-cover"
+                    priority={index < 6}
+                  />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                    <p className="text-sm font-semibold text-white">{entry.name}</p>
+                    <p className="text-[11px] text-white/85">{entry.category} - {entry.province}</p>
+                  </div>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void toggleFavoriteInUi(entry.id);
+                  }}
+                  className={`absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm ${
+                    entry.favorite ? "text-rose-600" : "text-slate-600"
+                  }`}
+                  aria-label={entry.favorite ? "Remove from favorites" : "Add to favorites"}
+                >
+                  <span aria-hidden="true" className="text-[16px] leading-none">♡</span>
+                </button>
               </div>
 
               <div className="space-y-2 p-3">
-                <p className="line-clamp-2 text-sm text-slate-700">{entry.description}</p>
+                <p className="line-clamp-2 text-xs text-slate-700">{entry.description}</p>
 
-                <div className="grid grid-cols-5 gap-2 text-center text-xs">
-                  <div className="rounded-lg border border-slate-200 p-2">
+                <div className="grid grid-cols-5 gap-2 text-center text-[11px]">
+                  <div className="rounded-lg border border-slate-200 p-1.5">
                     <p className="text-slate-500">Visits</p>
                     <p className="font-semibold text-slate-900">{entry.visitCount}</p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 p-2">
+                  <div className="rounded-lg border border-slate-200 p-1.5">
                     <p className="text-slate-500">Reviews</p>
                     <p className="font-semibold text-slate-900">{entry.reviewCount}</p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 p-2">
+                  <div className="rounded-lg border border-slate-200 p-1.5">
                     <p className="text-slate-500">Rating</p>
                     <p className="font-semibold text-slate-900">{entry.averageRating.toFixed(1)}</p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 p-2">
+                  <div className="rounded-lg border border-slate-200 p-1.5">
                     <p className="text-slate-500">Likes</p>
                     <p className="font-semibold text-slate-900">{entry.likesCount}</p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 p-2">
+                  <div className="rounded-lg border border-slate-200 p-1.5">
                     <p className="text-slate-500">Saves</p>
                     <p className="font-semibold text-slate-900">{entry.savesCount}</p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {entry.visited && <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">Visited</span>}
-                  {entry.wishlist && <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">Wishlist</span>}
-                  {entry.favorite && <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">Favorite</span>}
+                <div className="flex flex-wrap gap-1.5 text-[11px]">
+                  {entry.visited && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">
+                      <span aria-hidden="true" className="text-[13px] leading-none">✓</span>
+                      Visited
+                    </span>
+                  )}
+                  {entry.wishlist && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">
+                      <span aria-hidden="true" className="text-[13px] leading-none">⟟</span>
+                      Wishlist
+                    </span>
+                  )}
+                  {entry.favorite && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">
+                      <span aria-hidden="true" className="text-[13px] leading-none">♡</span>
+                      Favorite
+                    </span>
+                  )}
                   {entry.visitedAt && (
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
                       {formatDate(entry.visitedAt)}
                     </span>
                   )}
                 </div>
-
-                <Link
-                  href={`/hotspots/${entry.id}`}
-                  className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-center text-sm font-semibold text-slate-800"
-                >
-                  Open details
-                </Link>
               </div>
             </article>
           ))}
@@ -392,4 +437,5 @@ export default function MyHotspotsPage() {
     </div>
   );
 }
+
 

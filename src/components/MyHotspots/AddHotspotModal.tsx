@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Hotspot } from "@/types/hotspot";
 import { addHotspot } from "@/lib/services/addHotspot";
+import { awardXP } from "@/lib/services/gamification";
 import { useAuth } from "@/context/AuthContext";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 
@@ -80,6 +81,9 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
         longitude: parsedLng,
         visibility,
       });
+
+      // Award XP for adding hotspot
+      await awardXP(user.id, 'xp_adding_hotspot');
 
       // Show appropriate feedback
       if (result.approved) {

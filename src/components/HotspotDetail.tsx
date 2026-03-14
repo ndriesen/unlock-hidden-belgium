@@ -72,15 +72,19 @@ export default function HotspotDetail({
   if (!hotspot) return null;
 
   const routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${hotspot.latitude},${hotspot.longitude}`;
+  const detailUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/hotspots/${hotspot.id}`
+      : `/hotspots/${hotspot.id}`;
 
-  // Fallback image if no images available
+// Fallback image if no images available
   const fallbackImage = hotspot?.images && hotspot.images.length > 0
     ? hotspot.images
     : ["https://images.unsplash.com/photo-1469474968028-56623f02e42e"];
 
   const shareHotspot = async () => {
     const text = `${hotspot.name} - ${hotspot.category} in ${hotspot.province}`;
-    const url = routeUrl;
+    const url = detailUrl;
 
     if (navigator.share) {
       await navigator.share({ title: hotspot.name, text, url });
@@ -133,7 +137,7 @@ export default function HotspotDetail({
               isWishlist ? "text-amber-600" : "text-slate-700"
             }`}
           >
-            <span aria-hidden="true">☆</span> Wishlist
+            <span aria-hidden="true" className="text-[16px] leading-none">⟟</span> Wishlist
           </button>
 
           {showFavoriteInDetail && (
@@ -143,7 +147,7 @@ export default function HotspotDetail({
                 isFavorite ? "text-rose-600" : "text-slate-700"
               }`}
             >
-              <span aria-hidden="true">♡</span> Favorite
+              <span aria-hidden="true" className="text-[16px] leading-none">♡</span> Favorite
             </button>
           )}
         </div>
@@ -266,3 +270,6 @@ export default function HotspotDetail({
     </div>
   );
 }
+
+
+

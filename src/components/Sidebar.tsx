@@ -81,7 +81,6 @@ export default function Sidebar({ collapsed, onNavigate }: SidebarProps) {
     { name: "Buddies", href: "/buddies", icon: Users },
     { name: "Activity", href: "/activity", icon: Bell },
     { name: "Pricing", href: "/pricing", icon: Crown },
-    { name: "Profile", href: "/profile", icon: User },
   ];
 
   return (

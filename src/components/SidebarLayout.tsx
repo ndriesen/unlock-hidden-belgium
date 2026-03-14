@@ -1,14 +1,20 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { Bell, Compass, Home, Menu, Route, Settings, Shield, User, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { useAuth } from "@/context/AuthContext";
 import Sidebar from "./Sidebar";
+import LegalFooter from "@/components/LegalFooter";
 import { useSearch } from "@/context/SearchContext";
-import { fetchUnreadNotificationCount } from "@/lib/services/activity";
+import {
+  NotificationItem,
+  fetchNotifications,
+  fetchUnreadNotificationCount,
+} from "@/lib/services/activity";
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
@@ -25,6 +31,9 @@ export default function SidebarLayout({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const notificationsRef = useRef<HTMLDivElement>(null);
 
   const { searchQuery, setSearchQuery } = useSearch();
   const { user } = useAuth();
@@ -32,6 +41,16 @@ export default function SidebarLayout({
   const pathname = usePathname();
 
   const isAuthPage = pathname === "/auth";
+
+  const formatDate = useCallback((value: string): string => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    return new Intl.DateTimeFormat("nl-BE", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  }, []);
 
   // Listen for mobile sidebar toggle from StickyHeader
   useEffect(() => {
@@ -64,6 +83,50 @@ export default function SidebarLayout({
       active = false;
     };
   }, [user?.id, pathname]);
+
+  useEffect(() => {
+    if (!showNotifications) return;
+
+    let active = true;
+
+    const loadLatest = async () => {
+      if (!user?.id) {
+        if (active) setNotifications([]);
+        return;
+      }
+
+      const data = await fetchNotifications(user.id, 5);
+      if (active) {
+        setNotifications(data);
+      }
+    };
+
+    void loadLatest();
+
+    return () => {
+      active = false;
+    };
+  }, [showNotifications, user?.id]);
+
+  useEffect(() => {
+    if (!showNotifications) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (target && notificationsRef.current && !notificationsRef.current.contains(target)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showNotifications]);
+
+  const handleNotificationClick = useCallback(() => {
+    setAccountMenuOpen(false);
+    setShowNotifications((prev) => !prev);
+  }, []);
+
 
   // Check if user is admin
   useEffect(() => {
@@ -173,19 +236,66 @@ export default function SidebarLayout({
               onChange={(event) => setSearchQuery(event.target.value)}
               className="hidden md:block px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 w-72"
             />
+            <div ref={notificationsRef} className="relative">
+              <button
+                onClick={handleNotificationClick}
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
+                aria-label="Notifications"
+              >
+                <Bell className="h-4 w-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </button>
 
-            <button
-              onClick={() => router.push("/activity")}
-              className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
-              aria-label="Open activity"
-            >
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
+              {showNotifications && (
+                <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200 bg-white shadow-xl z-50">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+                    <span className="text-sm font-semibold text-slate-900">Notifications</span>
+                    <Link
+                      href="/activity"
+                      onClick={() => setShowNotifications(false)}
+                      className="text-xs font-semibold text-emerald-700"
+                    >
+                      See all activity
+                    </Link>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto px-3 py-2 space-y-2">
+                    {notifications.length === 0 && (
+                      <p className="text-xs text-slate-500">No notifications yet.</p>
+                    )}
+                    {notifications.map((notification) => (
+                      <div key={notification.id} className="flex gap-2 rounded-lg border border-slate-100 px-2 py-2">
+                        <div className="relative h-8 w-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                          {notification.activity.actorAvatarUrl ? (
+                            <Image
+                              src={notification.activity.actorAvatarUrl}
+                              alt={notification.activity.actorName}
+                              fill
+                              sizes="32px"
+                              className="object-cover"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-800">
+                            {notification.activity.actorName}
+                          </p>
+                          <p className="text-xs text-slate-600 truncate">
+                            {notification.activity.message}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {formatDate(notification.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
 
             {user ? (
               <div className="relative">
@@ -212,61 +322,20 @@ export default function SidebarLayout({
                     <button
                       onClick={() => {
                         setAccountMenuOpen(false);
-                        router.push("/hotspots");
-                      }}
-                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
-                    >
-                      Explore
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                        router.push("/hotspots/my");
-                      }}
-                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
-                    >
-                      My Hotspots
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                        router.push("/trips");
-                      }}
-                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
-                    >
-                      Trips
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                        router.push("/activity");
-                      }}
-                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
-                    >
-                      Activity
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                        router.push("/pricing");
-                      }}
-                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
-                    >
-                      Pricing
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountMenuOpen(false);
                         router.push("/profile");
                       }}
                       className="block w-full text-left px-4 py-3 hover:bg-slate-50"
                     >
                       Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        router.push("/legal");
+                      }}
+                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
+                    >
+                      Legal & Disclaimers
                     </button>
 
                     {isAdmin && (
@@ -336,6 +405,8 @@ export default function SidebarLayout({
           {children}
         </main>
 
+        <LegalFooter />
+
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur">
           <div className="grid grid-cols-5">
             {mobileTabs.map((tab) => {
@@ -366,4 +437,16 @@ export default function SidebarLayout({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
 

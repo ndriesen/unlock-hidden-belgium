@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/Supabase/browser-client";
+import { awardXP } from "@/lib/services/gamification";
 import { useAuth } from "@/context/AuthContext";
 
 interface Review {
@@ -9,6 +10,11 @@ interface Review {
   rating: number;
   comment: string | null;
   created_at?: string | null;
+  user_id: string;
+  user_avatar: string;
+  users?: {
+    username: string | null;
+  } | null;
 }
 
 type SortMode = "recent" | "rating";
@@ -29,9 +35,9 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
     const load = async () => {
       const { data } = await supabase
         .from("reviews")
-        .select("id, rating, comment, created_at")
+        .select("* , users:users(username)")
         .eq("hotspot_id", hotspotId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
 
       if (active && data) {
         setReviews(data as Review[]);
@@ -69,16 +75,16 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
   }, [reviews]);
 
   const reloadReviews = async () => {
-    const { data } = await supabase
-      .from("reviews")
-      .select("id, rating, comment, created_at")
-      .eq("hotspot_id", hotspotId)
-      .order("created_at", { ascending: false });
+      const { data } = await supabase
+        .from("reviews")
+        .select("*, users:users(username)")
+        .eq("hotspot_id", hotspotId)
+        .order("created_at", { ascending: false });
 
-    if (data) {
-      setReviews(data as Review[]);
-    }
-  };
+      if (data) {
+        setReviews(data as Review[]);
+      }
+    };
 
   const submitReview = async () => {
     if (!user) {
@@ -99,15 +105,14 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
       rating: number;
       comment: string;
       user_id?: string;
+      user_avatar: string;
     } = {
       hotspot_id: hotspotId,
       rating,
       comment: comment.trim(),
+      user_id: user?.id,
+      user_avatar: user?.user_metadata?.avatar_url || '',
     };
-
-    if (user?.id) {
-      payload.user_id = user.id;
-    }
 
     const { error } = await supabase.from("reviews").insert(payload);
 
@@ -118,10 +123,13 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
       return;
     }
 
+    // Award XP for review
+    await awardXP(user!.id, 'xp_writing_review');
+
     setComment("");
     setRating(5);
     setSubmitting(false);
-    setMessage("Review posted.");
+    setMessage("Review posted. +XP earned!");
     await reloadReviews();
   };
 
@@ -193,15 +201,29 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
             key={review.id}
             className="p-3 rounded-xl border border-slate-200 bg-white"
           >
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-semibold text-slate-900">{review.rating}/5</p>
-              <p className="text-xs text-slate-500">
-                {review.created_at
-                  ? new Date(review.created_at).toLocaleDateString("nl-BE")
-                  : ""}
-              </p>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-200 flex-shrink-0">
+                  <img
+                      src={review.user_avatar}
+                      alt={review.users?.username || "Anonymous User"}
+                      className="w-full h-full object-cover"
+                    />
+                </div>
+                <p className="font-semibold text-slate-900 text-sm truncate min-w-0 flex-1">
+                  {review.users?.username || "Anonymous User"}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <p className="font-semibold text-slate-900 text-sm">{review.rating}/5</p>
+                <p className="text-xs text-slate-500">
+                  {review.created_at
+                    ? new Date(review.created_at).toLocaleDateString("nl-BE")
+                    : ""}
+                </p>
+              </div>
             </div>
-            <p className="mt-1 text-sm text-slate-700">{review.comment || "No comment."}</p>
+            <p className="text-sm text-slate-700">{review.comment || "No comment."}</p>
           </article>
         ))}
       </div>

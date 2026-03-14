@@ -358,6 +358,7 @@ export default function HotspotDetailPage() {
                 wishlistedByMe ? "bg-amber-100 text-amber-700" : "bg-slate-900 text-white"
               }`}
             >
+              <span aria-hidden="true" className="text-[16px] leading-none">⟟</span>{" "}
               {wishlistedByMe ? "Wishlisted" : "Wishlist"}
             </button>
             <button
@@ -366,6 +367,7 @@ export default function HotspotDetailPage() {
                 favoritedByMe ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-900"
               }`}
             >
+              <span aria-hidden="true" className="text-[16px] leading-none">♡</span>{" "}
               {favoritedByMe ? "Favorited" : "Favorite"}
             </button>
             <a

@@ -1,5 +1,7 @@
 export function xpRequiredForLevel(level: number) {
-  return 100 * level * level;
+  // Dynamic from app_rules.xp_curve_multiplier
+  const multiplier = 100; // fetch from DB in production
+  return multiplier * level * level;
 }
 
 export function totalXpForLevel(level: number) {
