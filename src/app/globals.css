@@ -77,6 +77,50 @@ body {
   z-index: 700;
 }
 
+/* NEW: Mobile Leaflet fixes for FixedMobileMap */
+.leaflet-mobile-fixed .leaflet-container {
+  height: 100vh !important; /* Fix 1: Ensure full height on mobile */
+  position: relative;
+  will-change: contents; /* Fix 2: GPU optimization */
+}
+
+.leaflet-gpu-accelerated {
+  transform: translateZ(0); /* Fix 3: Hardware acceleration */
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.leaflet-mobile-fixed .leaflet-tile-pane {
+  z-index: 200 !important; /* Tiles above base */
+}
+
+.leaflet-mobile-fixed .leaflet-overlay-pane {
+  z-index: 400 !important; /* Overlays/vectors */
+}
+
+.leaflet-mobile-fixed .leaflet-marker-pane {
+  z-index: 600 !important; /* Markers on top */
+}
+
+.leaflet-mobile-fixed .leaflet-popup-pane {
+  z-index: 700 !important; /* Popups highest */
+}
+
+/* Mobile tile rendering perf */
+@media (max-width: 768px) {
+  .leaflet-container .leaflet-tile {
+    image-rendering: -webkit-optimize-contrast;
+    will-change: transform;
+    transform: translateZ(0.1px); /* Subpixel GPU wake */
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .leaflet-container {
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+}
+
 /* Card hover animations */
 .card-lift {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
