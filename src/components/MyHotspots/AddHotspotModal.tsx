@@ -1,6 +1,8 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { supabase } from "@/lib/Supabase/browser-client";
+import Fuse from "fuse.js";
 import { Hotspot } from "@/types/hotspot";
 import { addHotspot } from "@/lib/services/addHotspot";
 import { awardXP } from "@/lib/services/gamification";
@@ -27,7 +29,61 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isPending, setIsPending] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [isOpenCombo, setIsOpenCombo] = useState(false);
+  const [comboSearch, setComboSearch] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const comboRef = useRef<HTMLDivElement>(null);
+  const fuseRef = useRef<Fuse<string> | null>(null);
+
+  // Fetch categories on open
+  useEffect(() => {
+    if (isOpen) {
+      const fetchCategories = async () => {
+        try {
+          const { data } = await supabase
+            .from('hotspots')
+            .select('category')
+            .not('category', 'is', null)
+            .not('category', 'eq', '')
+            .limit(100);
+          if (data) {
+            const unique = Array.from(new Set(data.map((item: any) => item.category).filter(Boolean)));
+            setCategories(unique);
+            if (unique.length > 0) {
+              fuseRef.current = new Fuse(unique, {
+                threshold: 0.4,
+                keys: ['item']
+              });
+            }
+          }
+        } catch (e) {
+          console.error('Failed to fetch categories:', e);
+        }
+      };
+      fetchCategories();
+    }
+  }, [isOpen]);
+
+  // Click outside to close
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (comboRef.current && !comboRef.current.contains(e.target as Node)) {
+        setIsOpenCombo(false);
+      }
+    };
+    if (isOpenCombo) {
+      document.addEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
+    }
+  }, [isOpenCombo]);
+
+  const filteredCategories = useMemo(() => {
+    if (!comboSearch || !fuseRef.current) return categories;
+    return fuseRef.current.search(comboSearch).map((r: any) => r.item);
+  }, [comboSearch, categories]);
+
+  const showDropdown = isOpenCombo && filteredCategories.length > 0;
 
   useEffect(() => {
     if (isOpen && nameInputRef.current) {
@@ -174,12 +230,36 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-            <input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="Cafe, Museum, Viewpoint"
-              className="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            />
+            <div ref={comboRef} className="relative">
+              <input
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setComboSearch(e.target.value);
+                  setIsOpenCombo(true);
+                }}
+                onFocus={() => setIsOpenCombo(true)}
+                placeholder="Cafe, Museum, Viewpoint, or type new..."
+                className="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent pr-8"
+              />
+              {showDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                  {filteredCategories.slice(0, 10).map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        setCategory(cat);
+                        setComboSearch('');
+                        setIsOpenCombo(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-slate-900 first:rounded-t-lg last:rounded-b-lg"
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
