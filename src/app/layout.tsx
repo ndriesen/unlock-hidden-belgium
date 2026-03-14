@@ -6,6 +6,7 @@ import SidebarLayout from "@/components/SidebarLayout";
 import { SearchProvider } from "@/context/SearchContext";
 import { AuthModalProvider } from "@/lib/hooks/useAuthModal";
 import AuthModal from "@/components/auth/AuthModal";
+import { ToastProvider } from "@/context/ToastContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +36,9 @@ export default function RootLayout({
         <AuthProvider>
           <SearchProvider>
             <AuthProvider>
+              <ToastProvider>
               <SidebarLayout>{children}</SidebarLayout>
+              </ToastProvider>
               <AuthModal />
             </AuthProvider>
           </SearchProvider>

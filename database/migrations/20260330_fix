@@ -1,0 +1,45 @@
+-- Create trigger function to automatically create user record on signup
+-- Uses SECURITY DEFINER to run with elevated privileges (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE
+  username_from_email TEXT;
+BEGIN
+  -- Generate username from email (before @) + random suffix to ensure uniqueness
+  username_from_email := split_part(NEW.email, '@', 1) || '_' || LEFT(MD5(RANDOM()::TEXT), 4);
+  
+  -- Insert user into public.users (ignore if already exists)
+  -- Note: username is required, so we generate from email
+  INSERT INTO public.users (id, username, email, avatar_url, created_at)
+  VALUES (
+    NEW.id,
+    username_from_email,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'avatar_url', ''),
+    NOW()
+  )
+  ON CONFLICT (id) DO NOTHING;
+  
+  -- Create default list (ignore if already exists)
+  -- Note: lists table has unique constraint issues, so we use different approach
+  INSERT INTO public.lists (user_id, name, description, visibility, is_default)
+  VALUES (NEW.id, 'My Favorites', 'My favorite hidden gems', 'private', true)
+  ON CONFLICT DO NOTHING;
+  
+  -- Create user settings (ignore if already exists)  
+  INSERT INTO public.user_settings (user_id, allow_location, allow_notifications, allow_email)
+  VALUES (NEW.id, false, false, true)
+  ON CONFLICT (user_id) DO NOTHING;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger to call function on user creation
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Grant execute on the function to anon and authenticated roles
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO anon, authenticated;

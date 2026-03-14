@@ -1,0 +1,143 @@
+# GitLeaks Configuration
+# Detects secrets and sensitive information in code
+
+[allowlist]
+  description = "Allowlist patterns for this repository"
+  
+  # Ignore test files
+  paths = [
+    "**/test/**",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
+  ]
+  
+  # Ignore example patterns in documentation
+  regexes = [
+    "^example\\.",
+    "^test\\.",
+    "^sample\\.",
+    "YOUR_(KEY|SECRET|TOKEN)",
+    "placeholder",
+    "localhost:3000"
+  ]
+
+# Rule Definitions
+# These are the built-in rules plus custom additions
+
+# Generic API Key
+[[rules]]
+  description = "Generic API Key"
+  regex = '''(?i)(api[_-]?key|apikey|api_secret|api-secret)['"]?\s*[:=]\s*['"]?[a-zA-Z0-9_\-]{16,}['"]?'''
+  tags = ["key", "api"]
+
+# AWS Access Key
+[[rules]]
+  description = "AWS Access Key"
+  regex = '''(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'''
+  tags = ["key", "aws"]
+
+# AWS Secret Key
+[[rules]]
+  description = "AWS Secret Key"
+  regex = '''(?i)aws(.{0,20})?(?-i)['\"][0-9a-zA-Z/+]{40}['\"]'''
+  tags = ["key", "aws"]
+
+# GitHub Token
+[[rules]]
+  description = "GitHub Token"
+  regex = '''gh[pousr]_[A-Za-z0-9_]{36,251}'''
+  tags = ["key", "github"]
+
+# GitLab Token
+[[rules]]
+  description = "GitLab Token"
+  regex = '''glpat-[0-9a-zA-Z\-]{20}'''
+  tags = ["key", "gitlab"]
+
+# Slack Token
+[[rules]]
+  description = "Slack Token"
+  regex = '''xox[baprs]-[0-9a-zA-Z]{10,48}'''
+  tags = ["key", "slack"]
+
+# Discord Token
+[[rules]]
+  description = "Discord Token"
+  regex = '''[MN][A-Za-z\d]{23,}\.[\w-]{6}\.[\w-]{27}'''
+  tags = ["key", "discord"]
+
+# Private Key
+[[rules]]
+  description = "Private Key Header"
+  regex = '''-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'''
+  tags = ["key", "private"]
+
+# JWT Token
+[[rules]]
+  description = "JWT Token"
+  regex = '''eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*'''
+  tags = ["token", "jwt"]
+
+# Supabase Key
+[[rules]]
+  description = "Supabase Key"
+  regex = '''(?i)(supabase|sp)[_-]?(key|token|secret)[_-]?(anon|service|master)?['"]?\s*[:=]\s*['"]?(eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*)['"]?'''
+  tags = ["key", "supabase"]
+
+# Database Connection String
+[[rules]]
+  description = "Database Connection String"
+  regex = '''(?i)(database|db|postgres|mysql|mongodb|redis)[_-]?(url|connection|uri|string)?['"]?\s*[:=]\s*['"]?(postgres|MySQL|mongodb|redis)://[^\s'"]+['"]?'''
+  tags = ["secret", "database"]
+
+# Environment Variable with Secret
+[[rules]]
+  description = "Environment Variable with Secret Value"
+  regex = '''(?i)(secret|token|password|passwd|api_key|api_secret|access_token|auth_token)[_-]?(name|var|env)?['"]?\s*[:=]\s*['"][^'\n"]{8,}['"]'''
+  tags = ["secret"]
+
+# Generic Secret Pattern
+[[rules]]
+  description = "Generic Secret"
+  regex = '''(?i)secret\s*[:=]\s*['"][a-zA-Z0-9_\-]{16,}['"]'''
+  tags = ["secret"]
+
+# SendGrid API Key
+[[rules]]
+  description = "SendGrid API Key"
+  regex = '''SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}'''
+  tags = ["key", "sendgrid"]
+
+# Stripe API Key
+[[rules]]
+  description = "Stripe API Key"
+  regex = '''sk_live_[0-9a-zA-Z]{24}'''
+  tags = ["key", "stripe"]
+
+# Twilio API Key
+[[rules]]
+  description = "Twilio API Key"
+  regex = '''SK[a-f0-9]{32}'''
+  tags = ["key", "twilio"]
+
+# Google API Key
+[[rules]]
+  description = "Google API Key"
+  regex = '''AIza[0-9A-Za-z_-]{35}'''
+  tags = ["key", "google"]
+
+# OpenAI API Key
+[[rules]]
+  description = "OpenAI API Key"
+  regex = '''sk-[a-zA-Z0-9]{48,}'''
+  tags = ["key", "openai"]
+
+# Password in URL
+[[rules]]
+  description = "Password in URL"
+  regex = '''://[^/\s:@]+:[^/\s:@]+@'''
+  tags = ["secret", "url"]
+
