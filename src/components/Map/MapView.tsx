@@ -1,6 +1,9 @@
 ﻿"use client";
 
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
+import { MapResizeFix } from "./MapResizeFix";
+import { GeolocationControl } from "./GeolocationControl";
+import type { LatLngExpression } from 'leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 import "leaflet.heat/dist/leaflet-heat.js";
@@ -210,17 +213,27 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
   return (
     <div className="relative w-full h-full">
       <MapContainer
-        preferCanvas={useCanvas}
+        preferCanvas={true}
         center={[50.85, 4.35]}
         zoom={8}
-        className="w-full h-full"
+        className="w-full h-full leaflet-mobile-fixed leaflet-gpu-accelerated"
         ref={(mapInstance) => {
           if (mapInstance) {
             mapRef.current = mapInstance;
           }
         }}
       >
-        <TileLayer url={tile.url} attribution={tile.attribution} />
+        <MapResizeFix />
+        <TileLayer 
+          url={tile.url} 
+          attribution={tile.attribution}
+          detectRetina={true}
+          tileSize={256}
+          updateWhenIdle={false}
+        />
+        {/* Geolocation: Functional locate control when autoLocate=true */}
+        {autoLocate && <GeolocationControl autoLocate={autoLocate} />}
+      
 
         {viewMode === "markers" && enableClustering && hotspots.length > 1 && (
           <MarkerClusterGroup
@@ -280,17 +293,7 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
 
         {viewMode === "heatmap" && <HeatmapLayer hotspots={hotspots} />}
 
-{autoLocate && (
-  <div className="leaflet-control-container">
-    <div className="leaflet-top leaflet-right">
-      <div className="leaflet-control-locate leaflet-bar leaflet-control">
-        <a className="leaflet-control-locate-toggle" href="#" title="Locate me" role="button" aria-label="Locate me">
-          <span className="leaflet-control-locate-location"></span>
-        </a>
-      </div>
-    </div>
-  </div>
-)}
+{/* Locate UI moved to GeolocationControl for functionality */}
         <FitToHotspots hotspots={hotspots} enabled={autoFit} />
       </MapContainer>
 
