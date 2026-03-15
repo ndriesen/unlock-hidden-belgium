@@ -33,7 +33,7 @@ export async function getMessages(conversationId: ConversationId): Promise<Messa
     .from('messages')
     .select(`
       *,
-      sender:user_metadata(*)
+      sender:users(username, avatar_url)
     `)
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
@@ -41,7 +41,7 @@ export async function getMessages(conversationId: ConversationId): Promise<Messa
 
   return data.map((msg: any) => ({
     ...msg,
-    sender_name: msg.sender?.display_name || 'Unknown',
+    sender_name: msg.sender?.username || 'Unknown',
     sender_avatar: msg.sender?.avatar_url || '',
   })) as Message[];
 }
@@ -65,6 +65,24 @@ export async function sendMessage(
     .single();
   if (error) throw error;
   return data as Message;
+}
+
+// Fetch partner profile for chat header
+export async function getPartnerProfile(partnerId: string): Promise<{ name: string; avatar_url: string }> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('username, avatar_url')
+    .eq('id', partnerId)
+    .single();
+
+  if (error || !data) {
+    return { name: 'Unknown User', avatar_url: '' };
+  }
+
+  return {
+    name: data.username || 'Unknown',
+    avatar_url: data.avatar_url || '',
+  };
 }
 
 // Realtime hooks
@@ -134,6 +152,57 @@ export function useConversationParticipants(
       supabase.removeChannel(channel);
     };
   }, [conversationId, onUpdate]);
+}
+
+// Recent conversations for dropdown
+
+export interface RecentConversation {
+  conversationId: string;
+  partner: {
+    id: string;
+    name: string;
+    avatar_url: string;
+  };
+  preview: string;
+  timestamp: string;
+  unreadCount: number;
+}
+
+export async function fetchRecentConversations(
+  userId: string, 
+  limit: number = 5
+): Promise<RecentConversation[]> {
+  const { data, error } = await supabase
+    .rpc('get_recent_conversations', {
+      p_user_id: userId,
+      p_limit: limit
+    });
+
+  if (error) throw error;
+
+  // Transform RPC data to match type
+  return (data as any[]).map(conv => ({
+    conversationId: conv.conversation_id,
+    partner: {
+      id: conv.partner_id,
+      name: conv.partner_name,
+      avatar_url: conv.partner_avatar_url
+    },
+    preview: conv.preview,
+    timestamp: conv.last_message_at,
+    unreadCount: conv.unread_count
+  })).filter(conv => conv.partner);
+}
+
+export async function fetchUnreadMessagesCount(userId: string): Promise<number> {
+  const { data, error } = await supabase
+    .rpc('get_unread_messages_count', {
+      p_user_id: userId
+    });
+
+  if (error) throw error;
+
+  return data as number || 0;
 }
 
 // Bonus: Combined hook for messages (query + realtime)

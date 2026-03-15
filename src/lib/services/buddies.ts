@@ -126,11 +126,23 @@ export async function fetchBuddyProfiles(currentUserId: string) {
     .neq("user_id", currentUserId)
     .limit(50);
 
-  if (!profileError && profiles) {
+  if (!profileError && profiles && profiles.length > 0) {
+    // Validate users exist
+    const validProfiles = await Promise.all(
+      (profiles as BuddyProfileRow[]).map(async (row) => {
+        const { count } = await supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .eq('id', row.user_id);
+        return count && count > 0 ? mapBuddyProfileRow(row) : null;
+      })
+    );
+    const filteredProfiles = validProfiles.filter((p): p is BuddyProfile => p !== null);
+    
     return {
       source: "buddy_profiles" as const,
-      profiles: (profiles as BuddyProfileRow[]).map(mapBuddyProfileRow),
-      warning: "",
+      profiles: filteredProfiles,
+      warning: filteredProfiles.length < profiles.length ? "Some profiles skipped (invalid user)." : "",
     };
   }
 
@@ -140,7 +152,7 @@ export async function fetchBuddyProfiles(currentUserId: string) {
     .neq("id", currentUserId)
     .limit(50);
 
-  if (userError || !users) {
+  if (userError || !users || users.length === 0) {
     return {
       source: "none" as const,
       profiles: [] as BuddyProfile[],
@@ -149,6 +161,7 @@ export async function fetchBuddyProfiles(currentUserId: string) {
     };
   }
 
+  // Users fallback already from users table, so valid
   return {
     source: "users_fallback" as const,
     profiles: (users as UserRow[]).map(mapUserRow),

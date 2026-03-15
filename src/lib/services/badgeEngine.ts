@@ -203,7 +203,7 @@ async function computeUserStats(userId: string, visits: UserHotspot[]): Promise<
   const { count: friendInviteCount } = await supabase.from('user_invites').select('*', { count: 'exact', head: true }).eq('sent_by', userId).eq('accepted', true);
   const { count: hotspotAddedCount } = await supabase.from('hotspots').select('*', { count: 'exact', head: true }).eq('creator_id', userId);
   const { count: shareCount } = await supabase.from('shares').select('*', { count: 'exact', head: true }).eq('user_id', userId);
-  const { count: tripWithBuddyCount } = await supabase.from('user_trips').select('*', { count: 'exact', head: true }).eq('user_id', userId).gt('buddy_ids', '[]');
+  const { count: tripWithBuddyCount } = await supabase.from('trips').select('*', { count: 'exact', head: true }).eq('user_id', userId).gt('buddy_ids', '[]');
   const dailyMaxVisits = Math.max(...Array.from(dailyCounts.values()), 0);
 
   return {

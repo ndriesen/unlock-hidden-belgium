@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Bell, Compass, Home, Menu, Route, Settings, Shield, User, X } from "lucide-react";
+import { Bell, Compass, Home, Menu, MessageCircle, Route, Settings, Shield, User, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +15,8 @@ import {
   fetchNotifications,
   fetchUnreadNotificationCount,
 } from "@/lib/services/activity";
+import { RecentConversation, fetchRecentConversations, fetchUnreadMessagesCount } from "@/lib/services/chat";
+import { ChatDrawer } from "@/components/buddies/ChatDrawer";
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
@@ -30,10 +32,15 @@ export default function SidebarLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [messagesUnreadCount, setMessagesUnreadCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
+  const [openChatPartnerId, setOpenChatPartnerId] = useState<string | null>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   const { searchQuery, setSearchQuery } = useSearch();
   const { user } = useAuth();
@@ -67,13 +74,20 @@ export default function SidebarLayout({
 
     const loadUnread = async () => {
       if (!user?.id) {
-        if (active) setUnreadCount(0);
+        if (active) {
+          setUnreadCount(0);
+          setMessagesUnreadCount(0);
+        }
         return;
       }
 
-      const count = await fetchUnreadNotificationCount(user.id);
+      const [notifCount, msgCount] = await Promise.all([
+        fetchUnreadNotificationCount(user.id),
+        fetchUnreadMessagesCount(user.id)
+      ]);
       if (active) {
-        setUnreadCount(count);
+        setUnreadCount(notifCount);
+        setMessagesUnreadCount(msgCount);
       }
     };
 
@@ -108,23 +122,57 @@ export default function SidebarLayout({
     };
   }, [showNotifications, user?.id]);
 
+  // Messages dropdown logic
+  const loadRecent = useCallback(async (isAll = false) => {
+    if (!user?.id) {
+      setRecentConversations([]);
+      return;
+    }
+
+    try {
+      const data = await fetchRecentConversations(user.id, isAll ? 50 : 5);
+      setRecentConversations(data);
+    } catch (error) {
+      console.error('Failed to load recent conversations:', error);
+      setRecentConversations([]);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
-    if (!showNotifications) return;
+    if (!showMessages) return;
+
+    const active = true;
+    loadRecent();
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, [showMessages, loadRecent]);
+
+  useEffect(() => {
+    if (!showMessages) return;
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node | null;
-      if (target && notificationsRef.current && !notificationsRef.current.contains(target)) {
-        setShowNotifications(false);
+      if (target && messagesRef.current && !messagesRef.current.contains(target)) {
+        setShowMessages(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showNotifications]);
+  }, [showMessages]);
 
   const handleNotificationClick = useCallback(() => {
     setAccountMenuOpen(false);
     setShowNotifications((prev) => !prev);
+    setShowMessages(false);
+  }, []);
+
+  const handleMessagesClick = useCallback(() => {
+    setAccountMenuOpen(false);
+    setShowMessages((prev) => !prev);
+    setShowNotifications(false);
   }, []);
 
 
@@ -236,65 +284,132 @@ export default function SidebarLayout({
               onChange={(event) => setSearchQuery(event.target.value)}
               className="hidden md:block px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 w-72"
             />
-            <div ref={notificationsRef} className="relative">
-              <button
-                onClick={handleNotificationClick}
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
-                aria-label="Notifications"
-              >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
+            <div className="flex gap-2">
+              <div ref={notificationsRef} className="relative">
+                <button
+                  onClick={handleNotificationClick}
+                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
+                  aria-label="Notifications"
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200 bg-white shadow-xl z-50">
+                    <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+                      <span className="text-sm font-semibold text-slate-900">Notifications</span>
+                      <Link href="/activity" onClick={() => setShowNotifications(false)} className="text-xs font-semibold text-emerald-700">
+                        See all activity
+                      </Link>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto px-3 py-2 space-y-2">
+                      {notifications.length === 0 && (
+                        <p className="text-xs text-slate-500">No notifications yet.</p>
+                      )}
+                      {notifications.map((notification) => (
+                        <div key={notification.id} className="flex gap-2 rounded-lg border border-slate-100 px-2 py-2">
+                          <div className="relative h-8 w-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                            {notification.activity.actorAvatarUrl ? (
+                              <Image
+                                src={notification.activity.actorAvatarUrl}
+                                alt={notification.activity.actorName}
+                                fill
+                                sizes="32px"
+                                className="object-cover"
+                              />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-800">
+                              {notification.activity.actorName}
+                            </p>
+                            <p className="text-xs text-slate-600 truncate">
+                              {notification.activity.message}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {formatDate(notification.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </button>
-
-              {showNotifications && (
-                <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200 bg-white shadow-xl z-50">
-                  <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
-                    <span className="text-sm font-semibold text-slate-900">Notifications</span>
-                    <Link
-                      href="/activity"
-                      onClick={() => setShowNotifications(false)}
-                      className="text-xs font-semibold text-emerald-700"
-                    >
-                      See all activity
-                    </Link>
-                  </div>
-                  <div className="max-h-72 overflow-y-auto px-3 py-2 space-y-2">
-                    {notifications.length === 0 && (
-                      <p className="text-xs text-slate-500">No notifications yet.</p>
-                    )}
-                    {notifications.map((notification) => (
-                      <div key={notification.id} className="flex gap-2 rounded-lg border border-slate-100 px-2 py-2">
-                        <div className="relative h-8 w-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                          {notification.activity.actorAvatarUrl ? (
-                            <Image
-                              src={notification.activity.actorAvatarUrl}
-                              alt={notification.activity.actorName}
-                              fill
-                              sizes="32px"
-                              className="object-cover"
-                            />
-                          ) : null}
+              </div>
+              <div ref={messagesRef} className="relative">
+                <button
+                  onClick={handleMessagesClick}
+                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
+                  aria-label="Messages"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  {messagesUnreadCount > 0 && (
+                    <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-semibold text-white">
+                      {messagesUnreadCount > 99 ? "99+" : messagesUnreadCount}
+                    </span>
+                  )}
+                </button>
+                {showMessages && (
+                  <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200 bg-white shadow-xl z-50">
+                    <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+                      <span className="text-sm font-semibold text-slate-900">Conversations</span>
+                      <button
+                        onClick={() => {
+                          setShowMessages(true); 
+                          loadRecent(true);
+                        }}
+                        className="text-xs font-semibold text-emerald-700 hover:underline"
+                      >
+                        See all messages
+                      </button>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto px-3 py-2 space-y-2">
+                      {recentConversations.length === 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-xs text-slate-500">No recent conversations</p>
+                          <p className="text-xs text-slate-400 text-center">Start chatting in <Link href="/buddies" className="font-semibold text-emerald-600 hover:underline">Buddies</Link></p>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-800">
-                            {notification.activity.actorName}
-                          </p>
-                          <p className="text-xs text-slate-600 truncate">
-                            {notification.activity.message}
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            {formatDate(notification.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                      ) : recentConversations.map((conv) => (
+                        conv.partner && (
+                          <div key={conv.conversationId} className="flex gap-2 rounded-lg border border-slate-100 px-2 py-2 hover:bg-slate-50 cursor-pointer" onClick={() => setOpenChatPartnerId(conv.partner!.id)}>
+                            <div className="relative h-8 w-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                              {conv.partner.avatar_url ? (
+                                <Image
+                                  src={conv.partner.avatar_url}
+                                  alt={conv.partner.name ?? 'Partner'}
+                                  fill
+                                  sizes="32px"
+                                  className="object-cover"
+                                />
+                              ) : null}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold text-slate-800 truncate">
+                                {conv.partner.name ?? 'Unknown'}
+                              </p>
+                              <p className="text-xs text-slate-600 truncate">
+                                {conv.preview}
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                {formatDate(conv.timestamp)}
+                              </p>
+                            </div>
+                            {conv.unreadCount > 0 && (
+                              <span className="inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-semibold text-white ml-2 self-start">
+                                {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {user ? (
@@ -327,6 +442,15 @@ export default function SidebarLayout({
                       className="block w-full text-left px-4 py-3 hover:bg-slate-50"
                     >
                       Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        router.push("/buddies");
+                      }}
+                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
+                    >
+                      Messages
                     </button>
                     <button
                       onClick={() => {
@@ -368,6 +492,7 @@ export default function SidebarLayout({
                     </button>
                   </div>
                 )}
+
               </div>
             ) : (
               <button
@@ -405,6 +530,12 @@ export default function SidebarLayout({
           {children}
         </main>
 
+        {openChatPartnerId && (
+          <ChatDrawer 
+            conversationPartnerId={openChatPartnerId} 
+            onClose={() => setOpenChatPartnerId(null)} 
+          />
+        )}
         <LegalFooter />
 
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur">

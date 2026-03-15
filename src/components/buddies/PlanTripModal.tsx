@@ -33,8 +33,9 @@ export function PlanTripModal({ buddyUserId, onClose }: PlanTripModalProps) {
       await createTripInvite(selectedTripId, buddyUserId);
       addToast('Invite sent!');
       onClose();
-    } catch (error) {
-      addToast('Failed to send invite');
+    } catch (error: any) {
+      console.error('Invite error:', error);
+      addToast(error.message || 'Failed to send invite');
     } finally {
       setLoading(false);
     }
