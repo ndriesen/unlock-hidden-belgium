@@ -3,15 +3,15 @@
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import { MapResizeFix } from "./MapResizeFix";
 import { GeolocationControl } from "./GeolocationControl";
-import type { LatLngExpression } from 'leaflet';
+import type { LatLngExpression, Map } from 'leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 import "leaflet.heat/dist/leaflet-heat.js";
 import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from "react";
 
-import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { Hotspot } from "@/types/hotspot";
+
 
 interface Props {
   hotspots: Hotspot[];
@@ -195,6 +195,21 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
   const useCanvas = hotspots.length > 1500;
   const tile = useMemo(() => mapTileConfig(mapStyle, isDark), [mapStyle, isDark]);
 
+  const hotspotCoordinates = useMemo(() => {
+    return hotspots
+      .map((h) => {
+        const lat = h.lat ?? h.latitude;
+        const lng = h.lng ?? h.longitude;
+
+        if (typeof lat !== "number" || typeof lng !== "number") {
+          return null;
+        }
+
+        return { id: h.id, coords: [lat, lng] };
+      })
+      .filter(Boolean);
+  }, [hotspots]);
+
   const handleSelect = useCallback(
     (hotspot: Hotspot) => {
       setSelectedId(hotspot.id);
@@ -210,16 +225,18 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
     [onSelect, preventZoom]
   );
 
+
   return (
-    <div className="relative w-full h-full">
+<div className="relative w-full h-full min-h-[500px]">
       <MapContainer
         preferCanvas={true}
         center={[50.85, 4.35]}
         zoom={8}
         className="w-full h-full leaflet-mobile-fixed leaflet-gpu-accelerated"
-        ref={(mapInstance) => {
-          if (mapInstance) {
-            mapRef.current = mapInstance;
+        zoomControl={false}
+        ref={(instance) => {
+          if (instance !== null) {
+            mapRef.current = instance;
           }
         }}
       >
@@ -230,12 +247,20 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
           detectRetina={true}
           tileSize={256}
           updateWhenIdle={false}
+          eventHandlers={{
+            tileerror: (e) => {
+              console.error("Tile failed to load", e);
+            },
+            tileloadstart: () => {
+              console.log("Tile loading...");
+            }
+          }}
         />
         {/* Geolocation: Functional locate control when autoLocate=true */}
 {autoLocate && <GeolocationControl />}
       
 
-        {viewMode === "markers" && enableClustering && hotspots.length > 1 && (
+{viewMode === "markers" && enableClustering && hotspotCoordinates.length > 100 && (
           <MarkerClusterGroup
             chunkedLoading
             maxClusterRadius={19}
@@ -345,12 +370,14 @@ function ZoomAwareMarkers({
   useEffect(() => {
     if (visibleCount >= hotspots.length) return;
 
+    const delay = hotspots.length > 2000 ? 30 : 100;
     const timeout = setTimeout(() => {
       setVisibleCount((prev) => Math.min(prev + 50, hotspots.length));
-    }, 100);
+    }, delay);
 
     return () => clearTimeout(timeout);
   }, [visibleCount, hotspots.length]);
+
 
   // Only show markers up to visibleCount for performance
   const visibleHotspots = useMemo(
