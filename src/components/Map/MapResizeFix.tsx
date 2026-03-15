@@ -6,10 +6,16 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 export function MapResizeFix() {
+  return <MapResizeFixInner />;
+}
+
+function MapResizeFixInner() {
   const map = useMap();
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   useEffect(() => {
+    if (!map) return;
+
     // Initial invalidateSize after mount (critical for SSR/Next.js)
     const timeoutId = setTimeout(() => {
       map.invalidateSize();
@@ -34,7 +40,7 @@ export function MapResizeFix() {
 
   // Additional resize on map events
   useMapEvent('moveend', () => {
-    map.invalidateSize();
+    map?.invalidateSize();
   });
 
   // Tile debugging events

@@ -21,27 +21,13 @@ import HotspotPanel from "@/components/HotspotPanel";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
 
 const MapContainer = dynamic(
-  () =>
-    import("@/components/Map/MapContainer").then(
-      (mod) => mod.default as React.ComponentType<{
-        viewMode?: "markers" | "heatmap";
-        mapStyle?: "default" | "satellite" | "retro" | "terrain";
-        searchQuery?: string;
-        categoryFilter?: string;
-        provinceFilter?: string;
-        visitedIds?: string[];
-        wishlistIds?: string[];
-        favoriteIds?: string[];
-        preventZoom?: boolean;
-        hotspots?: Hotspot[];
-        selectedHotspotId?: string | null;
-        loading?: boolean;
-        onSelect?: (hotspot: Hotspot) => void;
-        onVisit?: (hotspotId: string) => void;
-        onToast?: (message: string) => void;
-      }>
-    ),
-  { ssr: false }
+  () => import("@/components/Map/MapContainer"),
+  {
+    ssr: false,
+    loading: () => <div className="h-[400px] bg-gradient-to-br from-gray-50 to-gray-100 animate-pulse rounded-lg flex items-center justify-center">
+      <div className="text-emerald-600 font-semibold">Loading interactive map...</div>
+    </div>
+  }
 );
 
 function hasCoordinates(

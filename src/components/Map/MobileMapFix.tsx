@@ -1,19 +1,21 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useCallback } from "react"
 import { useMap } from "react-leaflet"
 
-export default function MobileMapFix() {
+function SafeMobileMapFix() {
   const map = useMap()
 
-  useEffect(() => {
-
-    const fix = () => {
-      setTimeout(() => {
+  const fix = useCallback(() => {
+    if (!map || !map.getSize) return;
+    requestAnimationFrame(() => {
+      if (map) {
         map.invalidateSize()
-      }, 200)
-    }
+      }
+    })
+  }, [map])
 
+  useEffect(() => {
     fix()
 
     window.addEventListener("resize", fix)
@@ -23,9 +25,12 @@ export default function MobileMapFix() {
       window.removeEventListener("resize", fix)
       window.removeEventListener("orientationchange", fix)
     }
-
-  }, [map])
+  }, [fix])
 
   return null
+}
+
+export default function MobileMapFix() {
+  return <SafeMobileMapFix />;
 }
 

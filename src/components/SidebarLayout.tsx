@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Bell, Compass, Home, Menu, MessageCircle, Route, Settings, Shield, User, X } from "lucide-react";
+import { Bell, Compass, Home, Menu, Route, Shield, User, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { useAuth } from "@/context/AuthContext";
@@ -30,17 +30,16 @@ export default function SidebarLayout({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [unifiedDropdownOpen, setUnifiedDropdownOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'notifications' | 'messages' | 'account'>('account');
   const [unreadCount, setUnreadCount] = useState(0);
   const [messagesUnreadCount, setMessagesUnreadCount] = useState(0);
+  const [combinedBadge, setCombinedBadge] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showMessages, setShowMessages] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [openChatPartnerId, setOpenChatPartnerId] = useState<string | null>(null);
-  const notificationsRef = useRef<HTMLDivElement>(null);
-  const messagesRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { searchQuery, setSearchQuery } = useSearch();
   const { user } = useAuth();
@@ -77,6 +76,7 @@ export default function SidebarLayout({
         if (active) {
           setUnreadCount(0);
           setMessagesUnreadCount(0);
+          setCombinedBadge(0);
         }
         return;
       }
@@ -88,6 +88,7 @@ export default function SidebarLayout({
       if (active) {
         setUnreadCount(notifCount);
         setMessagesUnreadCount(msgCount);
+        setCombinedBadge(notifCount + msgCount);
       }
     };
 
@@ -98,39 +99,44 @@ export default function SidebarLayout({
     };
   }, [user?.id, pathname]);
 
+  // Unified dropdown click outside handler
   useEffect(() => {
-    if (!showNotifications) return;
-
-    let active = true;
-
-    const loadLatest = async () => {
-      if (!user?.id) {
-        if (active) setNotifications([]);
-        return;
-      }
-
-      const data = await fetchNotifications(user.id, 5);
-      if (active) {
-        setNotifications(data);
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (unifiedDropdownOpen && dropdownRef.current && !dropdownRef.current.contains(target)) {
+        setUnifiedDropdownOpen(false);
       }
     };
 
-    void loadLatest();
+    if (unifiedDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
 
     return () => {
-      active = false;
+      document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showNotifications, user?.id]);
+  }, [unifiedDropdownOpen]);
 
-  // Messages dropdown logic
-  const loadRecent = useCallback(async (isAll = false) => {
+  // Load notifications on tab switch
+  const loadNotifications = useCallback(async () => {
+    if (!user?.id) {
+      setNotifications([]);
+      return;
+    }
+
+    const data = await fetchNotifications(user.id, 5);
+    setNotifications(data);
+  }, [user?.id]);
+
+  // Load recent conversations on tab switch
+  const loadRecentConversationsTab = useCallback(async () => {
     if (!user?.id) {
       setRecentConversations([]);
       return;
     }
 
     try {
-      const data = await fetchRecentConversations(user.id, isAll ? 50 : 5);
+      const data = await fetchRecentConversations(user.id, 5);
       setRecentConversations(data);
     } catch (error) {
       console.error('Failed to load recent conversations:', error);
@@ -138,43 +144,29 @@ export default function SidebarLayout({
     }
   }, [user?.id]);
 
-  useEffect(() => {
-    if (!showMessages) return;
 
-    const active = true;
-    loadRecent();
 
-    return () => {
-      // Cleanup if needed
-    };
-  }, [showMessages, loadRecent]);
-
-  useEffect(() => {
-    if (!showMessages) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node | null;
-      if (target && messagesRef.current && !messagesRef.current.contains(target)) {
-        setShowMessages(false);
+  const handleUnifiedToggle = useCallback(() => {
+    setUnifiedDropdownOpen((prev) => !prev);
+    if (!unifiedDropdownOpen) {
+      // Load default tab content if opening
+      if (activeTab === 'notifications') {
+        loadNotifications();
+      } else if (activeTab === 'messages') {
+        loadRecentConversationsTab();
       }
-    };
+    }
+  }, [unifiedDropdownOpen, activeTab, loadNotifications, loadRecentConversationsTab]);
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMessages]);
-
-  const handleNotificationClick = useCallback(() => {
-    setAccountMenuOpen(false);
-    setShowNotifications((prev) => !prev);
-    setShowMessages(false);
-  }, []);
-
-  const handleMessagesClick = useCallback(() => {
-    setAccountMenuOpen(false);
-    setShowMessages((prev) => !prev);
-    setShowNotifications(false);
-  }, []);
-
+  const handleTabChange = useCallback((tab: 'notifications' | 'messages' | 'account') => {
+    setActiveTab(tab);
+    setUnifiedDropdownOpen(true);
+    if (tab === 'notifications') {
+      loadNotifications();
+    } else if (tab === 'messages') {
+      loadRecentConversationsTab();
+    }
+  }, [loadNotifications, loadRecentConversationsTab]);
 
   // Check if user is admin
   useEffect(() => {
@@ -284,140 +276,14 @@ export default function SidebarLayout({
               onChange={(event) => setSearchQuery(event.target.value)}
               className="hidden md:block px-4 py-2 rounded-full border border-slate-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 w-72"
             />
-            <div className="flex gap-2">
-              <div ref={notificationsRef} className="relative">
-                <button
-                  onClick={handleNotificationClick}
-                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
-                  aria-label="Notifications"
-                >
-                  <Bell className="h-4 w-4" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </span>
-                  )}
-                </button>
-                {showNotifications && (
-                  <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200 bg-white shadow-xl z-50">
-                    <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
-                      <span className="text-sm font-semibold text-slate-900">Notifications</span>
-                      <Link href="/activity" onClick={() => setShowNotifications(false)} className="text-xs font-semibold text-emerald-700">
-                        See all activity
-                      </Link>
-                    </div>
-                    <div className="max-h-72 overflow-y-auto px-3 py-2 space-y-2">
-                      {notifications.length === 0 && (
-                        <p className="text-xs text-slate-500">No notifications yet.</p>
-                      )}
-                      {notifications.map((notification) => (
-                        <div key={notification.id} className="flex gap-2 rounded-lg border border-slate-100 px-2 py-2">
-                          <div className="relative h-8 w-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                            {notification.activity.actorAvatarUrl ? (
-                              <Image
-                                src={notification.activity.actorAvatarUrl}
-                                alt={notification.activity.actorName}
-                                fill
-                                sizes="32px"
-                                className="object-cover"
-                              />
-                            ) : null}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-slate-800">
-                              {notification.activity.actorName}
-                            </p>
-                            <p className="text-xs text-slate-600 truncate">
-                              {notification.activity.message}
-                            </p>
-                            <p className="text-[10px] text-slate-400">
-                              {formatDate(notification.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div ref={messagesRef} className="relative">
-                <button
-                  onClick={handleMessagesClick}
-                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
-                  aria-label="Messages"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  {messagesUnreadCount > 0 && (
-                    <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-semibold text-white">
-                      {messagesUnreadCount > 99 ? "99+" : messagesUnreadCount}
-                    </span>
-                  )}
-                </button>
-                {showMessages && (
-                  <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200 bg-white shadow-xl z-50">
-                    <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
-                      <span className="text-sm font-semibold text-slate-900">Conversations</span>
-                      <button
-                        onClick={() => {
-                          setShowMessages(true); 
-                          loadRecent(true);
-                        }}
-                        className="text-xs font-semibold text-emerald-700 hover:underline"
-                      >
-                        See all messages
-                      </button>
-                    </div>
-                    <div className="max-h-72 overflow-y-auto px-3 py-2 space-y-2">
-                      {recentConversations.length === 0 ? (
-                        <div className="space-y-2">
-                          <p className="text-xs text-slate-500">No recent conversations</p>
-                          <p className="text-xs text-slate-400 text-center">Start chatting in <Link href="/buddies" className="font-semibold text-emerald-600 hover:underline">Buddies</Link></p>
-                        </div>
-                      ) : recentConversations.map((conv) => (
-                        conv.partner && (
-                          <div key={conv.conversationId} className="flex gap-2 rounded-lg border border-slate-100 px-2 py-2 hover:bg-slate-50 cursor-pointer" onClick={() => setOpenChatPartnerId(conv.partner!.id)}>
-                            <div className="relative h-8 w-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                              {conv.partner.avatar_url ? (
-                                <Image
-                                  src={conv.partner.avatar_url}
-                                  alt={conv.partner.name ?? 'Partner'}
-                                  fill
-                                  sizes="32px"
-                                  className="object-cover"
-                                />
-                              ) : null}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-semibold text-slate-800 truncate">
-                                {conv.partner.name ?? 'Unknown'}
-                              </p>
-                              <p className="text-xs text-slate-600 truncate">
-                                {conv.preview}
-                              </p>
-                              <p className="text-[10px] text-slate-400">
-                                {formatDate(conv.timestamp)}
-                              </p>
-                            </div>
-                            {conv.unreadCount > 0 && (
-                              <span className="inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-semibold text-white ml-2 self-start">
-                                {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
-                              </span>
-                            )}
-                          </div>
-                        )
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Old buttons removed - unified dropdown now on profile button */}
 
             {user ? (
-              <div className="relative">
+              <div ref={dropdownRef} className="relative">
                 <button
-                  onClick={() => setAccountMenuOpen((prev) => !prev)}
-                  className="relative w-10 h-10 rounded-full bg-emerald-600 text-white font-semibold flex items-center justify-center overflow-hidden"
-                  aria-label="Open account menu"
+                  onClick={handleUnifiedToggle}
+                  className={`relative w-10 h-10 rounded-full bg-emerald-600 text-white font-semibold flex items-center justify-center overflow-hidden ${combinedBadge > 0 ? 'ring-2 ring-rose-400/50 shadow-md' : ''}`}
+                  aria-label="Open unified menu"
                 >
                   {user.user_metadata?.avatar_url ? (
                     <Image
@@ -430,66 +296,190 @@ export default function SidebarLayout({
                   ) : (
                     user.email?.charAt(0).toUpperCase()
                   )}
+                  {combinedBadge > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white shadow-lg">
+                      {combinedBadge > 99 ? "99+" : combinedBadge}
+                    </span>
+                  )}
                 </button>
 
-                {accountMenuOpen && (
-                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-xl border z-50 overflow-hidden">
-                    <button
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                        router.push("/profile");
-                      }}
-                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
-                    >
-                      Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                        router.push("/buddies");
-                      }}
-                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
-                    >
-                      Messages
-                    </button>
-                    <button
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                        router.push("/legal");
-                      }}
-                      className="block w-full text-left px-4 py-3 hover:bg-slate-50"
-                    >
-                      Legal & Disclaimers
-                    </button>
+                {unifiedDropdownOpen && (
+                  <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+                    {/* Tab Headers */}
+                    <div className="flex border-b border-slate-200">
+                      <button
+                        onClick={() => handleTabChange('notifications')}
+                        className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'notifications' ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500' : 'text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        Notifications
+                      </button>
+                      <button
+                        onClick={() => handleTabChange('messages')}
+                        className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'messages' ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500' : 'text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        Messages
+                      </button>
+                      <button
+                        onClick={() => handleTabChange('account')}
+                        className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'account' ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500' : 'text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        Account
+                      </button>
+                    </div>
 
-                    {isAdmin && (
-                      <>
-                        <div className="border-t border-slate-100" />
-                        <button
-                          onClick={() => {
-                            setAccountMenuOpen(false);
-                            router.push("/admin/pending-hotspots");
-                          }}
-                          className="block w-full text-left px-4 py-3 hover:bg-slate-50 text-amber-600"
-                        >
-                          <span className="flex items-center gap-2">
-                            <Shield className="w-4 h-4" />
-                            Admin Dashboard
-                          </span>
-                        </button>
-                      </>
-                    )}
+                    {/* Tab Content */}
+                    <div className="max-h-96 overflow-y-auto">
+                      {activeTab === 'notifications' && (
+                        <div className="p-4 space-y-2">
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
+                            <span className="text-sm font-semibold text-slate-900">Notifications</span>
+                            <Link href="/activity" className="text-xs font-semibold text-emerald-700 hover:underline">
+                              See all activity
+                            </Link>
+                          </div>
+                          {notifications.length === 0 ? (
+                            <p className="text-xs text-slate-500 text-center py-8">No notifications yet.</p>
+                          ) : (
+                            notifications.map((notification) => (
+                              <div key={notification.id} className="flex gap-2 rounded-lg border border-slate-100 px-2 py-2 hover:bg-slate-50">
+                                <div className="relative h-8 w-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                                  {notification.activity.actorAvatarUrl ? (
+                                    <Image
+                                      src={notification.activity.actorAvatarUrl}
+                                      alt={notification.activity.actorName}
+                                      fill
+                                      sizes="32px"
+                                      className="object-cover"
+                                    />
+                                  ) : null}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-semibold text-slate-800">
+                                    {notification.activity.actorName}
+                                  </p>
+                                  <p className="text-xs text-slate-600 truncate">
+                                    {notification.activity.message}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400">
+                                    {formatDate(notification.createdAt)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
 
-                    <button
-                      onClick={async () => {
-                        await supabase.auth.signOut();
-                        setAccountMenuOpen(false);
-                        router.refresh();
-                      }}
-                      className="block w-full text-left px-4 py-3 hover:bg-slate-50 text-red-500"
-                    >
-                      Logout
-                    </button>
+                      {activeTab === 'messages' && (
+                        <div className="p-4 space-y-2">
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
+                            <span className="text-sm font-semibold text-slate-900">Conversations</span>
+                            <Link href="/buddies" className="text-xs font-semibold text-emerald-700 hover:underline">
+                              See all messages
+                            </Link>
+                          </div>
+                          {recentConversations.length === 0 ? (
+                            <div className="text-center py-8 space-y-2">
+                              <p className="text-xs text-slate-500">No recent conversations</p>
+                              <p className="text-xs text-slate-400">Start chatting in <Link href="/buddies" className="font-semibold text-emerald-600 hover:underline">Buddies</Link></p>
+                            </div>
+                          ) : (
+                            recentConversations.map((conv) => 
+                              conv.partner && (
+                                <div key={conv.conversationId} className="flex gap-2 rounded-lg border border-slate-100 px-2 py-2 hover:bg-slate-50 cursor-pointer" onClick={() => setOpenChatPartnerId(conv.partner!.id)}>
+                                  <div className="relative h-8 w-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                                    {conv.partner.avatar_url ? (
+                                      <Image
+                                        src={conv.partner.avatar_url}
+                                        alt={conv.partner.name ?? 'Partner'}
+                                        fill
+                                        sizes="32px"
+                                        className="object-cover"
+                                      />
+                                    ) : null}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-semibold text-slate-800 truncate">
+                                      {conv.partner.name ?? 'Unknown'}
+                                    </p>
+                                    <p className="text-xs text-slate-600 truncate">
+                                      {conv.preview}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400">
+                                      {formatDate(conv.timestamp)}
+                                    </p>
+                                  </div>
+                                  {conv.unreadCount > 0 && (
+                                    <span className="inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-semibold text-white ml-2 self-start">
+                                      {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            )
+                          )}
+                        </div>
+                      )}
+
+                      {activeTab === 'account' && (
+                        <div className="p-4 space-y-1">
+                          <button
+                            onClick={() => {
+                              setUnifiedDropdownOpen(false);
+                              router.push("/profile");
+                            }}
+                            className="block w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg"
+                          >
+                            Profile
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUnifiedDropdownOpen(false);
+                              router.push("/buddies");
+                            }}
+                            className="block w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg"
+                          >
+                            Messages
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUnifiedDropdownOpen(false);
+                              router.push("/legal");
+                            }}
+                            className="block w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg"
+                          >
+                            Legal & Disclaimers
+                          </button>
+                          {isAdmin && (
+                            <>
+                              <div className="border-t border-slate-100 my-1" />
+                              <button
+                                onClick={() => {
+                                  setUnifiedDropdownOpen(false);
+                                  router.push("/admin/pending-hotspots");
+                                }}
+                                className="block w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg text-amber-600 font-semibold"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Shield className="w-4 h-4" />
+                                  Admin Dashboard
+                                </span>
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={async () => {
+                              await supabase.auth.signOut();
+                              setUnifiedDropdownOpen(false);
+                              router.refresh();
+                            }}
+                            className="block w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg text-red-500 font-semibold"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

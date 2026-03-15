@@ -30,12 +30,18 @@ interface FixedMobileMapProps {
 // 🆕 Custom hook: MapResizeFix - Forces Leaflet invalidateSize on mount/resize for mobile
 // Fixes common mobile issue where map tiles don't render correctly after dynamic height changes
 function MapResizeFix() {
+  return <MapResizeFixLocal />;
+}
+
+function MapResizeFixLocal() {
   const map = useMap();
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   useEffect(() => {
+    if (!map) return;
+
     // Fix 1: Initial invalidateSize after mount (critical for SSR/Next.js dynamic)
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       map.invalidateSize();
     }, 100);
 
@@ -49,6 +55,7 @@ function MapResizeFix() {
     }
 
     return () => {
+      clearTimeout(timeoutId);
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
       }
@@ -126,7 +133,7 @@ export default function FixedMobileMap({
       className="leaflet-mobile-fixed leaflet-gpu-accelerated w-full h-screen min-h-screen overflow-hidden"
       style={containerStyle}
     >
-      <MapContainer
+      <MapContainer 
         center={center}
         zoom={zoom}
         style={mapStyle}

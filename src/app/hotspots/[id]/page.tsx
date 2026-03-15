@@ -12,7 +12,6 @@ import { supabase } from "@/lib/Supabase/browser-client";
 import OpeningHoursDisplay from "@/components/ui/OpeningHoursDisplay";
 import { fetchHotspotMedia, fetchOrganizedHotspotMedia, uploadHotspotPhoto } from "@/lib/services/hotspotMedia";
 import { toggleFavorite, toggleWishlist } from "@/lib/services/gamification";
-
 import { MediaVisibility } from "@/lib/services/media";
 import { Hotspot, getSafeDisplay } from "@/types/hotspot";
 
