@@ -215,10 +215,10 @@ export default function SidebarLayout({
 
             <div className="flex items-center gap-2 min-w-0">
               <Image
-                src="/branding/spotly-logo.svg"
+                src="/branding/spotly-logo.png"
                 alt="Spotly logo"
-                width={30}
-                height={30}
+                width={45}
+                height={45}
                 className="rounded-lg"
               />
               <div className="min-w-0">
