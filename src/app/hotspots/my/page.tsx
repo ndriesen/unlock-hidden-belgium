@@ -22,18 +22,8 @@ const MapContainer = dynamic(
 
 type StatusFilter = "all" | "visited" | "wishlist" | "favorite";
 
-const MapView = dynamic(() => import("@/components/Map/MapView"), {
-  ssr: false,
-}) as React.ComponentType<{
-  hotspots: Hotspot[];
-  loading: boolean;
-  visitedIds?: string[];
-  wishlistIds?: string[];
-  favoriteIds?: string[];
-  viewMode: "markers" | "heatmap";
-  mapStyle: "default" | "satellite" | "retro" | "terrain";
-  onSelect?: (hotspot: Hotspot) => void;
-}>;
+// const MapView = ... (commented out, using MapContainer instead)
+
 
 function parseStatusFilter(value: string | null): StatusFilter {
   if (value === "visited" || value === "wishlist" || value === "favorite") {
@@ -159,9 +149,9 @@ export default function MyHotspotsPage() {
     });
   }, [entries, provinceFilter, searchQuery, statusFilter]);
 
-  const mapHotspots = useMemo<Hotspot[]>(
-    () =>
-      filteredEntries.map((entry) => ({
+const mapHotspots = useMemo<Hotspot[]>(
+    () => {
+      const hotspots = filteredEntries.map((entry) => ({
         id: entry.id,
         name: entry.name,
         category: entry.category,
@@ -171,7 +161,13 @@ export default function MyHotspotsPage() {
         visit_count: entry.visitCount,
         latitude: entry.latitude,
         longitude: entry.longitude,
-      })),
+      }));
+      // DEBUG: Log valid coords
+      console.log('🔍 MyHotspots map data:', hotspots.length, 'total');
+      const validCoords = hotspots.filter(h => !isNaN(h.latitude) && !isNaN(h.longitude) && h.latitude && h.longitude);
+      console.log('📍 Valid coords:', validCoords.length, validCoords.map(h => ({id: h.id, coords: [h.latitude, h.longitude]})));
+      return hotspots;
+    },
     [filteredEntries]
   );
 
@@ -324,23 +320,22 @@ export default function MyHotspotsPage() {
         </p>
       )}
 
-      {!loading && !errorMessage && showMap && (
-        <section className="h-[52vh] min-h-[22rem] rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-          <MapView
-            hotspots={mapHotspots}
-            loading={false}
-            visitedIds={visitedIds}
-            wishlistIds={wishlistIds}
-            favoriteIds={favoriteIds}
-            viewMode="markers"
-            mapStyle={mapStyle}
-            onSelect={setSelectedHotspot}
-          />
-
-
-
-
-
+{!loading && !errorMessage && showMap && (
+        <section className="rounded-2xl overflow-hidden shadow-xl border border-slate-200">
+          <div className="h-[400px] md:h-[500px]">
+            <MapContainer
+              hotspots={mapHotspots}
+              viewMode="markers"
+              mapStyle={mapStyle}
+              preventZoom={false}
+              visitedIds={visitedIds}
+              wishlistIds={wishlistIds}
+              favoriteIds={favoriteIds}
+              loading={false}
+              onSelect={setSelectedHotspot}
+              onVisit={() => {}}
+            />
+          </div>
         </section>
       )}
       <HotspotPanel

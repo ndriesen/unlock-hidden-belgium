@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { validatePasswordStrength, validateEmail, mapAuthError, mapSignupError } from "@/lib/security/passwordValidation";
 import { isRateLimited, getRemainingRequests } from "@/lib/security/rateLimit";
 import { useAuthModal } from "@/lib/hooks/useAuthModal";
+import LoginSlideshow from "@/components/auth/LoginSlideshow";
 
 const EXPLORER_TYPES = [
   { id: "nature", label: "Nature Explorer", icon: "🌲", description: "Parks, forests & outdoor adventures" },
@@ -289,15 +290,15 @@ export default function AuthModal() {
           />
 
           {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", duration: 0.5 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={(e) => e.target === e.currentTarget && closeModal()}
-          >
-            <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: 20 }}
+      transition={{ type: "spring", duration: 0.5 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={(e) => e.target === e.currentTarget && closeModal()}
+    >
+      <div className="relative w-full max-w-md bg-transparent backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-white/20">
               {/* Close button */}
               <button
                 onClick={closeModal}
@@ -382,14 +383,12 @@ function LoginView({
   onSwitchToSignup: () => void;
 }) {
   return (
-    <div className="p-8">
+    <div className="p-8 relative bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-2xl">
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl mb-4">
-          <Compass className="w-8 h-8 text-white" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Welcome back</h2>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">Continue your exploration</p>
+      <LoginSlideshow />
+      <div className="text-center mb-8 relative z-10 pt-4">
+        <h2 className="text-3xl font-bold text-white drop-shadow-lg">Welcome back</h2>
+        <p className="text-slate-200/90 dark:text-slate-400 mt-1 drop-shadow-md">Continue your exploration</p>
       </div>
 
       {/* Tabs */}
@@ -546,8 +545,7 @@ function SignupView({
   getProgressWidth: () => string;
 }) {
   return (
-    <div className="p-8">
-      {/* Progress Bar */}
+    <div className="p-8 relative bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-2xl">      {/* Progress Bar */}
       <div className="mb-6">
         <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
           <motion.div
@@ -564,13 +562,14 @@ function SignupView({
       </div>
 
       {/* Header */}
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+      <LoginSlideshow />
+      <div className="text-center mb-6 relative z-10 pt-4">
+        <h2 className="text-3xl font-bold text-white drop-shadow-lg">
           {signupStep === "account" && "Create your account"}
           {signupStep === "explorer" && "What kind of explorer are you?"}
           {signupStep === "preferences" && "Tell us about yourself"}
         </h2>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-slate-200/90 mt-1 drop-shadow-md">
           {signupStep === "account" && "Start your journey to hidden gems"}
           {signupStep === "explorer" && "Select up to 3 types that match your style"}
           {signupStep === "preferences" && "Help us personalize your discovery"}

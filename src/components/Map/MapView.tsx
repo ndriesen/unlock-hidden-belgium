@@ -405,13 +405,18 @@ function ZoomAwareMarkers({
   });
 
   const visibleHotspots = useMemo(() => {
+    // TEMP DISABLED bounds filter for MyHotspots debugging
+    // const filtered = hotspots.filter((hotspot) => {
+    //   const coords = getCoordinates(hotspot);
+    //   if (!coords) return false;
+    //   return bounds.contains(coords);
+    // });
     const filtered = hotspots.filter((hotspot) => {
       const coords = getCoordinates(hotspot);
-      if (!coords) return false;
-      return bounds.contains(coords);
+      return coords !== null;
     });
     return filtered.slice(0, visibleCount);
-  }, [hotspots, bounds, visibleCount]);
+  }, [hotspots, visibleCount]); // removed bounds dep
 
   const size = zoom < 9 ? 16 : zoom < 12 ? 22 : zoom < 14 ? 26 : 30;
 

@@ -132,37 +132,37 @@ export default function HotspotDetail({
         </div>
       </div>
 
-      <div className="px-4 pt-4 space-y-3">
+      <div className="px-6 pt-4 space-y-3">
         {/* Social + utility actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex grid grid-cols-3 left-4 right-4 gap-5 items-center">
 
           <button
             onClick={() => onVisit?.(hotspot.id)}
-            className={`text-sm font-medium ${
+            className={`text-sm font-bold ${
               isVisited ? "text-green-600" : "text-slate-700"
             }`}
           >
-            <span aria-hidden="true" className="text-[16px] leading-none">✓</span> Mark visited
+            <span aria-hidden="true" className="text-[16px] font-bold leading-none">✓</span> Mark visited
           </button>
 
 
           <button
             onClick={() => onWishlist?.(hotspot.id)}
-            className={`text-sm font-medium ${
+            className={`text-sm font-bold ${
               isWishlist ? "text-amber-600" : "text-slate-700"
             }`}
           >
-            <span aria-hidden="true" className="text-[16px] leading-none">⟟</span> Wishlist
+            <span aria-hidden="true" className="text-[16px] font-bold leading-none">⟟</span> Wishlist
           </button>
 
       
             <button
               onClick={() => onFavorite?.(hotspot.id)}
-              className={`text-sm font-medium ${
+              className={`text-sm font-bold ${
                 isFavorite ? "text-rose-600" : "text-slate-700"
               }`}
             >
-              <span aria-hidden="true" className="text-[16px] leading-none">♡</span> Favorite
+              <span aria-hidden="true" className="text-[16px] font-bold leading-none">♡</span> Favorite
             </button>
           
         </div>
