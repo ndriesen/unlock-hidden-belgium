@@ -1,4 +1,4 @@
-﻿"use client";
+﻿﻿"use client";
 
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import { MapResizeFix } from "./MapResizeFix";
@@ -7,6 +7,7 @@ import { GeolocationControl } from "./GeolocationControl";
 import type { LatLngExpression, Map } from 'leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
+
 
 // Task 9: Leaflet Next.js icon fix
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -131,7 +132,7 @@ function FitToHotspots({ hotspots, enabled }: { hotspots: Hotspot[]; enabled: bo
   const map = useMap();
 
   useEffect(() => {
-    if (!enabled || !hotspots.length) return;
+    if (!enabled || !hotspots.length || !map) return;
 
     const points = hotspots
       .map((hotspot) => getCoordinates(hotspot))
@@ -143,15 +144,14 @@ function FitToHotspots({ hotspots, enabled }: { hotspots: Hotspot[]; enabled: bo
       map.setView(points[0], 14, {
         animate: true,
       });
-      return;
+    } else {
+      const bounds = L.latLngBounds(points.map((point) => L.latLng(point[0], point[1])));
+      map.fitBounds(bounds, {
+        padding: [28, 28],
+        maxZoom: 13,
+        animate: true,
+      });
     }
-
-    const bounds = L.latLngBounds(points.map((point) => L.latLng(point[0], point[1])));
-    map.fitBounds(bounds, {
-      padding: [28, 28],
-      maxZoom: 13,
-      animate: true,
-    });
   }, [enabled, hotspots, map]);
 
   return null;
@@ -272,7 +272,7 @@ updateWhenIdle={true}
           }}
         />
         {/* Geolocation: Functional locate control when autoLocate=true */}
-{autoLocate && <GeolocationControl />}
+{autoLocate && hotspots.length > 0 && <GeolocationControl hotspots={hotspots} />}
       
 
 {viewMode === "markers" && enableClustering && hotspotCoordinates.length > 100 && (
@@ -413,7 +413,7 @@ function ZoomAwareMarkers({
     return filtered.slice(0, visibleCount);
   }, [hotspots, bounds, visibleCount]);
 
-  const size = zoom < 9 ? 18 : zoom < 12 ? 22 : zoom < 14 ? 26 : 30;
+  const size = zoom < 9 ? 16 : zoom < 12 ? 22 : zoom < 14 ? 26 : 30;
 
   return (
     <>
@@ -508,6 +508,7 @@ function HeatmapLayer({ hotspots }: { hotspots: Hotspot[] }) {
 
   return null;
 }
+
 
 
 

@@ -105,10 +105,15 @@ const securityHeaders = [
     key: "X-XSS-Protection",
     value: "1; mode=block",
   },
+  // Fix duplicate React instances
+  {
+    key: "X-React-Singleton",
+    value: "true"
+  }
 ];
 
 const nextConfig: NextConfig = {
-  reactCompiler: true,
+  reactCompiler: false, // Disable React Compiler to avoid hook issues with React 19 + react-leaflet
   poweredByHeader: false,
   images: {
     remotePatterns: Array.from(imageHosts).map((hostname) => ({
@@ -120,6 +125,19 @@ const nextConfig: NextConfig = {
     // Disable image optimization for external domains in development to avoid 429 rate limiting
     // In production, you can remove this or set it to false
     unoptimized: isDev,
+  },
+  turbopack: {}, // Silence Turbopack webpack warning, keep webpack config for React aliases
+  webpack: (config, { isServer }) => {
+    // React singleton enforcement - prevent duplicate React instances causing hook errors
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        react: require.resolve('react'),
+        'react-dom': require.resolve('react-dom'),
+        'react-leaflet': require.resolve('react-leaflet'),
+      };
+    }
+    return config;
   },
   async headers() {
     return [
