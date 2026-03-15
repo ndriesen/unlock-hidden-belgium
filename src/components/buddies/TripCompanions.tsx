@@ -78,7 +78,7 @@ export function TripCompanions({ profiles }: TripCompanionsProps) {
       return;
     }
     try {
-      await createTripInvite(tripId, tripId); // trip.creator.id would be better, stub
+await createTripInvite(tripId, user!.id);
       addToast('Trip invite sent!');
     } catch (error) {
       addToast('Failed to send invite');
@@ -93,16 +93,16 @@ export function TripCompanions({ profiles }: TripCompanionsProps) {
           id: u.id,
           explorer: {
             userId: u.creator.id,
-            name: u.creator.display_name,
-            city: u.creator.city,
+            name: u.creator.display_name ?? 'Explorer',
+            city: u.creator.city ?? 'Nearby',
             interests: [],
             style: 'balanced' as any,
             availability: 'Flexible',
             bio: '',
-            avatarUrl: u.creator.avatar_url,
+            avatarUrl: u.creator.avatar_url ?? '',
             xpPoints: 0,
           } as BuddyProfile,
-          destination: u.name,
+          destination: u.title,
           dates: new Date(u.start_date).toLocaleDateString('en-GB', {
             month: 'short',
             day: 'numeric'

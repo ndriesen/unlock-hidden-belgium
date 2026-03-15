@@ -10,6 +10,7 @@ export interface UpcomingTrip {
     id: string;
     display_name: string;
     avatar_url: string;
+    city?: string;
   };
 }
 
@@ -21,7 +22,7 @@ export async function getUpcomingTripsWithCompanions(): Promise<UpcomingTrip[]> 
       title,
       start_date,
       looking_for_companions,
-      users!trips_created_by_fkey(id, username, avatar_url)
+      users!trips_created_by_fkey(id, username, avatar_url, city)
     `)
     .order('start_date')
     .limit(20);
@@ -34,6 +35,7 @@ export async function getUpcomingTripsWithCompanions(): Promise<UpcomingTrip[]> 
       id: trip.users.id,
       display_name: trip.users.username || 'Explorer',
       avatar_url: trip.users.avatar_url || '',
+      city: trip.users.city ?? '',
     },
   })) as UpcomingTrip[];
 }
