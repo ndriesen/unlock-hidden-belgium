@@ -2,10 +2,21 @@
 
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import { MapResizeFix } from "./MapResizeFix";
+import MobileMapFix from "./MobileMapFix";
 import { GeolocationControl } from "./GeolocationControl";
 import type { LatLngExpression, Map } from 'leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
+
+// Task 9: Leaflet Next.js icon fix
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
 import "leaflet.heat/dist/leaflet-heat.js";
 import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from "react";
 
@@ -227,9 +238,10 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
 
 
   return (
-<div className="relative w-full h-full min-h-[500px]">
+<div className="relative w-full h-[100dvh] min-h-[500px] overflow-hidden">
       <MapContainer
         preferCanvas={true}
+        renderer={L.canvas({ padding: 0.5 })}
         center={[50.85, 4.35]}
         zoom={8}
         className="w-full h-full leaflet-mobile-fixed leaflet-gpu-accelerated"
@@ -240,13 +252,16 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
           }
         }}
       >
-        <MapResizeFix />
+<MapResizeFix />        <MobileMapFix />
         <TileLayer 
           url={tile.url} 
           attribution={tile.attribution}
           detectRetina={true}
+          crossOrigin={true}
+          updateWhenZooming={false}
+          keepBuffer={6}
           tileSize={256}
-          updateWhenIdle={false}
+updateWhenIdle={true}
           eventHandlers={{
             tileerror: (e) => {
               console.error("Tile failed to load", e);
@@ -262,8 +277,7 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
 
 {viewMode === "markers" && enableClustering && hotspotCoordinates.length > 100 && (
           <MarkerClusterGroup
-            chunkedLoading
-            maxClusterRadius={19}
+chunkedLoading            chunkInterval={200}            chunkDelay={50}            removeOutsideVisibleBounds            maxClusterRadius={40}
             iconCreateFunction={(cluster: ClusterLike) => {
               const count = cluster.getChildCount();
               const size = count < 10 ? 26 : count < 50 ? 36 : 54;
@@ -379,11 +393,25 @@ function ZoomAwareMarkers({
   }, [visibleCount, hotspots.length]);
 
 
-  // Only show markers up to visibleCount for performance
-  const visibleHotspots = useMemo(
-    () => hotspots.slice(0, visibleCount),
-    [hotspots, visibleCount]
-  );
+// Viewport-based marker rendering (Task 6) + progressive load
+  const [bounds, setBounds] = useState<any>(map.getBounds());
+
+  useEffect(() => {
+    setBounds(map.getBounds());
+  }, [map]);
+
+  useMapEvents({
+    moveend: () => setBounds(map.getBounds()),
+  });
+
+  const visibleHotspots = useMemo(() => {
+    const filtered = hotspots.filter((hotspot) => {
+      const coords = getCoordinates(hotspot);
+      if (!coords) return false;
+      return bounds.contains(coords);
+    });
+    return filtered.slice(0, visibleCount);
+  }, [hotspots, bounds, visibleCount]);
 
   const size = zoom < 9 ? 18 : zoom < 12 ? 22 : zoom < 14 ? 26 : 30;
 
