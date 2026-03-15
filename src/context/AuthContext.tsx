@@ -37,10 +37,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     getSession();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+        const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+
+        // Check onboarding after login/signup - only if not on auth/onboarding pages
+        if (session?.user && !window.location.pathname.startsWith('/auth') && !window.location.pathname.startsWith('/onboarding')) {
+          const { data } = await supabase
+            .from('users')
+            .select('onboarding_completed')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (data && !data.onboarding_completed) {
+            window.location.href = '/onboarding';
+          }
+        }
       }
     );
 

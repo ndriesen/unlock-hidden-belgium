@@ -35,6 +35,21 @@ export interface BuddyRequest {
   createdAt: string;
 }
 
+import {
+  type ConversationId,
+  type Message,
+  getOrCreateConversation,
+  getMessages,
+  sendMessage
+} from './chat';
+
+export {
+  getOrCreateConversation,
+  getMessages,
+  sendMessage,
+};
+export type { ConversationId, Message };
+
 interface BuddyProfileRow {
   user_id: string;
   display_name: string | null;
@@ -252,14 +267,56 @@ export async function fetchBuddyRequests(): Promise<BuddyRequest[]> {
   }));
 }
 
+export async function fetchFilteredBuddyProfiles(
+  currentUserId: string,
+  filters: {
+    city?: string;
+    style?: TravelStyle;
+    interests?: string[];
+    availability?: string;
+  }
+): Promise<{profiles: BuddyProfile[]}> {
+  let query = supabase
+    .from("buddy_profiles")
+    .select(
+      "user_id,display_name,city,interests,travel_style,availability,bio,avatar_url"
+    )
+    .neq("user_id", currentUserId)
+    .limit(50);
+
+  if (filters.city) {
+    query = query.ilike("city", `%${filters.city}%`);
+  }
+  if (filters.style) {
+    query = query.eq("travel_style", filters.style);
+  }
+  if (filters.interests?.length) {
+    query = query.contains("interests", filters.interests);
+  }
+  if (filters.availability) {
+    query = query.eq("availability", filters.availability);
+  }
+
+  const { data: profiles, error } = await query;
+  if (error) throw error;
+
+  return {
+    profiles: (profiles as BuddyProfileRow[]).map(mapBuddyProfileRow),
+  };
+}
+
+
+
 export function calculateBuddyMatchScore(
   profile: BuddyProfile,
   preferences: {
     city: string;
     interests: string[];
     style: TravelStyle;
-  }
+  } = { city: '', interests: [], style: 'balanced' }
 ): number {
+
+
   const overlap = profile.interests.filter((interest) =>
     preferences.interests.includes(interest)
   ).length;

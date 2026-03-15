@@ -18,12 +18,20 @@ export default function AuthCallback() {
       }
 
       if (session) {
-        // User is logged in - redirect to hotspots
-        // The trigger will automatically create user records in the background
-        router.push("/hotspots");
+        // Check if user profile exists and onboarding status
+        const { data: userData } = await supabase
+          .from('users')
+          .select('onboarding_completed')
+          .eq('id', session.user.id)
+          .single();
+
+        if (!userData || !userData.onboarding_completed) {
+          router.push('/onboarding');
+        } else {
+          router.push('/hotspots');
+        }
       } else {
-        // No session - redirect to home
-        router.push("/");
+        router.push('/');
       }
     };
 
