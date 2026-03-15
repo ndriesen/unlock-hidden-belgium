@@ -11,6 +11,14 @@ import { fetchMyHotspots, MyHotspotEntry } from "@/lib/services/myHotspots";
 import { toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
+import HotspotPanel from "@/components/HotspotPanel";
+const MapContainer = dynamic(
+  () => import("@/components/Map/MapContainer").then((mod) => mod.default),
+  { ssr: false }
+);
+
+
+
 
 type StatusFilter = "all" | "visited" | "wishlist" | "favorite";
 
@@ -58,6 +66,8 @@ export default function MyHotspotsPage() {
   const [showMap, setShowMap] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
+  const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
+
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -324,13 +334,37 @@ export default function MyHotspotsPage() {
             favoriteIds={favoriteIds}
             viewMode="markers"
             mapStyle={mapStyle}
+            onSelect={setSelectedHotspot}
           />
+
+
+
+
+
         </section>
       )}
+      <HotspotPanel
+        hotspot={selectedHotspot}
+        onClose={() => setSelectedHotspot(null)}
+        onVisit={() => {}}
+        onWishlist={() => {}}
+        onFavorite={toggleFavoriteInUi}
+        onAddToTrip={() => {}}
+        isVisited={false}
+        isWishlist={false}
+        isFavorite={false}
+        canGoPrevious={false}
+        canGoNext={false}
+        onPrevious={() => {}}
+        onNext={() => {}}
+        positionLabel=""
+      />
+
 
       {!loading && !errorMessage && filteredEntries.length === 0 && (
         <p className="text-sm text-slate-600">No hotspots found for this filter set.</p>
       )}
+
 
       {!loading && !errorMessage && filteredEntries.length > 0 && (
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">

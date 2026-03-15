@@ -135,6 +135,17 @@ export default function HotspotDetail({
       <div className="px-4 pt-4 space-y-3">
         {/* Social + utility actions */}
         <div className="flex items-center gap-4">
+
+          <button
+            onClick={() => onVisit?.(hotspot.id)}
+            className={`text-sm font-medium ${
+              isVisited ? "text-green-600" : "text-slate-700"
+            }`}
+          >
+            <span aria-hidden="true" className="text-[16px] leading-none">✓</span> Mark visited
+          </button>
+
+
           <button
             onClick={() => onWishlist?.(hotspot.id)}
             className={`text-sm font-medium ${
@@ -144,7 +155,7 @@ export default function HotspotDetail({
             <span aria-hidden="true" className="text-[16px] leading-none">⟟</span> Wishlist
           </button>
 
-          {showFavoriteInDetail && (
+      
             <button
               onClick={() => onFavorite?.(hotspot.id)}
               className={`text-sm font-medium ${
@@ -153,7 +164,7 @@ export default function HotspotDetail({
             >
               <span aria-hidden="true" className="text-[16px] leading-none">♡</span> Favorite
             </button>
-          )}
+          
         </div>
 
         <div className="mt-1 grid grid-cols-3 gap-2">

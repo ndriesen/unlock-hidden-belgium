@@ -117,9 +117,9 @@ export default function HotspotPanel({
               />
             </div>
 
-            {/* Sticky Footer with primary actions */}
-            <div className="border-t border-gray-200 bg-white px-4 py-3 flex flex-col gap-2">
-              {/* Visit */}
+            {/* Sticky Footer with primary actions 
+            <div className="border-t border-gray-200 bg-white px-4 py-3 flex flex-col gap-2"> */}
+              {/* Visit 
               <button
                 onClick={() => onVisit(hotspot.id)}
                 className={`w-full py-2 rounded-lg text-white font-semibold ${
@@ -131,22 +131,22 @@ export default function HotspotPanel({
                   <span aria-hidden="true" className="text-[18px] leading-none">✓</span>
                   {isVisited ? "Visited" : "Mark as Visited"}
                 </span>
-              </button>
+              </button>*/}
 
-              {/* Add to Trip */}
+              {/* Add to Trip 
               <button
                 onClick={() => onAddToTrip(hotspot)}
                 className="w-full py-2 rounded-lg bg-blue-100 text-blue-700 font-semibold hover:bg-blue-200"
               >
                 Add to Trip
-              </button>
+              </button>*/}
 
-              {/* Favorite */}
+              {/* Favorite
               <button
                 onClick={() => onFavorite(hotspot.id)}
                 className={`w-full py-2 rounded-lg border border-gray-200 font-medium flex justify-center items-center ${
                   isFavorite ? "text-red-500" : "text-gray-700"
-                }`}
+                }`} 
               >
                 {isFavorite ? (
                   <>
@@ -158,7 +158,7 @@ export default function HotspotPanel({
                   </>
                 )}
               </button>
-            </div>
+            </div>*/}
           </motion.aside>
         </>
       )}
