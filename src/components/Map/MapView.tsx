@@ -232,7 +232,7 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
           updateWhenIdle={false}
         />
         {/* Geolocation: Functional locate control when autoLocate=true */}
-        {autoLocate && <GeolocationControl autoLocate={autoLocate} />}
+{autoLocate && <GeolocationControl />}
       
 
         {viewMode === "markers" && enableClustering && hotspots.length > 1 && (

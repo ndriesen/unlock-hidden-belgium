@@ -46,8 +46,10 @@ export function GeolocationControl({ autoLocate = true }: GeolocationControlProp
       }).addTo(map);
     };
 
-    const handleLocationError = (e: L.ErrorEvent) => {
-      console.error('❌ Geolocation error:', e.message);
+  const handleLocationError = (e: L.ErrorEvent) => {
+      console.warn('⚠️ Geolocation failed:', e.message);
+      // Fallback to Belgium center
+      map.setView([50.8503, 4.3517], 8, { animate: true });
     };
 
     map.on('locationfound', handleLocationFound);
