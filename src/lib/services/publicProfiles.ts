@@ -37,6 +37,7 @@ export interface PublicProfileData {
     image_url: string;
     visited_at: string;
   }>;
+  recentHotspots: PublicProfileData['visitedHotspots'];
   photos: Array<{
     id: string;
     storage_path: string;
