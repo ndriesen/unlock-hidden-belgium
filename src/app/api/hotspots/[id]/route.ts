@@ -1,12 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/Supabase/server-client';
 
 export async function GET(
-  request: Request, 
-  { params }: { params: { id: string } }
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { id } = params;
     const supabase = await getSupabaseClient(); // echte client
     const { data, error } = await supabase
       .from('hotspots')

@@ -50,7 +50,7 @@ export default function ContactPage() {
     if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
-    } else if (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(formData.email)) {
+    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email";
     }
     if (!formData.topic) newErrors.topic = "Please select a topic";
@@ -65,11 +65,32 @@ export default function ContactPage() {
     if (!validateForm()) return;
 
     setSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setSubmitting(false);
-    setSuccess(true);
-    setFormData({ name: "", email: "", topic: "", message: "" });
+    setErrors({}); // Clear previous errors
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSuccess(true);
+        setFormData({ name: "", email: "", topic: "", message: "" });
+      } else {
+        // Server error, show as general submit error
+        setErrors({ submit: result.error || 'Failed to send message. Please try again.' });
+      }
+    } catch (error) {
+      setErrors({ submit: 'Network error. Please check your connection and try again.' });
+      console.error('Contact form submit error:', error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClear = () => {
@@ -244,7 +265,7 @@ export default function ContactPage() {
                         aria-invalid={!!errors.name}
                       />
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-{errors.name && <p className="mt-1 text-sm text-rose-600">{errors.name}</p>}
+                      {errors.name && <p className="mt-1 text-sm text-rose-600">{errors.name}</p>}
                     </div>
                   </div>
 
@@ -260,7 +281,7 @@ export default function ContactPage() {
                         aria-invalid={!!errors.email}
                       />
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-{errors.email && <p className="mt-1 text-sm text-rose-600">{errors.email}</p>}
+                      {errors.email && <p className="mt-1 text-sm text-rose-600">{errors.email}</p>}
                     </div>
                   </div>
 
@@ -280,7 +301,7 @@ export default function ContactPage() {
                         ))}
                       </select>
                       <HelpCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-{errors.topic && <p className="mt-1 text-sm text-rose-600">{errors.topic}</p>}
+                      {errors.topic && <p className="mt-1 text-sm text-rose-600">{errors.topic}</p>}
                     </div>
                   </div>
 
@@ -297,10 +318,15 @@ export default function ContactPage() {
                         placeholder="Tell us more about what you need help with..."
                       />
                       <MessageSquare className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
-{errors.message && <p className="mt-1 text-sm text-rose-600">{errors.message}</p>}
+                      {errors.message && <p className="mt-1 text-sm text-rose-600">{errors.message}</p>}
                     </div>
                   </div>
 
+                  {errors.submit && (
+                    <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl">
+                      <p className="text-sm text-rose-700">{errors.submit}</p>
+                    </div>
+                  )}
                   <div className="flex flex-col sm:flex-row gap-4 pt-4">
                     <button
                       type="submit"
