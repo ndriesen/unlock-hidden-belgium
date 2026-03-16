@@ -203,6 +203,9 @@ export default function ProfilePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [savingUsername, setSavingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Buddy Preferences edit state
@@ -513,8 +516,75 @@ export default function ProfilePage() {
             <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
           </label>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">{username || email}</h1>
+        <div className="space-y-2">
+          {editingUsername ? (
+            <div className="flex items-center gap-3 justify-center flex-wrap">
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => {
+                  const val = e.target.value.trim();
+                  setUsername(val);
+                  setUsernameError("");
+                  if (val.length < 3) setUsernameError("Username must be at least 3 characters");
+                  else if (val.length > 20) setUsernameError("Username must be 20 characters or less");
+                  else if (!/^[a-zA-Z0-9_]+$/.test(val)) setUsernameError("Only letters, numbers, and underscores allowed");
+                }}
+                placeholder="Enter username"
+                className="flex-1 max-w-md px-4 py-3 text-2xl font-bold text-center text-slate-900 border-2 border-emerald-300 rounded-2xl focus:ring-4 focus:ring-emerald-500/50 bg-emerald-50 shadow-lg transition-all"
+                autoFocus
+              />
+              <button
+                onClick={async () => {
+                  if (usernameError || username.length < 3) return;
+                  setSavingUsername(true);
+                  const { error } = await supabase
+                    .from("users")
+                    .update({ username: username.trim() })
+                    .eq("id", userId!)
+                    .single();
+                  setSavingUsername(false);
+                  if (error) {
+                    setUsernameError(error.message);
+                  } else {
+                    setEditingUsername(false);
+                    setUsernameError("");
+                  }
+                }}
+                disabled={savingUsername || !!usernameError || username.length < 3}
+                className="px-6 py-3 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-all whitespace-nowrap"
+              >
+                {savingUsername ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={() => {
+                  setEditingUsername(false);
+                  setUsernameError("");
+                }}
+                className="px-6 py-3 text-slate-500 font-bold rounded-2xl hover:bg-slate-100 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="group">
+              <h1 
+                className="text-3xl font-bold text-slate-900 cursor-pointer hover:text-emerald-600 transition-colors group-hover:underline"
+                onClick={() => setEditingUsername(true)}
+              >
+                {username || email}
+              </h1>
+              <button
+                className="text-emerald-600 hover:text-emerald-700 text-sm font-medium opacity-0 group-hover:opacity-100 transition-all ml-2"
+                onClick={() => setEditingUsername(true)}
+              >
+                Edit
+              </button>
+            </div>
+          )}
+          {usernameError && (
+            <p className="text-red-600 text-sm font-medium text-center">{usernameError}</p>
+          )}
           <p className="text-lg text-slate-600">{explorerTitle}</p>
         </div>
       </div>
