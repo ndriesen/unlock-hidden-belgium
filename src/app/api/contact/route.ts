@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
-
 export async function POST(request: NextRequest) {
+  // Check if email service is available
+  if (!process.env.RESEND_API_KEY) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Email service temporarily unavailable. Please try again later.' 
+    }, { status: 503 });
+  }
+
   try {
     const body = await request.json();
+
     const { name, email, topic, message }: { name: string; email: string; topic: string; message: string } = body;
 
     // Server-side validation
@@ -28,11 +35,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Spam detected' }, { status: 400 });
     }
 
+    // Initialize Resend with checked env var
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    
     // Send email
     const adminEmail = 'nicolas_driesen@hotmail.be'; // Change to your email
     await resend.emails.send({
       from: `Hidden Gems Contact <contact@spotly.app>`, // Verified domain in Resend dashboard
       to: adminEmail,
+
       subject: `New Contact Form: ${topic}`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">

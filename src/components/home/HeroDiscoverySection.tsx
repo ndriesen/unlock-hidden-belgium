@@ -29,54 +29,54 @@ export default function HeroDiscoverySection({
   };
 
   return (
-    <section className="relative h-[50vh] md:h-[60vh] overflow-hidden">
+    <section className="relative h-[40vh] sm:h-[45vh] md:h-[50vh] lg:h-[55vh] overflow-hidden">
       {/* Adventure-themed background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-slate-900 to-indigo-900">
-        {/* Subtle map visualization overlay */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-20 left-10 w-32 h-32 bg-white/10 rounded-full blur-xl" />
-          <div className="absolute top-1/2 left-1/4 w-48 h-48 bg-emerald-400/20 rounded-full blur-2xl animate-pulse" />
-          <div className="absolute bottom-20 right-20 w-24 h-24 bg-amber-400/20 rounded-full blur-xl animate-bounce" />
-          <div className="absolute bottom-1/4 right-1/4 w-40 h-40 bg-indigo-400/10 rounded-full blur-2xl" />
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-slate-900/90 to-indigo-900">
+        {/* Subtle map visualization overlay - reduced intensity for mobile */}
+        <div className="absolute inset-0 opacity-30 sm:opacity-35">
+          <div className="absolute top-16 left-8 w-24 h-24 bg-white/20 rounded-full blur-lg sm:blur-xl" />
+          <div className="absolute top-1/2 left-1/4 w-32 h-32 bg-emerald-400/30 rounded-full blur-xl sm:blur-2xl animate-pulse" />
+          <div className="absolute bottom-16 right-8 w-20 h-20 bg-amber-400/30 rounded-full blur-lg sm:blur-xl animate-bounce [animation-delay:1s]" />
+          <div className="absolute bottom-1/4 right-1/4 w-32 h-32 bg-indigo-400/20 rounded-full blur-xl sm:blur-2xl" />
         </div>
       </div>
 
-      {/* Floating elements */}
+      {/* Floating elements - mobile optimized positions */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-20 left-10 w-2 h-2 bg-white/40 rounded-full animate-ping" />
-        <div className="absolute top-1/2 left-20 w-1.5 h-1.5 bg-emerald-300/70 rounded-full animate-pulse" />
-        <div className="absolute bottom-32 right-16 w-3 h-3 bg-amber-300/60 rounded-full animate-bounce slow-bounce" />
+        <div className="absolute top-16 left-8 w-2 h-2 bg-white/50 rounded-full animate-ping" />
+        <div className="absolute top-1/2 left-12 w-1.5 h-1.5 bg-emerald-300/80 rounded-full animate-pulse [animation-delay:0.5s]" />
+        <div className="absolute bottom-20 right-8 w-2.5 h-2.5 bg-amber-300/70 rounded-full animate-bounce [animation-delay:1.5s]" />
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 h-full flex flex-col items-center justify-center text-center text-white pt-16 md:pt-24 pb-12">
-        <div className="max-w-2xl mx-auto space-y-6">
-<h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-            Hi <span className="text-emerald-400">{name}</span>, ready for your next
-            <span className="block bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-lg">
+      <div className="relative z-10 container mx-auto px-4 h-full flex flex-col items-center justify-center text-center text-white py-6 sm:py-8 md:py-12 lg:py-16">
+        <div className="max-w-xl sm:max-w-2xl mx-auto space-y-4 sm:space-y-5 md:space-y-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
+            Hi <span className="text-emerald-400 drop-shadow-md">{name}</span>, ready for your next
+            <span className="block bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-lg sm:drop-shadow-xl">
               adventure?
             </span>
           </h1>
 
-          <p className="text-xl md:text-2xl text-slate-200/90 max-w-md mx-auto leading-relaxed">
+          <p className="text-lg sm:text-xl md:text-2xl text-white/95 max-w-md mx-auto leading-relaxed font-medium">
             Discover hidden gems near you.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center max-w-md mx-auto">
             <button
               onClick={handleExploreMap}
-              className="group flex items-center justify-center gap-3 px-8 py-4 bg-white text-slate-900 font-bold rounded-2xl shadow-2xl hover:shadow-3xl hover:-translate-y-1 transition-all duration-300 active:scale-[0.97] text-lg min-h-[56px]"
+              className="group flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 py-3.5 sm:py-4 bg-white text-slate-900 font-bold rounded-2xl shadow-2xl hover:shadow-3xl hover:shadow-white/20 hover:-translate-y-1 transition-all duration-300 active:scale-[0.97] text-base sm:text-lg min-h-[52px] sm:min-h-[56px]"
             >
-              <Map className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              <Map className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
               Explore Map
             </button>
 
             <button
               onClick={handleSurpriseAdventure}
-              className="group flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-2xl shadow-2xl hover:shadow-3xl hover:-translate-y-1 transition-all duration-300 active:scale-[0.97] text-lg min-h-[56px] relative overflow-hidden"
+              className="group flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-2xl shadow-2xl hover:shadow-emerald-500/30 hover:shadow-3xl hover:-translate-y-1 transition-all duration-300 active:scale-[0.97] text-base sm:text-lg min-h-[52px] sm:min-h-[56px] relative overflow-hidden"
             >
-              <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-all animate-sparkle" />
-              Surprise Adventure
-              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-12 transition-all duration-500" />
+              Surprise Me
+              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
             </button>
           </div>
         </div>

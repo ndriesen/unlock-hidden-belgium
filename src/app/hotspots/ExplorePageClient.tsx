@@ -669,14 +669,51 @@ const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
           </Link>
         </div>
 
-        {tripsWarning && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            {tripsWarning}
-          </p>
+        {tripsQuery.isLoading && (
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-48 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 animate-pulse shadow-sm overflow-hidden">
+                <div className="h-24 bg-gradient-to-r from-slate-200 to-slate-300" />
+                <div className="p-3 space-y-2">
+                  <div className="h-4 bg-slate-300 rounded w-3/4" />
+                  <div className="h-3 bg-slate-300 rounded w-1/2" />
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {Array.from({ length: 4 }).map((_, j) => (
+                      <div key={j} className="h-12 bg-slate-200 rounded-lg" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
-        {!tripsWarning && trips.length === 0 && (
-          <p className="text-sm text-slate-600">No public trips yet.</p>
+        {tripsWarning && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-5 h-5 mt-0.5 text-amber-600 flex-shrink-0">⚠️</div>
+              <div>
+                <p className="font-semibold text-amber-900">{tripsWarning}</p>
+                <p className="text-sm text-amber-800 mt-1">Try creating your first public trip!</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!tripsWarning && trips.length === 0 && !tripsQuery.isLoading && (
+          <div className="text-center py-12 bg-gradient-to-r from-slate-50 to-emerald-50 rounded-2xl border-2 border-dashed border-emerald-200">
+            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">🗺️</span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">No public trips yet</h3>
+            <p className="text-slate-600 mb-6 max-w-md mx-auto">Be the first to share your adventure! Community trips will appear here.</p>
+            <Link 
+              href="/trips" 
+              className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition-all shadow-lg hover:shadow-xl"
+            >
+              Create Your First Trip
+            </Link>
+          </div>
         )}
 
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
