@@ -163,7 +163,7 @@ export default function PublicTripPage() {
               <button
                 className={`px-6 py-3 rounded-xl font-medium transition-all shadow-lg hover:shadow-xl flex items-center gap-2 ${
                   isLiked 
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25' 
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-blue-400/25' 
                     : 'border-2 border-slate-200 hover:border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
                 } ${updatingLike || !user ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={handleLike}
@@ -175,7 +175,7 @@ export default function PublicTripPage() {
               <button
                 className={`px-6 py-3 rounded-xl font-medium transition-all shadow-lg hover:shadow-xl flex items-center gap-2 ${
                   isSaved 
-                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-yellow-500/25' 
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-blue-400/25'
                     : 'border-2 border-slate-200 hover:border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
                 } ${updatingSave || !user ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={handleSave}
