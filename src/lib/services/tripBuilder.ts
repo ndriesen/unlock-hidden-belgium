@@ -9,6 +9,7 @@ import {
 } from "@/lib/services/media";
 import { recordActivity } from "@/lib/services/activity";
 
+export type { Trip, TripStop, TripMedia } from "@/types/trip";
 
 interface TripRow {
   id: string;
