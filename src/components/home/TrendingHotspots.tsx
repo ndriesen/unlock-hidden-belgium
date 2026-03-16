@@ -99,12 +99,12 @@ export default function TrendingHotspots({
             <span className="text-lg">🔥</span>
           </div>
           <h2 className="text-xl md:text-2xl font-bold text-slate-900">
-            Trending near you
+            Trending Near You
           </h2>
         </div>
         
         <p className="text-sm text-slate-600 mb-4">
-          Places explorers are discovering this week.
+          Places explorers are discovering near you.
         </p>
         {/* View All + Scroll Controls */}
         <div className="flex items-center justify-between mb-4">

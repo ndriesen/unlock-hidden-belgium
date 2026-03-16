@@ -1,5 +1,6 @@
 ﻿import { Hotspot } from "@/types/hotspot";
 import { supabase } from "@/lib/Supabase/browser-client";
+import type { Trip, TripMedia, TripStop } from "@/types/trip";
 import {
   createSignedMediaUrl,
   MediaVisibility,
@@ -7,6 +8,7 @@ import {
   uploadImageToMediaBucket,
 } from "@/lib/services/media";
 import { recordActivity } from "@/lib/services/activity";
+
 
 interface TripRow {
   id: string;
@@ -54,51 +56,10 @@ interface TripReactionRow {
   trip_id: string;
 }
 
-export interface TripMedia {
-  id: string;
-  tripId: string;
-  tripStopId: string | null;
-  hotspotId: string | null;
-  storagePath: string;
-  signedUrl: string;
-  caption: string;
-  visibility: MediaVisibility;
-  isHighlight: boolean;
-  createdAt: string;
-}
 
-export interface TripStop {
-  id: string;
-  hotspotId: string;
-  name: string;
-  province: string;
-  category: string;
-  lat: number;
-  lng: number;
-  note: string;
-  photoUrl: string;
-  addedAt: string;
-  visitedAt: string | null;
-  media: TripMedia[];
-}
 
-export interface Trip {
-  id: string;
-  title: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  visibility: "private" | "friends" | "public";
-  coverImage: string;
-  createdAt: string;
-  updatedAt: string;
-  likesCount: number;
-  savesCount: number;
-  viewsCount: number;
-  likedByMe: boolean;
-  savedByMe: boolean;
-  stops: TripStop[];
-}
+// Removed local interfaces - use src/types/trip.ts
+
 
 export function buildTripShareText(trip: Trip): string {
   const header = `${trip.title} (${trip.stops.length} stops)`;
@@ -109,7 +70,7 @@ export function buildTripShareText(trip: Trip): string {
   return [header, ...lines].join("\n");
 }
 
-function mapTripMediaByStop(media: TripMedia[]): Map<string, TripMedia[]> {
+export function mapTripMediaByStop(media: TripMedia[]): Map<string, TripMedia[]> {
   const map = new Map<string, TripMedia[]>();
 
   media.forEach((item) => {
@@ -197,26 +158,28 @@ function mapTripRows(
 async function fetchTripMedia(tripIds: string[]): Promise<TripMedia[]> {
   if (!tripIds.length) return [];
 
+  // Query public data filtered by user's trip IDs (RLS handles auth)
   // First try to fetch with is_highlight column (if migration was run)
   const { data, error } = await supabase
     .from("trip_media")
-    .select("id,trip_id,trip_stop_id,hotspot_id,storage_path,caption,visibility,is_highlight,created_at")
+    .select(
+      "id,trip_id,trip_stop_id,hotspot_id,storage_path,caption,visibility,is_highlight,created_at"
+    )
     .in("trip_id", tripIds)
     .order("created_at", { ascending: false });
 
   if (error || !data) {
-    // Fallback: try without is_highlight if the column doesn't exist
-    console.log("fetchTripMedia: trying without is_highlight", error);
+    // Fallback if column doesn't exist
     const fallbackResult = await supabase
       .from("trip_media")
-      .select("id,trip_id,trip_stop_id,hotspot_id,storage_path,caption,visibility,created_at")
+      .select(
+        "id,trip_id,trip_stop_id,hotspot_id,storage_path,caption,visibility,created_at"
+      )
       .in("trip_id", tripIds)
       .order("created_at", { ascending: false });
-    
-    if (fallbackResult.error || !fallbackResult.data) {
-      return [];
-    }
-    
+
+    if (fallbackResult.error || !fallbackResult.data) return [];
+
     const rows = fallbackResult.data;
     const signedUrls = await Promise.all(
       rows.map((row) => createSignedMediaUrl(row.storage_path))
@@ -243,8 +206,8 @@ async function fetchTripMedia(tripIds: string[]): Promise<TripMedia[]> {
       .filter((item): item is TripMedia => item !== null);
   }
 
+  // Normal case
   const rows = data;
-
   const signedUrls = await Promise.all(
     rows.map((row) => createSignedMediaUrl(row.storage_path))
   );
@@ -274,6 +237,13 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
   // First, get trips created by this user
   console.log("fetchTrips called with userId:", userId);
   
+  // Simple debounce: skip if fetch in progress (prevents lock contention)
+  if ((fetchTrips as any).inProgress) {
+    console.log("fetchTrips debounced - already in progress");
+    return []; // or return cached, but simple skip for now
+  }
+  (fetchTrips as any).inProgress = true;
+  
   const { data: tripData, error: tripsError } = await supabase
     .from("trips")
     .select("id,title,description,start_date,end_date,visibility,cover_image,created_at,updated_at,likes_count,saves_count,views_count")
@@ -282,6 +252,7 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
 
   if (tripsError) {
     console.error("Error fetching trips:", JSON.stringify(tripsError, null, 2));
+    (fetchTrips as any).inProgress = false;
     return [];
   }
 
@@ -341,8 +312,13 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
     ((savesResult.data ?? []) as TripReactionRow[]).map((row) => row.trip_id)
   );
 
+  (fetchTrips as any).inProgress = false;
   return mapTripRows(trips, stopRows, media, likedByMe, savedByMe);
-}
+};
+
+// Always reset flag at end (module top-level)
+(fetchTrips as any).inProgress = false;
+
 
 export async function createTrip(params: {
   userId: string;
@@ -541,6 +517,7 @@ async function toggleTripReaction(params: {
   table: "trip_likes" | "trip_saves";
   tripId: string;
   userId: string;
+  isAdding?: boolean;
 }): Promise<boolean> {
   const { data: existing } = await supabase
     .from(params.table)
@@ -549,23 +526,34 @@ async function toggleTripReaction(params: {
     .eq("user_id", params.userId)
     .maybeSingle();
 
-  if (existing) {
+  const adding = params.isAdding !== undefined ? params.isAdding : !existing;
+
+  if (existing && !adding) {
     await supabase
       .from(params.table)
       .delete()
       .eq("trip_id", params.tripId)
       .eq("user_id", params.userId);
-
-    return false;
+  } else if (!existing && adding) {
+    await supabase
+      .from(params.table)
+      .insert({ trip_id: params.tripId, user_id: params.userId });
   }
 
-  await supabase.from(params.table).insert({
-    trip_id: params.tripId,
-    user_id: params.userId,
-  });
+  const rpcName =
+    params.table === "trip_likes"
+      ? adding
+        ? "increment_trip_likes"
+        : "decrement_trip_likes"
+      : adding
+      ? "increment_trip_saves"
+      : "decrement_trip_saves";
 
-  return true;
+  await supabase.rpc(rpcName, { trip_id: params.tripId });
+
+  return adding;
 }
+
 
 export async function toggleTripLike(params: {
   tripId: string;
@@ -747,3 +735,21 @@ export async function toggleTripMediaHighlight(params: {
   return { success: true, message: params.isHighlight ? "Added to highlights." : "Removed from highlights." };
 }
 
+export async function incrementTripViews(tripId: string) {
+  const { error } = await supabase.rpc("increment_trip_views", { trip_id: tripId });
+  if (error) console.error("Failed to increment views:", error);
+
+  // Optional activity log
+  const { data: userResult } = await supabase.auth.getUser();
+  const user = userResult?.user;
+  if (user) {
+    await supabase.from("user_activity").upsert({
+      user_id: user.id,
+      action_type: "view_trip",
+      entity_type: "trip",
+      entity_id: tripId,
+      metadata: { source: "public_page" },
+      created_at: new Date().toISOString(),
+    });
+  }
+}

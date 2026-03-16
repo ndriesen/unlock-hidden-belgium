@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { TripStop } from "@/lib/services/tripBuilder";
+import type { TripStop } from "@/types/trip";
 import { TripLocation } from "@/lib/services/tripLocationTracking";
 
 interface TripRouteMapProps {

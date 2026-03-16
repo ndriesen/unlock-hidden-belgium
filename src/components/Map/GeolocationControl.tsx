@@ -21,7 +21,7 @@ function SafeGeolocationControl({ autoLocate, hotspots = [] }: GeolocationContro
     map.invalidateSize();
     map.locate({
       setView: false,
-      maxZoom: 8,
+      maxZoom: 6,
       enableHighAccuracy: false,
       timeout: 8000,
       maximumAge: 300000,
@@ -41,10 +41,10 @@ function SafeGeolocationControl({ autoLocate, hotspots = [] }: GeolocationContro
       if (circleRef.current) circleRef.current.setLatLng(e.latlng).setRadius(e.accuracy ?? 50);
       else circleRef.current = L.circle(e.latlng, {
         radius: e.accuracy ?? 50,
-        color: "#10b981",
-        fillColor: "#10b981",
+        color: "#b4d1ff",
+        fillColor: "#1770ff",
         fillOpacity: 0.2,
-        weight: 2
+        weight: 5
       }).addTo(map);
     };
 

@@ -19,13 +19,14 @@ import {
 } from "@/lib/services/gamification";
 import { useSearch } from "@/context/SearchContext";
 import type { MapContainerProps } from "@/components/Map/MapContainer";
-import { Hotspot } from "@/types/hotspot";
+import { Hotspot, getSafeDisplay } from "@/types/hotspot";
 import BadgeCelebration from "@/components/BadgeCelebration";
 import HeroDiscoverySection from "@/components/home/HeroDiscoverySection";
 import CategoryExplorer from "@/components/home/DiscoveryChips";
 import ExplorerProgressPanel from "@/components/home/ExplorerProgressPanel";
 import MapPreviewSection from "@/components/home/MapPreviewSection";
 import { fetchVisitStatsForUser } from "@/lib/services/engagement";
+import { MOCK_HOTSPOTS } from './mocks';
 
 // Pre-login components
 import PreLoginHero from "@/components/home/PreLoginHero";
@@ -486,8 +487,13 @@ export default function Home() {
   // State for ranked hotspots
   const [rankedHotspots, setRankedHotspots] = useState<Hotspot[]>([]);
 
-  // Fetch ranked hotspots for FeaturedHotspots (pre-login)
+// Mock hotspots fallback + ranked for FeaturedHotspots (pre-login)
   useEffect(() => {
+    // Use mocks if no real data
+    if (questCandidates.length === 0) {
+      setQuestCandidates(MOCK_HOTSPOTS);
+    }
+
     async function fetchRankedHotspots() {
       try {
         const rankings = await getTopHotspots(10);
@@ -507,9 +513,12 @@ export default function Home() {
             visit_count: r.trip_visits_count,
           }));
           setRankedHotspots(converted);
+        } else {
+          setRankedHotspots(MOCK_HOTSPOTS.slice(0, 8));
         }
       } catch (error) {
-        console.warn('Ranking not available yet:', error);
+        console.warn('Using mocks:', error);
+        setRankedHotspots(MOCK_HOTSPOTS.slice(0, 8));
       }
     }
 
@@ -555,7 +564,7 @@ export default function Home() {
           selectedCategory={selectedCategory}
         />
 
-        <div className="max-w-4xl mx-auto px-4 py-4">
+        <div className="max-w-4xl mx-auto px-4 py-8">
           <CategoryExplorer
             selectedCategory={selectedCategory}
             onCategoryChange={handleCategoryChange}
@@ -564,7 +573,7 @@ export default function Home() {
         </div>
 
         <FeaturedHotspots 
-          hotspots={questCandidates.slice(0, 8)}
+          hotspots={questCandidates.slice(8, 16).filter(h => !selectedCategory || h.category === getSafeDisplay(selectedCategory))}
           wishlistIds={wishlistIds}
           onWishlistToggle={handleWishlist}
           selectedCategory={selectedCategory}

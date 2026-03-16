@@ -50,7 +50,7 @@ export default function MapTestPage() {
           <div className="h-[400px] md:h-[600px]">
             <DynamicFixedMobileMap 
               center={[50.85, 4.35]} // Belgium center
-              zoom={8}
+              zoom={6}
               height="100%"
               markers={extraMarkers}
               onMarkerClick={handleMarkerClick}

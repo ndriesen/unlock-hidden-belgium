@@ -57,9 +57,16 @@ export default function HeroDiscoverySection({
             </span>
           </h1>
 
-          <p className="text-lg sm:text-xl md:text-2xl text-white/95 max-w-md mx-auto leading-relaxed font-medium">
-            Discover hidden gems near you.
+<p className="text-lg sm:text-xl md:text-2xl text-white/95 max-w-md mx-auto leading-relaxed font-medium">
+            Discover hidden gems near you, curated for true explorers.
           </p>
+
+          {/* Visual cue pointing down to trending section */}
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+            <svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white/60 w-6 h-8 drop-shadow-lg">
+              <path d="M3 10L12 20L21 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center max-w-md mx-auto">
             <button

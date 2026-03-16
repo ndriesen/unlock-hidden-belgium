@@ -119,7 +119,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({
   }, [activeHotspots, categoryFilter, provinceFilter, searchQuery, providedHotspots]);
 
   useImperativeHandle(ref, () => ({
-    flyTo: (lat: number, lng: number, zoom = 16) => {
+    flyTo: (lat: number, lng: number, zoom = 14) => {
       mapViewRef.current?.flyTo([lat, lng], zoom);
     },
   }));
@@ -133,7 +133,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({
     const coords = getCoordinates(selected);
     if (!coords) return;
 
-    mapViewRef.current?.flyTo(coords, 16);
+    mapViewRef.current?.flyTo(coords, 14);
   }, [filtered, preventZoom, selectedHotspotId]);
 
   const isLoading = typeof loadingOverride === "boolean" ? loadingOverride : loading;

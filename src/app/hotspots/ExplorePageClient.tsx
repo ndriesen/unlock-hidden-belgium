@@ -14,8 +14,12 @@ import {
   fetchExploreHotspots,
   fetchPopularTrips,
 } from "@/lib/services/explore";
+import {
+  toggleTripLike,
+  toggleTripSave
+} from "@/lib/services/tripBuilder";
 import { queryKeys } from '@/lib/react-query/queryKeys';
-import { toggleTripLike, toggleTripSave } from "@/lib/services/tripBuilder";
+
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
 import { markVisited, toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
@@ -91,12 +95,12 @@ export default function ExplorePage() {
   // Query data
   const tripsQuery = useQuery({
     queryKey: queryKeys.popularTrips(user?.id),
-    queryFn: () => fetchPopularTrips(6, user?.id ?? null),
+    queryFn: () => fetchPopularTrips(5, user?.id ?? null),
   });
 
   const mentionsQuery = useQuery({
     queryKey: queryKeys.mentions(),
-    queryFn: () => fetchInfluencerMentions(6),
+    queryFn: () => fetchInfluencerMentions(5),
   });
 
   const rawHotspots = baseHotspotsQuery.data ?? [];
@@ -105,14 +109,12 @@ export default function ExplorePage() {
   const mentionsData = mentionsQuery.data ?? [];
 
   const mentions = mentionsData;
- 
+  const trips = tripsData.trips ?? [];
+  const tripsWarning = tripsData.warning ?? '';
 
   const loading = baseHotspotsQuery.isLoading || tripsQuery.isLoading || mentionsQuery.isLoading;
   const errorMessage = baseHotspotsQuery.error ? (baseHotspotsQuery.error as Error).message : '';
-  const hotspots = rawHotspots;
-// State for trips
-const [trips, setTrips] = useState<PopularTrip[]>(tripsData.trips ?? []);
-const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
+const hotspots = rawHotspots;
   const { searchQuery, setSearchQuery } = useSearch();
   const [categoryFilter, setCategoryFilter] = useState("");
   const [provinceFilter, setProvinceFilter] = useState("");
@@ -127,9 +129,7 @@ const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
   
 
   // Removed loadExplore - React Query handles fetching
-  useEffect(() => {
-    setTripsWarning(tripsData.warning || '');
-  }, [tripsData.warning]);
+
 
   useEffect(() => {
     const categoryParam = searchParams.get("category");
@@ -188,10 +188,10 @@ const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
     return output;
   }, [categoryFilter, hotspots, provinceFilter, searchQuery, sortMode]);
 
-  const canShowAllHotspots = filteredHotspots.length > 6;
+  const canShowAllHotspots = filteredHotspots.length > 5;
 
   const visibleHotspots = useMemo(
-    () => (showAllHotspots ? filteredHotspots : filteredHotspots.slice(0, 6)),
+    () => (showAllHotspots ? filteredHotspots : filteredHotspots.slice(0, 5)),
     [filteredHotspots, showAllHotspots]
   );
 
@@ -355,37 +355,38 @@ const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
     [hotspots, user?.id, queryClient]
   );
 
-  const toggleTripLikeInUi = async (item: PopularTrip) => {
-    if (!user?.id) {
-      setActionMessage("Login required.");
-      return;
-    }
+const toggleTripLikeInUi = useCallback(async (item: PopularTrip) => {
+  if (!user?.id) {
+    setActionMessage("Login required");
+    return;
+  }
+  try {
+    const next = await toggleTripLike({ tripId: item.id, userId: user.id, tripTitle: item.title });
+    queryClient.invalidateQueries({ queryKey: queryKeys.popularTrips(user.id) });
+    setActionMessage(next ? "Liked" : "Unliked");
+  } catch (error) {
+    console.error("Toggle like failed:", error);
+    setActionMessage("Like failed");
+  }
+}, [user?.id, queryClient]);
 
-    const next = await toggleTripLike({ userId: user.id, tripId: item.id, tripTitle: item.title });
-    setTrips((prev) =>
-      prev.map((trip) =>
-        trip.id === item.id
-          ? { ...trip, likedByMe: next, likesCount: Math.max(trip.likesCount + (next ? 1 : -1), 0) }
-          : trip
-      )
-    );
-  };
+const toggleTripSaveInUi = useCallback(async (item: PopularTrip) => {
+  if (!user?.id) {
+    setActionMessage("Login required");
+    return;
+  }
+  try {
+    const next = await toggleTripSave({ tripId: item.id, userId: user.id, tripTitle: item.title });
+    queryClient.invalidateQueries({ queryKey: queryKeys.popularTrips(user.id) });
+    setActionMessage(next ? "Saved" : "Unsaved");
+  } catch (error) {
+    console.error("Toggle save failed:", error);
+    setActionMessage("Save failed");
+  }
+}, [user?.id, queryClient]);
 
-  const toggleTripSaveInUi = async (item: PopularTrip) => {
-    if (!user?.id) {
-      setActionMessage("Login required.");
-      return;
-    }
 
-    const next = await toggleTripSave({ userId: user.id, tripId: item.id, tripTitle: item.title });
-    setTrips((prev) =>
-      prev.map((trip) =>
-        trip.id === item.id
-          ? { ...trip, savedByMe: next, savesCount: Math.max(trip.savesCount + (next ? 1 : -1), 0) }
-          : trip
-      )
-    );
-  };
+
 
   return (
     <div className="space-y-6">
@@ -561,7 +562,7 @@ const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"
                       className="object-cover"
-                      priority={index < 6}
+                      priority={index < 5}
                     />
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
                       <p className="text-sm font-semibold text-white">{hotspot.name}</p>
@@ -671,7 +672,7 @@ const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
 
         {tripsQuery.isLoading && (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-48 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 animate-pulse shadow-sm overflow-hidden">
                 <div className="h-24 bg-gradient-to-r from-slate-200 to-slate-300" />
                 <div className="p-3 space-y-2">
@@ -720,7 +721,7 @@ const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
           {trips.map((trip, index) => (
             <article key={trip.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="relative h-24">
-                <Link href={`/trips/${trip.id}`} className="block h-full">
+  <Link href={`/public/${trip.id}`} className="block h-full">
                   <Image
                     src={trip.coverImage}
                     alt={trip.title}
@@ -770,20 +771,22 @@ const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => {
-                      void toggleTripLikeInUi(trip);
+                      if (!user) return;
+                      toggleTripLikeInUi(trip);
                     }}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-                      trip.likedByMe ? "bg-rose-100 text-rose-700" : "border border-slate-200 text-slate-700"
+                      trip.likedByMe ? "bg-rose-100 text-rose-700 hover:bg-rose-200" : "border border-slate-200 text-slate-700 hover:bg-slate-50"
                     }`}
                   >
                     {trip.likedByMe ? "Liked" : "Like"}
                   </button>
                   <button
                     onClick={() => {
-                      void toggleTripSaveInUi(trip);
+                      if (!user) return;
+                      toggleTripSaveInUi(trip);
                     }}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-                      trip.savedByMe ? "bg-amber-100 text-amber-700" : "border border-slate-200 text-slate-700"
+                      trip.savedByMe ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "border border-slate-200 text-slate-700 hover:bg-slate-50"
                     }`}
                   >
                     {trip.savedByMe ? "Saved" : "Save"}

@@ -148,7 +148,7 @@ function FitToHotspots({ hotspots, enabled }: { hotspots: Hotspot[]; enabled: bo
       const bounds = L.latLngBounds(points.map((point) => L.latLng(point[0], point[1])));
       map.fitBounds(bounds, {
         padding: [28, 28],
-        maxZoom: 13,
+        maxZoom: 6,
         animate: true,
       });
     }
@@ -288,7 +288,7 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
                     width:${size}px;
                     height:${size}px;
                     border-radius:50%;
-                    background:rgba(16,185,129,0.65);
+                    background:rgba(149, 150, 152, 0.65);
                     backdrop-filter: blur(8px);
                     display:flex;
                     align-items:center;
@@ -426,16 +426,16 @@ function ZoomAwareMarkers({
         const coords = getCoordinates(hotspot);
         if (!coords) return null;
 
-        let color = "#10b981";
+        let color = "#959698";
         let symbol = "•";
         if (selectedId === hotspot.id) {
           color = "#f59e0b";
           symbol = "•";
         } else if (visitedIds.includes(hotspot.id)) {
-          color = "#64748b";
+          color = "#10b981";
           symbol = "✓";
         } else if (favoriteIds.includes(hotspot.id)) {
-          color = "#e11d48";
+          color = "#e12e55";
           symbol = "♡";
         } else if (wishlistIds.includes(hotspot.id)) {
           color = "#f59e0b";
@@ -500,7 +500,7 @@ function HeatmapLayer({ hotspots }: { hotspots: Hotspot[] }) {
     heatLayerRef.current = (L as any).heatLayer(points, {
       radius: 25,
       blur: 15,
-      maxZoom: 17,
+      maxZoom: 10,
       gradient: { 0.4: "#00f5d4", 0.65: "#ff6b6b", 1: "#ffee00" }
     }) as any;
 
