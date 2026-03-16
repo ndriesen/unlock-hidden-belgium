@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -11,28 +11,42 @@ import { toggleTripLike, toggleTripSave } from "@/lib/services/tripBuilder";
 
 import { Heart, Bookmark, Calendar, MapPin, Image as ImageIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
 
+
 export default function PublicTripPage() {
-  const params = useParams();
+  
   const router = useRouter();
   const { user } = useAuth();
-  const tripId = params.id as string;
 
-  const [trip, setTrip] = useState<Trip | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [isLiked, setIsLiked] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [updatingLike, setUpdatingLike] = useState(false);
-  const [updatingSave, setUpdatingSave] = useState(false);
-  const [lightbox, setLightbox] = useState<{ index: number } | null>(null);
+
+
+const params = useParams();
+let tripId: string | undefined;
+
+if (params?.id) {
+  tripId = Array.isArray(params.id) ? params.id[0] : params.id;
+}
+
+if (!tripId) {
+  console.warn('Trip ID missing, redirecting...');
+  router.push('/');
+  return null;
+}
+
+// Nu is tripId gegarandeerd een string
 
   useEffect(() => {
+    if (!tripId) {
+      console.warn('Trip ID is missing, redirecting...');
+      router.push('/'); // of fallback pagina
+      return;
+    }
+
     const loadTrip = async () => {
+      setLoading(true);
       try {
         const publicTrip = await fetchPublicTrip(tripId);
         if (!publicTrip) {
           setError('Trip not found or not public');
-          setLoading(false);
           return;
         }
         setTrip(publicTrip);
@@ -47,49 +61,110 @@ export default function PublicTripPage() {
     };
 
     loadTrip();
-  }, [tripId]);
+  }, [tripId, router]);
+
+  console.log("params:", params, "tripId:", tripId);
+
+
+
+
+  const [trip, setTrip] = useState<Trip | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [isLiked, setIsLiked] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [updatingLike, setUpdatingLike] = useState(false);
+  const [updatingSave, setUpdatingSave] = useState(false);
+  const [lightbox, setLightbox] = useState<{ index: number } | null>(null);
+
+
 
   const handleLike = async () => {
-    if (!user?.id || updatingLike) return;
-    setUpdatingLike(true);
-    try {
-      const liked = await toggleTripLike({
-        tripId,
-        userId: user.id,
-        tripTitle: trip!.title,
-      });
-      setIsLiked(liked);
-      if (trip) {
-        setTrip({ ...trip, likesCount: liked ? trip.likesCount + 1 : trip.likesCount - 1 });
-      }
-    } catch (err) {
-      console.error('Like failed', err);
-    } finally {
-      setUpdatingLike(false);
+  if (!user?.id || updatingLike) return;
+  setUpdatingLike(true);
+  try {
+    // Call the toggle API, which returns updated like count
+    const res = await fetch(`/api/trip/${tripId}/like`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id }),
+    });
+    const data = await res.json();
+    // data: { liked: boolean, likesCount: number }
+    setIsLiked(data.liked);
+    if (trip) {
+      setTrip({ ...trip, likesCount: data.likesCount });
     }
-  };
+  } catch (err) {
+    console.error('Like failed', err);
+  } finally {
+    setUpdatingLike(false);
+  }
+};
 
-  const handleSave = async () => {
-    if (!user?.id || updatingSave) return;
-    setUpdatingSave(true);
+useEffect(() => {
+  if (!tripId || !trip) return;
+
+  const key = `viewed-${tripId}`;
+  if (sessionStorage.getItem(key)) return;
+
+  (async () => {
     try {
-      const saved = await toggleTripSave({
-        tripId,
-        userId: user.id,
-        tripTitle: trip!.title,
-      });
-      setIsSaved(saved);
-      if (trip) {
-        setTrip({ ...trip, savesCount: saved ? trip.savesCount + 1 : trip.savesCount - 1 });
-      }
-    } catch (err) {
-      console.error('Save failed', err);
-    } finally {
-      setUpdatingSave(false);
-    }
-  };
+      const res = await fetch(`/api/trip/${tripId}/view`, { method: "POST" });
+      const data = await res.json();
 
-  const allTripPhotos = trip ? trip.stops.flatMap(s => s.media) : [];
+      if (trip && data.viewCount !== undefined) {
+        setTrip({ ...trip, viewsCount: data.viewCount });
+      }
+
+      sessionStorage.setItem(key, "true");
+    } catch (err) {
+      console.error("View tracking failed", err);
+    }
+  })();
+}, [tripId, trip]);
+
+
+const handleSave = async () => {
+  if (!tripId || !user?.id) {
+    console.warn("Cannot save trip, missing tripId or userId", { tripId, userId: user?.id });
+    return;
+  }
+
+  setUpdatingSave(true);
+  try {
+    const res = await fetch(`/api/trip/${tripId}/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id }),
+    });
+
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      console.warn("No JSON in response, raw status:", res.status);
+    }
+
+    if (!res.ok) {
+      console.error("Save request failed", data, "Status:", res.status);
+      return;
+    }
+
+    console.log("Save response:", data);
+
+    setIsSaved(data.saved);
+    if (trip) setTrip({ ...trip, savesCount: data.savesCount });
+  } catch (err) {
+    console.error("Save request failed", err);
+  } finally {
+    setUpdatingSave(false);
+  }
+};
+ 
+  const allTripPhotos = useMemo(() => {
+  return trip ? trip.stops.flatMap(s => s.media) : [];
+  }, [trip]);
 
   const openLightbox = useCallback((imageUrl: string) => {
     const index = allTripPhotos.findIndex(p => p.signedUrl === imageUrl);
@@ -233,7 +308,11 @@ export default function PublicTripPage() {
                     <div className="text-xs text-green-600 font-medium mb-3">✓ Visited {new Date(stop.visitedAt).toLocaleDateString()}</div>
                   )}
                 </div>
-                <div className="relative w-48 h-32 bg-slate-200 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => openLightbox(stop.media[0]?.signedUrl!)} title="View photos">
+                <div className="relative w-48 h-32 bg-slate-200 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => {
+                  if (stop.media[0]?.signedUrl) {
+                    openLightbox(stop.media[0].signedUrl);
+                  }
+                }} title="View photos">
                   {stop.media[0]?.signedUrl ? (
                     <Image src={stop.media[0].signedUrl} alt="" fill className="object-cover hover:scale-105 transition-transform duration-200" />
                   ) : (

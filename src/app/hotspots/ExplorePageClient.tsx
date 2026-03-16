@@ -721,7 +721,7 @@ const toggleTripSaveInUi = useCallback(async (item: PopularTrip) => {
           {trips.map((trip, index) => (
             <article key={trip.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="relative h-24">
-  <Link href={`/public/${trip.id}`} className="block h-full">
+  <Link href={`/trip/${trip.id}`} className="block h-full">
                   <Image
                     src={trip.coverImage}
                     alt={trip.title}

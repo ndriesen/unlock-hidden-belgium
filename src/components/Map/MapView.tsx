@@ -1,5 +1,6 @@
 ﻿﻿"use client";
 
+
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import { MapResizeFix } from "./MapResizeFix";
 import MobileMapFix from "./MobileMapFix";

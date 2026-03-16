@@ -75,6 +75,9 @@ export default function TripDetailPage() {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
+  
+
+
   // Initial load
   useEffect(() => {
     const loadTrip = async () => {
@@ -92,6 +95,8 @@ export default function TripDetailPage() {
     };
     loadTrip();
   }, [tripId, user?.id]);
+
+
 
   useEffect(() => {
     const search = async () => {
@@ -130,6 +135,8 @@ export default function TripDetailPage() {
       });
     }
   }, [isTracking, trip]);
+
+  
 
   const refreshTrip = async () => {
     if (!user?.id) return;
