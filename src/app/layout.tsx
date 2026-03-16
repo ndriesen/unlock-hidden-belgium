@@ -1,13 +1,15 @@
-﻿import type { Metadata } from "next";
+﻿﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "leaflet/dist/leaflet.css"; 
 import { AuthProvider } from "@/context/AuthContext";
+import { Providers } from '@/app/providers'
 import SidebarLayout from "@/components/SidebarLayout";
 import { SearchProvider } from "@/context/SearchContext";
 import { AuthModalProvider } from "@/lib/hooks/useAuthModal";
 import AuthModal from "@/components/auth/AuthModal";
 import { ToastProvider } from "@/context/ToastContext";
+import AuthLoadingGate from "@/components/AuthLoadingGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,18 +36,21 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-gray-900`}
       >
-        <AuthProvider>
-          <SearchProvider>
-            <AuthProvider>
+        <Providers>
+          <AuthProvider>
+            <SearchProvider>
               <ToastProvider>
-              <SidebarLayout>{children}</SidebarLayout>
+                <AuthModalProvider>
+                  <AuthLoadingGate>
+                    <SidebarLayout>{children}</SidebarLayout>
+                  </AuthLoadingGate>
+                <AuthModal />
+                </AuthModalProvider>
               </ToastProvider>
-              <AuthModal />
-            </AuthProvider>
-          </SearchProvider>
-        </AuthProvider>
+            </SearchProvider>
+          </AuthProvider>
+        </Providers>
       </body>
     </html>
   );
 }
-

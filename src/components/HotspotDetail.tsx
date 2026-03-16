@@ -226,8 +226,12 @@ export default function HotspotDetail({
                 <span className="font-semibold">Province:</span> {hotspot.province}
               </p>
               <p>
-                <span className="font-semibold">Coordinates:</span> {hotspot.latitude.toFixed(4)}, {hotspot.longitude.toFixed(4)}
+                <span className="font-semibold">Address:</span> {hotspot.province}, Belgium
               </p>
+              <p className="text-xs text-slate-500 mt-1">
+                ({hotspot.latitude.toFixed(4)}, {hotspot.longitude.toFixed(4)})
+              </p>
+              <OpeningHoursDisplay openingHours={hotspot.opening_hours} className="mt-2" />
             </div>
           </div>
         )}

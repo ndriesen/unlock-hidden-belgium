@@ -48,14 +48,21 @@ export default function SidebarLayout({
 
   const isAuthPage = pathname === "/auth";
 
-  const formatDate = useCallback((value: string): string => {
+  const formatRelativeDate = useCallback((value: string): string => {
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
+    if (Number.isNaN(date.getTime())) return "Just now";
 
-    return new Intl.DateTimeFormat("nl-BE", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(date);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return new Intl.DateTimeFormat("nl-BE", { dateStyle: "medium" }).format(date);
   }, []);
 
   // Listen for mobile sidebar toggle from StickyHeader
@@ -361,7 +368,7 @@ export default function SidebarLayout({
                                     {notification.activity.message}
                                   </p>
                                   <p className="text-[10px] text-slate-400">
-                                    {formatDate(notification.createdAt)}
+                                    {formatRelativeDate(notification.createdAt)}
                                   </p>
                                 </div>
                               </div>
@@ -402,11 +409,11 @@ export default function SidebarLayout({
                                     <p className="text-xs font-semibold text-slate-800 truncate">
                                       {conv.partner.name ?? 'Unknown'}
                                     </p>
-                                    <p className="text-xs text-slate-600 truncate">
-                                      {conv.preview}
+                                    <p className="text-xs text-slate-600 truncate max-w-[140px]">
+                                      {conv.preview || 'Tap to chat'}
                                     </p>
                                     <p className="text-[10px] text-slate-400">
-                                      {formatDate(conv.timestamp)}
+                                      {formatRelativeDate(conv.timestamp)}
                                     </p>
                                   </div>
                                   {conv.unreadCount > 0 && (

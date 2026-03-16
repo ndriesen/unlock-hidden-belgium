@@ -1,8 +1,6 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef, forwardRef, useImperativeHandle } from "react";
-import { fetchHotspots } from "@/lib/services/hotspots";
-import { supabase } from "@/lib/Supabase/browser-client";
 import MapView, { MapViewHandle } from "./MapView";
 import { Hotspot } from "@/types/hotspot";
 
@@ -88,73 +86,15 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({
     onToastRef.current = onToast;
   }, [onToast]);
 
-  const loadHotspots = useCallback(async () => {
-    if (providedHotspots) return;
+// Removed direct fetchHotspots - now uses React Query from parent (ExplorePageClient)
+  // Supports bbox fetching + IndexedDB hybrid in future phases
 
-    setLoading(true);
-    try {
-      const data = (await fetchHotspots()) as HotspotRow[] | null;
 
-      if (!data) {
-        setInternalHotspots([]);
-        return;
-      }
+// No internal fetching needed - relies on props from parent queries
 
-      const mapped: Hotspot[] = data
-        .filter((hotspot) => hotspot.latitude !== null && hotspot.longitude !== null)
-        .map((hotspot) => ({
-          id: hotspot.id,
-          name: hotspot.name,
-          latitude: Number(hotspot.latitude),
-          longitude: Number(hotspot.longitude),
-          category: hotspot.category ?? "Unknown",
-          province: hotspot.province ?? "Unknown",
-          description: hotspot.description ?? undefined,
-          images: hotspot.images ?? undefined,
-          opening_hours: hotspot.opening_hours ?? undefined,
-          combine_with: hotspot.combine_with ?? undefined,
-          visit_count: hotspot.visit_count ?? 0,
-          likes_count: hotspot.likes_count ?? 0,
-          saves_count: hotspot.saves_count ?? 0,
-        }));
 
-      setInternalHotspots(mapped);
-    } catch (error) {
-      console.error("Failed to load hotspots:", error);
-      onToastRef.current?.("Unable to load hotspots.");
-    } finally {
-      setLoading(false);
-    }
-  }, [providedHotspots]);
+// Live updates handled by React Query refetchOnFocus/refetchInterval in Phase 2
 
-  useEffect(() => {
-    if (providedHotspots) {
-      setLoading(false);
-      return;
-    }
-
-    void loadHotspots();
-  }, [loadHotspots, providedHotspots]);
-
-  useEffect(() => {
-    if (providedHotspots) return;
-
-    const channel = supabase
-      .channel("hotspots-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "hotspots" },
-        async () => {
-          await loadHotspots();
-          onToastRef.current?.("Map updated.");
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [loadHotspots, providedHotspots]);
 
   const activeHotspots = providedHotspots ?? internalHotspots;
 

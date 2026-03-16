@@ -166,7 +166,7 @@ export function ChatDrawer({ conversationPartnerId, onClose }: ChatDrawerProps) 
               className="w-14 h-14 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-3xl font-semibold shadow-lg border-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 rotate-[220deg]">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.953 59.953 0 0121.75 12 59.953 0 0 1 3.27 20.873L6 12z" />
+d="M6 12L3.269 3.126A59.953 59.953 0 0121.75 12A59.953 59.953 0 0 1 3.27 20.873L6 12z"
               </svg>
             </motion.button>
           </div>

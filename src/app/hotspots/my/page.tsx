@@ -12,6 +12,7 @@ import { toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
 import HotspotPanel from "@/components/HotspotPanel";
+import HotspotSheet from "@/components/HotspotSheet";
 const MapContainer = dynamic(
   () => import("@/components/Map/MapContainer").then((mod) => mod.default),
   { ssr: false }
@@ -158,6 +159,7 @@ const mapHotspots = useMemo<Hotspot[]>(
         province: entry.province,
         description: entry.description,
         images: [entry.imageUrl],
+        opening_hours: undefined, // Not available in my hotspots; MapContainer provides full data onSelect
         visit_count: entry.visitCount,
         latitude: entry.latitude,
         longitude: entry.longitude,
@@ -332,28 +334,52 @@ const mapHotspots = useMemo<Hotspot[]>(
               wishlistIds={wishlistIds}
               favoriteIds={favoriteIds}
               loading={false}
-              onSelect={setSelectedHotspot}
+              onSelect={(hotspot) => {
+                console.log('Selected hotspot:', hotspot);
+                console.log('Opening hours:', hotspot.opening_hours);
+                setSelectedHotspot(hotspot);
+              }}
               onVisit={() => {}}
             />
           </div>
         </section>
       )}
-      <HotspotPanel
-        hotspot={selectedHotspot}
-        onClose={() => setSelectedHotspot(null)}
-        onVisit={() => {}}
-        onWishlist={() => {}}
-        onFavorite={toggleFavoriteInUi}
-        onAddToTrip={() => {}}
-        isVisited={false}
-        isWishlist={false}
-        isFavorite={false}
-        canGoPrevious={false}
-        canGoNext={false}
-        onPrevious={() => {}}
-        onNext={() => {}}
-        positionLabel=""
-      />
+      {selectedHotspot && (
+        <>
+          <HotspotPanel
+            hotspot={selectedHotspot}
+            onClose={() => setSelectedHotspot(null)}
+            onVisit={() => {}}
+            onWishlist={() => {}}
+            onFavorite={toggleFavoriteInUi}
+            onAddToTrip={() => {}}
+            isVisited={false}
+            isWishlist={false}
+            isFavorite={false}
+            canGoPrevious={false}
+            canGoNext={false}
+            onPrevious={() => {}}
+            onNext={() => {}}
+            positionLabel=""
+          />
+          <HotspotSheet
+            hotspot={selectedHotspot}
+            onClose={() => setSelectedHotspot(null)}
+            onVisit={() => {}}
+            onAddToTrip={() => {}}
+            onWishlist={() => {}}
+            onFavorite={toggleFavoriteInUi}
+            isVisited={false}
+            isWishlist={false}
+            isFavorite={false}
+            canGoPrevious={false}
+            canGoNext={false}
+            onPrevious={() => {}}
+            onNext={() => {}}
+            positionLabel=""
+          />
+        </>
+      )}
 
 
       {!loading && !errorMessage && filteredEntries.length === 0 && (

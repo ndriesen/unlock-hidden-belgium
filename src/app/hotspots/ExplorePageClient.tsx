@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -13,6 +14,7 @@ import {
   fetchExploreHotspots,
   fetchPopularTrips,
 } from "@/lib/services/explore";
+import { queryKeys } from '@/lib/react-query/queryKeys';
 import { toggleTripLike, toggleTripSave } from "@/lib/services/tripBuilder";
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
 import { markVisited, toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
@@ -77,13 +79,40 @@ export default function ExplorePage() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
 
-  const [hotspots, setHotspots] = useState<ExploreHotspot[]>([]);
-  const [trips, setTrips] = useState<PopularTrip[]>([]);
-  const [mentions, setMentions] = useState<InfluencerMention[]>([]);
-  const [tripsWarning, setTripsWarning] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  const queryClient = useQueryClient();
 
+  // Base queries without filters for initial data
+  const baseHotspotsQuery = useQuery({
+    queryKey: queryKeys.allHotspots(),
+    queryFn: () => fetchExploreHotspots(user?.id ?? null),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+  // Query data
+  const tripsQuery = useQuery({
+    queryKey: queryKeys.popularTrips(user?.id),
+    queryFn: () => fetchPopularTrips(6, user?.id ?? null),
+  });
+
+  const mentionsQuery = useQuery({
+    queryKey: queryKeys.mentions(),
+    queryFn: () => fetchInfluencerMentions(6),
+  });
+
+  const rawHotspots = baseHotspotsQuery.data ?? [];
+  // Extract raw tripsData safely
+  const tripsData = tripsQuery.data ?? { trips: [], warning: '' };
+  const mentionsData = mentionsQuery.data ?? [];
+
+  const mentions = mentionsData;
+ 
+
+  const loading = baseHotspotsQuery.isLoading || tripsQuery.isLoading || mentionsQuery.isLoading;
+  const errorMessage = baseHotspotsQuery.error ? (baseHotspotsQuery.error as Error).message : '';
+  const hotspots = rawHotspots;
+// State for trips
+const [trips, setTrips] = useState<PopularTrip[]>(tripsData.trips ?? []);
+const [tripsWarning, setTripsWarning] = useState(tripsData.warning ?? '');
   const { searchQuery, setSearchQuery } = useSearch();
   const [categoryFilter, setCategoryFilter] = useState("");
   const [provinceFilter, setProvinceFilter] = useState("");
@@ -95,33 +124,12 @@ export default function ExplorePage() {
   const [mapFocusId, setMapFocusId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showTripSelector, setShowTripSelector] = useState(false);
+  
 
-  const loadExplore = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage("");
-
-    try {
-      const [hotspotData, tripData, mentionData] = await Promise.all([
-        fetchExploreHotspots(user?.id ?? null),
-        fetchPopularTrips(6, user?.id ?? null),
-        fetchInfluencerMentions(6),
-      ]);
-
-      setHotspots(hotspotData);
-      setTrips(tripData.trips);
-      setTripsWarning(tripData.warning);
-      setMentions(mentionData);
-    } catch (error) {
-      setErrorMessage("Could not load explore data right now.");
-      console.error("Explore load error:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
+  // Removed loadExplore - React Query handles fetching
   useEffect(() => {
-    void loadExplore();
-  }, [loadExplore]);
+    setTripsWarning(tripsData.warning || '');
+  }, [tripsData.warning]);
 
   useEffect(() => {
     const categoryParam = searchParams.get("category");
@@ -291,20 +299,16 @@ export default function ExplorePage() {
         return;
       }
 
+      queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
       try {
         const next = await toggleWishlist(user.id, hotspotId);
-
-        setHotspots((prev) =>
-          prev.map((hotspot) =>
-            hotspot.id === hotspotId ? { ...hotspot, wishlist: next } : hotspot
-          )
-        );
+        setActionMessage(next ? "Added to wishlist" : "Removed from wishlist");
       } catch (error) {
         console.error("Wishlist toggle failed:", error);
         setActionMessage("Could not update wishlist.");
       }
     },
-    [user?.id]
+    [user?.id, queryClient]
   );
 
   const toggleFavoriteInUi = useCallback(
@@ -314,20 +318,16 @@ export default function ExplorePage() {
         return;
       }
 
+      queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
       try {
         const next = await toggleFavorite(user.id, hotspotId);
-
-        setHotspots((prev) =>
-          prev.map((hotspot) =>
-            hotspot.id === hotspotId ? { ...hotspot, favorite: next } : hotspot
-          )
-        );
+        setActionMessage(next ? "Added to favorites" : "Removed from favorites");
       } catch (error) {
         console.error("Favorite toggle failed:", error);
         setActionMessage("Could not update favorites.");
       }
     },
-    [user?.id]
+    [user?.id, queryClient]
   );
 
   const handleVisit = useCallback(
@@ -343,24 +343,16 @@ export default function ExplorePage() {
         return;
       }
 
+      queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
       try {
         await markVisited(user.id, hotspotId);
-
-        setHotspots((prev) =>
-          prev.map((hotspot) =>
-            hotspot.id === hotspotId
-              ? { ...hotspot, visited: true, visitCount: hotspot.visitCount + 1 }
-              : hotspot
-          )
-        );
-
         setActionMessage("Visited hotspot. +50 XP earned.");
       } catch (error) {
         console.error("Visit update failed:", error);
         setActionMessage("Could not mark visited.");
       }
     },
-    [hotspots, user?.id]
+    [hotspots, user?.id, queryClient]
   );
 
   const toggleTripLikeInUi = async (item: PopularTrip) => {
@@ -564,7 +556,7 @@ export default function ExplorePage() {
                 <div className="relative h-32 w-full">
                   <Link href={`/hotspots/${hotspot.id}`} className="block h-full">
                     <Image
-                      src={hotspot.imageUrl}
+                      src={hotspot.imageUrl ?? "/public/images/placeholder.jpg"} 
                       alt={hotspot.name}
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"
@@ -805,7 +797,7 @@ export default function ExplorePage() {
         onClose={() => setIsAddModalOpen(false)}
         onAdded={() => {
           setIsAddModalOpen(false);
-          void loadExplore();
+          queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
         }}
       />
     </div>

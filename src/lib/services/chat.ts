@@ -180,8 +180,8 @@ export async function fetchRecentConversations(
 
   if (error) throw error;
 
-  // Transform RPC data to match type
-  return (data as any[]).map(conv => ({
+  // Transform RPC data to match type & deduplicate by conversationId (safeguard)
+  const transformed = (data as any[]).map(conv => ({
     conversationId: conv.conversation_id,
     partner: {
       id: conv.partner_id,
@@ -189,9 +189,28 @@ export async function fetchRecentConversations(
       avatar_url: conv.partner_avatar_url
     },
     preview: conv.preview,
-    timestamp: conv.last_message_at,
-    unreadCount: conv.unread_count
+    timestamp: conv.last_message_at || conv.timestamp,
+    unreadCount: Number(conv.unread_count) || 0
   })).filter(conv => conv.partner);
+
+  // Dedup: keep most recent per PARTNER_ID (unique per partner)
+  // First dedup convos
+  const seenConvo = new Map();
+  const dedupedConvos = transformed.filter(conv => {
+    if (seenConvo.has(conv.conversationId)) return false;
+    seenConvo.set(conv.conversationId, true);
+    return true;
+  });
+  // Then per partner, only if has preview or unread
+  // Fixed duplicate const - clean dedup per partner
+  const seenPartner = new Map();
+  return transformed
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .filter(conv => {
+      if (seenPartner.has(conv.partner.id)) return false;
+      seenPartner.set(conv.partner.id, true);
+      return true;
+    });
 }
 
 export async function fetchUnreadMessagesCount(userId: string): Promise<number> {
