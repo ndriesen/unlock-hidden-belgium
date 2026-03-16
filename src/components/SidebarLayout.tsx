@@ -442,12 +442,23 @@ export default function SidebarLayout({
                           <button
                             onClick={() => {
                               setUnifiedDropdownOpen(false);
-                              router.push("/buddies");
+                              router.push("/About");
                             }}
                             className="block w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg"
                           >
-                            Messages
+                            About Us
                           </button>
+
+                          <button
+                            onClick={() => {
+                              setUnifiedDropdownOpen(false);
+                              router.push("/contact");
+                            }}
+                            className="block w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg"
+                          >
+                            Contact Us
+                          </button>
+
                           <button
                             onClick={() => {
                               setUnifiedDropdownOpen(false);
