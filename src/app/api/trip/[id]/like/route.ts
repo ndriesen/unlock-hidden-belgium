@@ -6,8 +6,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function POST(req: NextRequest, { params }: { params: { tripId: string } }) {
-  const { tripId } = params; // ✅ direct destructure
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: tripId } = await params;
   const { userId } = await req.json();
 
   if (!userId) return NextResponse.json({ error: "No user ID provided" }, { status: 400 });

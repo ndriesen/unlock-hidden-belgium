@@ -425,12 +425,11 @@ export default function Home() {
         setVisitStreak(stats.streak);
         setVisitedToday(stats.visitedToday);
 
-        showToast("Visited hotspot. +50 XP earned.");
-
-        if (unlockedBadges?.length) {
+        showToast("Visited hotspot. +50 XP earned.");      
+        if (unlockedBadges && "badges" in unlockedBadges && unlockedBadges.badges?.length) {          
           setBadgeCelebration(true);
-          showToast(`Badge unlocked: ${unlockedBadges[0].name}`);
-        }
+          showToast(`Badge unlocked: ${unlockedBadges.badges[0].name}`); 
+             }
 
         const projectedCount = visitedIds.length + 1;
 
@@ -610,7 +609,9 @@ export default function Home() {
         onFavorite={handleFavorite}
         isVisited={visitedIds.includes(selected?.id ?? "")}
         isWishlist={wishlistIds.includes(selected?.id ?? "")}
-        isFavorite={favoriteIds.includes(selected?.id ?? "")}
+        isFavorite={favoriteIds.includes(selected?.id ?? "")} 
+        isLiked={false}        
+        isSaved={false}
         canGoPrevious={canNavigatePrevious}
         canGoNext={canNavigateNext}
         onPrevious={handleSelectPrevious}
@@ -629,8 +630,10 @@ export default function Home() {
         onWishlist={handleWishlist}
         onFavorite={handleFavorite}
         isVisited={visitedIds.includes(selected?.id ?? "")}
-        isWishlist={wishlistIds.includes(selected?.id ?? "")}
+        isWishlist={wishlistIds.includes(selected?.id ?? "")}        
         isFavorite={favoriteIds.includes(selected?.id ?? "")}
+        isLiked={false}        
+        isSaved={false}
         canGoPrevious={canNavigatePrevious}
         canGoNext={canNavigateNext}
         onPrevious={handleSelectPrevious}

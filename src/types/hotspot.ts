@@ -16,6 +16,7 @@
   visit_count?: number;
   likes_count?: number;
   saves_count?: number;
+  views_count?: number | null;
   rating?: number;
   status?: "private" | "pending" | "approved";
   created_by?: string;
