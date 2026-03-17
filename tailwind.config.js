@@ -22,6 +22,15 @@ module.exports = {
       },
       boxShadow: {
         soft: "0 4px 20px rgba(0,0,0,0.05)"
+      },
+      keyframes: {
+        'glass-shimmer': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' }
+        }
+      },
+      animation: {
+        'glass-shimmer': 'glass-shimmer 2.5s linear infinite'
       }
     }
   },

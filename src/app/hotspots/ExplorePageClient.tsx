@@ -29,6 +29,9 @@ import { markVisited, toggleWishlist, toggleFavorite } from "@/lib/services/gami
 import { Hotspot } from "@/types/hotspot";
 import HotspotPanel from "@/components/HotspotPanel";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
+import { GlassButton } from "@/components/ui/glass-button";
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 
 const MapContainer = dynamic(
   () => import("@/components/Map/MapContainer"),
@@ -130,7 +133,7 @@ const hotspots = rawHotspots;
   const [mapFocusId, setMapFocusId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showTripSelector, setShowTripSelector] = useState(false);
-  
+  const [showFilters, setShowFilters] = useState(false);
 
   // Removed loadExplore - React Query handles fetching
 
@@ -454,59 +457,78 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-2 font-semibold text-emerald-700 hover:bg-emerald-100"
+      <section className="rounded-2xl p-3 shadow-sm border border-slate-300 bg-slate-100/30 dark:bg-slate-900/30 backdrop-blur-md">
+        <div className="flex justify-center gap-4">
+          <GlassButton
+            size="sm"
+            contentClassName="text-slate-800"
+            onClick={() => setIsAddModalOpen(true)}
+          >
+            + Add Hotspot
+          </GlassButton>
+
+          <GlassButton
+            size="sm"
+            contentClassName="text-slate-800"
+            onClick={() => setShowFilters(prev => !prev)}
+          >
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </GlassButton>
+        </div>
+
+        {/* Animated filter panel */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ${
+            showFilters ? "max-h-[1000px] opacity-100 mt-3" : "max-h-0 opacity-0"
+          }`}
         >
-          + Add Hotspot
-        </button>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search by name, category or province"
-            className="rounded-xl border border-slate-200 px-3 py-2"
-          />
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search by name, category or province"
+              className="rounded-xl border border-slate-200 px-3 py-2"
+            />
 
-          <select
-            value={categoryFilter}
-            onChange={(event) => setCategoryFilter(event.target.value)}
-            className="rounded-xl border border-slate-200 px-3 py-2"
-          >
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="rounded-xl border border-slate-200 px-3 py-2"
+            >
+              <option value="">All categories</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
 
-          <select
-            value={provinceFilter}
-            onChange={(event) => setProvinceFilter(event.target.value)}
-            className="rounded-xl border border-slate-200 px-3 py-2"
-          >
-            <option value="">All provinces</option>
-            {provinces.map((province) => (
-              <option key={province} value={province}>
-                {province}
-              </option>
-            ))}
-          </select>
+            <select
+              value={provinceFilter}
+              onChange={(event) => setProvinceFilter(event.target.value)}
+              className="rounded-xl border border-slate-200 px-3 py-2"
+            >
+              <option value="">All provinces</option>
+              {provinces.map((province) => (
+                <option key={province} value={province}>
+                  {province}
+                </option>
+              ))}
+            </select>
 
-          <select
-            value={sortMode}
-            onChange={(event) => setSortMode(event.target.value as ExploreSortMode)}
-            className="rounded-xl border border-slate-200 px-3 py-2"
-          >
-            <option value="popular">Most popular</option>
-            <option value="reviews">Most reviewed</option>
-            <option value="rating">Highest rated</option>
-          </select>
+            <select
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value as ExploreSortMode)}
+              className="rounded-xl border border-slate-200 px-3 py-2"
+            >
+              <option value="popular">Most popular</option>
+              <option value="reviews">Most reviewed</option>
+              <option value="rating">Highest rated</option>
+            </select>
+          </div>
         </div>
       </section>
-
+      
       {/* Interactive Map Section */}
       <section className="rounded-2xl overflow-hidden shadow-xl border border-slate-200">
         <div className="h-[400px] md:h-[500px]">
@@ -574,13 +596,13 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
               <p className="text-xs text-slate-500">Browse the full community collection.</p>
             </div>
             <div className="flex items-center gap-3 text-sm">
-              {canShowAllHotspots && !showAllHotspots && (
+              {canShowAllHotspots && (
                 <button
                   type="button"
-                  onClick={() => setShowAllHotspots(true)}
+                  onClick={() => setShowAllHotspots(prev => !prev)}
                   className="font-medium text-emerald-700"
                 >
-                  Show all hotspots
+                  {showAllHotspots ? "Show less" : "Show all"}
                 </button>
               )}
               <Link href="/hotspots/my" className="font-medium text-emerald-700">
