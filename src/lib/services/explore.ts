@@ -14,6 +14,7 @@ interface HotspotRow {
   visit_count: number | null;
   likes_count: number | null;
   saves_count: number | null;
+  views_count: number | null;
 
   // Enrichment fields
   latitude?: number | null;
@@ -43,6 +44,7 @@ export interface ExploreHotspot {
   averageRating: number;
   likesCount: number;
   savesCount: number;
+  viewsCount: number;
   likedByMe: boolean;
   savedByMe: boolean;
   visited: boolean;
@@ -299,6 +301,7 @@ export async function fetchExploreHotspots(userId?: string | null): Promise<Expl
         averageRating: review.avg,
         likesCount: row.likes_count ?? 0,
         savesCount: row.saves_count ?? 0,
+        viewsCount: row.views_count ?? 0,
         likedByMe: likedByMe.has(row.id),
         savedByMe: savedByMe.has(row.id),
         visited: flags.visited,

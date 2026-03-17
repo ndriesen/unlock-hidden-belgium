@@ -25,8 +25,9 @@ export default function TripSelectorModal({
   const [adding, setAdding] = useState<string | null>(null);
   const [showCreateNew, setShowCreateNew] = useState(false);
   const [newTripTitle, setNewTripTitle] = useState("");
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private');
   const [creating, setCreating] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(""); 
 
   const loadTrips = useCallback(async () => {
     if (!user?.id) return;
@@ -73,8 +74,8 @@ export default function TripSelectorModal({
       const newTrip = await createTrip({
         userId: user.id,
         title: newTripTitle.trim(),
-        visibility: "private",
-      });
+        visibility,
+      }); 
 
       if (newTrip) {
         await addHotspotToTrip({ tripId: newTrip.id, hotspot });
@@ -193,6 +194,31 @@ export default function TripSelectorModal({
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-[#2A7FFF] focus:border-transparent"
                     autoFocus
                   />
+                  {/* Visibility Toggle */}
+                  <div className="pt-2">
+                    <label className="flex items-center gap-3 text-sm font-medium text-slate-700 mb-1">
+                      <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2A7FFF] focus:ring-offset-2">
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                            visibility === 'public'
+                              ? 'translate-x-6'
+                              : 'translate-x-1'
+                          }`}
+                        />
+                        <span
+                          className={`absolute mx-1 block h-4 w-4 rounded-full shadow-md transition-colors duration-200 ease-in-out ${
+                            visibility === 'public'
+                              ? 'bg-emerald-400'
+                              : 'bg-slate-300'
+                          }`}
+                        />
+                      </span>
+                      <span className="flex items-center gap-1">
+                        {visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                      </span>
+                    </label>
+                    <p className="text-xs text-slate-500">Public trips can be discovered by others</p>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setShowCreateNew(false)}
@@ -209,7 +235,7 @@ export default function TripSelectorModal({
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : ( 
                 <button
                   onClick={() => setShowCreateNew(true)}
                   className="w-full py-2 text-[#2A7FFF] font-medium text-sm"

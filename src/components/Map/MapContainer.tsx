@@ -26,6 +26,7 @@ export interface MapContainerProps {
   hotspots?: Hotspot[];
   selectedHotspotId?: string | null;
   loading?: boolean;
+  autoFit?: boolean;
 
   searchQuery?: string;
   categoryFilter?: string;

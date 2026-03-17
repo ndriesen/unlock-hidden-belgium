@@ -25,9 +25,16 @@ export function useGamification() {
   const [currentLevel, setCurrentLevel] = useState(1);
   const addToast = useToast(); // or context
 
+  type AwardXPResult = GamificationResult | { success: false; reason: string; };
+
   const triggerAction = useCallback(async (actionKey: string, context = {}) => {
     if (!user) throw new Error('Login required');
-    const result: GamificationResult = await awardXP(user.id!, actionKey, context);
+    const result: AwardXPResult = await awardXP(user.id!, actionKey, context);
+
+    if ('success' in result) {
+      addToast(result.reason, 'error');
+      return;
+    }
     
     // Toast
     addToast(result.message, 'success');

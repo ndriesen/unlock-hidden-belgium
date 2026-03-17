@@ -354,6 +354,8 @@ const mapHotspots = useMemo<Hotspot[]>(
             onFavorite={toggleFavoriteInUi}
             onAddToTrip={() => {}}
             isVisited={false}
+            isLiked ={false}
+            isSaved={false}
             isWishlist={false}
             isFavorite={false}
             canGoPrevious={false}

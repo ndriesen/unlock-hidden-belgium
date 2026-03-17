@@ -3,6 +3,16 @@ import { evaluateBadges } from "./badgeEngine";
 import { addXp } from "./xpEngine";
 import { recordActivity } from "./activity";
 
+interface GamificationResult {
+  xpGained: number;
+  oldXp: number;
+  newXp: number;
+  leveledUp: boolean;
+  newLevel: number;
+  badges: any[];
+  message: string;
+}
+
 async function upsertBooleanFlag(
   userId: string,
   hotspotId: string,
@@ -23,22 +33,16 @@ async function upsertBooleanFlag(
   }
 }
 
+export type { GamificationResult };
+
 export async function awardXP(
   userId: string, 
   actionKey: string, 
   context: { hotspotId?: string, entityId?: string, photoPath?: string } = {}
-): Promise<{
-  xpGained: number;
-  oldXp: number;
-  newXp: number;
-  leveledUp: boolean;
-  newLevel: number;
-  badges: any[];
-  message: string;
-}> {
+): Promise<GamificationResult | { success: false; reason: string; }> {
   // Add new triggers like addReview etc. call awardXP internally
   // 1. Anti-abuse checks
-  if (actionKey === 'visit_hotspot_xp' && context.hotspotId) {
+    if (actionKey === 'visit_hotspot_xp' && context.hotspotId) {
     const { data } = await supabase
       .from('user_hotspots')
       .select('visited_at')
@@ -46,7 +50,9 @@ export async function awardXP(
       .eq('hotspot_id', context.hotspotId)
       .gte('visited_at', new Date(Date.now() - 24*60*60*1000).toISOString())
       .single();
-    if (data) throw new Error('Already visited recently');
+    if (data) {
+      return { success: false, reason: "already_visited" };
+    }
   }
 
 // Daily cap - simplified, full impl in user_activity logs
@@ -107,7 +113,10 @@ export async function markVisited(userId: string, hotspotId: string) {
   if (error) throw error;
 
   const result = await awardXP(userId, 'visit_hotspot_xp', { hotspotId });
-  return result.badges || [];
+  if ('success' in result && result.success === false) {
+    return result;
+  }
+  return result;
 }
 
 export async function toggleFavorite(userId: string, hotspotId: string) {
@@ -126,7 +135,10 @@ export async function toggleFavorite(userId: string, hotspotId: string) {
   await upsertBooleanFlag(userId, hotspotId, "favorite", newValue);
 
   if (newValue) {
-    await awardXP(userId, 'xp_mark_wishlist', { hotspotId }); // reuse for favorite too, or specific rule
+    const result = await awardXP(userId, 'xp_mark_wishlist', { hotspotId });
+    if ('success' in result && result.success === false) {
+      console.warn('XP award skipped:', result.reason);
+    }
   }
 
   return newValue;
@@ -148,7 +160,10 @@ export async function toggleWishlist(userId: string, hotspotId: string) {
   await upsertBooleanFlag(userId, hotspotId, "wishlist", newValue);
 
   if (newValue) {
-    await awardXP(userId, 'xp_mark_wishlist', { hotspotId });
+    const result = await awardXP(userId, 'xp_mark_wishlist', { hotspotId });
+    if ('success' in result && result.success === false) {
+      console.warn('XP award skipped:', result.reason);
+    }
   }
 
   return newValue;

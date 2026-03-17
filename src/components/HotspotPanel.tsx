@@ -8,8 +8,12 @@ interface HotspotPanelProps {
   hotspot: Hotspot | null;
   onClose: () => void;
   onVisit: (id: string) => void;
+  onLike?: (id: string, name: string) => void;
+  onSave?: (id: string, name: string) => void;
   onAddToTrip: (hotspot: Hotspot) => void;
   isVisited: boolean;
+  isLiked: boolean;
+  isSaved: boolean;
   isFavorite: boolean;
   isWishlist: boolean;
   onFavorite: (id: string) => void;
@@ -52,8 +56,8 @@ export default function HotspotPanel({
           {/* Subtle backdrop */}
           <motion.div
             onClick={onClose}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.1 }}
+initial={{ opacity: 0 }}
+            animate={{ opacity: 0.2 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[990] bg-black"
           />
@@ -64,7 +68,8 @@ export default function HotspotPanel({
             animate={{ x: 0 }}
             exit={{ x: 460 }}
             transition={{ duration: 0.25 }}
-            className="hidden md:flex fixed right-0 top-0 z-[1000] h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-xl rounded-l-[28px] overflow-hidden"
+className="hidden md:flex fixed right-0 top-0 z-[1000] h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-xl rounded-l-[28px] overflow-hidden"
+          
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -114,6 +119,7 @@ export default function HotspotPanel({
                 onShowTripSelector={onShowTripSelector}
                 onTripUpdated={onTripUpdated}
                 showFavoriteInDetail={false}
+                onClose={onClose}
               />
             </div>
 
@@ -160,9 +166,71 @@ export default function HotspotPanel({
               </button>
             </div>*/}
           </motion.aside>
+          
+          {/* Mobile Bottom Sheet */}
+          <motion.div
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 300 }}
+            onDragEnd={(e, info) => {
+              if (info.offset.y > 120) onClose();
+            }}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.3 }}
+            className="md:hidden fixed bottom-0 left-0 right-0 z-[1000] h-[85vh] bg-white shadow-xl rounded-t-[28px] overflow-hidden flex flex-col"
+          >
+            {/* Mobile Header */}
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onPrevious(hotspot.id)}
+                  disabled={!canGoPrevious}
+                  className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
+                >
+                  <span aria-hidden="true">&larr;</span>
+                </button>
+                <button
+                  onClick={() => onNext(hotspot.id)}
+                  disabled={!canGoNext}
+                  className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
+                >
+                  <span aria-hidden="true">&rarr;</span>
+                </button>
+              </div>
+              <span className="text-sm text-gray-500">{positionLabel}</span>
+              <button
+                onClick={onClose}
+                className="p-1 rounded-md hover:bg-gray-100"
+              >
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            {/* Drag handle */}
+            <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2 cursor-grab active:cursor-grabbing" />
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-4">
+              <HotspotDetail
+                hotspot={hotspot}
+                onVisit={onVisit}
+                onWishlist={onWishlist}
+                onFavorite={onFavorite}
+                onAddToTrip={onAddToTrip}
+                isVisited={isVisited}
+                isWishlist={isWishlist}
+                isFavorite={isFavorite}
+                showTripSelector={showTripSelector}
+                onShowTripSelector={onShowTripSelector}
+                onTripUpdated={onTripUpdated}
+                showFavoriteInDetail={false}
+                onClose={onClose}
+              />
+            </div>
+          </motion.div>
         </>
       )}
     </AnimatePresence>
   );
 }
+
 

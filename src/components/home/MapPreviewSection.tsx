@@ -9,20 +9,11 @@ import { Hotspot } from "@/types/hotspot";
 const MapContainer = dynamic(
   () =>
     import("@/components/Map/MapContainer").then(
-      (mod) => mod.default as React.ComponentType<{
-        viewMode?: "markers" | "heatmap";
-        mapStyle?: "default" | "satellite" | "retro" | "terrain";
-        visitedIds?: string[];
-        wishlistIds?: string[];
-        favoriteIds?: string[];
-        onSelect?: (hotspot: Hotspot) => void;
-        onVisit?: (hotspotId: string) => void;
-        onToast?: (message: string) => void;
-        compact?: boolean;
-      }>
+      (mod) => mod.default as React.ComponentType<MapContainerProps>
     ),
   { ssr: false }
 );
+import type { MapContainerProps } from '@/components/Map/MapContainer';
 
 interface MapPreviewSectionProps {
   hotspots: Hotspot[];
@@ -54,11 +45,11 @@ export default function MapPreviewSection({
   return (
     <section className="py-8">
       <div className="container mx-auto px-4">
-        <div className="h-[300px] md:h-[400px] relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200 hover:shadow-3xl transition-all duration-500">
+        <div className="h-[400px] md:h-[500px] relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200 hover:shadow-3xl transition-all duration-500">
           {/* Map Container */}
           <div className="absolute inset-0">
             <MapContainer
-              //hotspots={hotspots}
+              hotspots={hotspots}
               viewMode={viewMode}
               mapStyle={mapStyle}
               visitedIds={visitedIds}
@@ -68,6 +59,8 @@ export default function MapPreviewSection({
               onVisit={onVisit}
               onToast={onToast}
               compact={true}
+              autoFit={true}
+              key={hotspots?.length}
             />
           </div>
 

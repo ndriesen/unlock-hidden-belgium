@@ -41,7 +41,8 @@ export default function TripDetailPage() {
   const [editDescription, setEditDescription] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+  const [editVisibility, setEditVisibility] = useState<'private' | 'friends' | 'public'>('private');
+  const [isSaving, setIsSaving] = useState(false); 
   
   // Memory modal state
   const [showMemoryModal, setShowMemoryModal] = useState(false);
@@ -90,8 +91,9 @@ export default function TripDetailPage() {
         setEditDescription(found.description);
         setEditStartDate(found.startDate ? found.startDate.split('T')[0] : "");
         setEditEndDate(found.endDate ? found.endDate.split('T')[0] : "");
+        setEditVisibility(found.visibility);
       }
-      setLoading(false);
+      setLoading(false); 
     };
     loadTrip();
   }, [tripId, user?.id]);
@@ -204,7 +206,8 @@ export default function TripDetailPage() {
       description: editDescription,
       startDate: editStartDate || undefined,
       endDate: editEndDate || undefined,
-    });
+      visibility: editVisibility,
+    }); 
     await refreshTrip();
     setIsSaving(false);
     setIsEditingTrip(false);
@@ -258,15 +261,45 @@ export default function TripDetailPage() {
           </button>
           
           {isEditingTrip ? (
-            <input
-              type="text"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="font-semibold text-slate-900 bg-transparent border-b border-[#2A7FFF] focus:outline-none max-w-[180px]"
-            />
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="font-semibold text-slate-900 bg-transparent border-b border-[#2A7FFF] focus:outline-none max-w-[120px]"
+              />
+              {/* Visibility Toggle */}
+              <div className="flex items-center gap-1 text-sm bg-slate-100 px-2 py-1 rounded-lg">
+                <span className={`inline-block w-3 h-3 rounded-full ${
+                  editVisibility === 'public' ? 'bg-emerald-400' : 
+                  editVisibility === 'friends' ? 'bg-amber-400' : 'bg-slate-400'
+                }`} />
+                <span className="font-medium capitalize">{editVisibility}</span>
+                <select 
+                  value={editVisibility} 
+                  onChange={(e) => setEditVisibility(e.target.value as 'private' | 'friends' | 'public')}
+                  className="bg-transparent border-0 text-xs font-medium focus:outline-none"
+                >
+                  <option value="private">🔒 Private</option>
+                  <option value="friends">👥 Friends</option>
+                  <option value="public">🌐 Public</option>
+                </select>
+              </div>
+            </div>
           ) : (
-            <h1 className="font-semibold text-slate-900 truncate max-w-[180px]">{trip.title}</h1>
-          )}
+            <div className="flex items-center gap-2">
+              <h1 className="font-semibold text-slate-900 truncate max-w-[150px]">{trip.title}</h1>
+              {/* Visibility Badge */}
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                trip.visibility === 'public' ? 'bg-emerald-100 text-emerald-800' :
+                trip.visibility === 'friends' ? 'bg-amber-100 text-amber-800' :
+                'bg-slate-100 text-slate-600'
+              }`}>
+                {trip.visibility === 'public' ? '🌐 Public' : 
+                 trip.visibility === 'friends' ? '👥 Friends' : '🔒 Private'}
+              </span>
+            </div>
+          )} 
           
           <div className="flex gap-1">
             {isEditingTrip ? (

@@ -18,6 +18,10 @@ import {
   toggleTripLike,
   toggleTripSave
 } from "@/lib/services/tripBuilder";
+import {
+  toggleHotspotLike,
+  toggleHotspotSave
+} from "@/lib/services/hotspotSocial";
 import { queryKeys } from '@/lib/react-query/queryKeys';
 
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
@@ -385,6 +389,43 @@ const toggleTripSaveInUi = useCallback(async (item: PopularTrip) => {
   }
 }, [user?.id, queryClient]);
 
+const toggleHotspotLikeInUi = useCallback(async (hotspot: ExploreHotspot) => {
+  if (!user?.id) {
+    setActionMessage("Login required");
+    return;
+  }
+  try {
+    const next = await toggleHotspotLike({ 
+      userId: user.id, 
+      hotspotId: hotspot.id, 
+      hotspotName: hotspot.name 
+    });
+    queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
+    setActionMessage(next ? "Liked" : "Unliked");
+  } catch (error) {
+    console.error("Toggle hotspot like failed:", error);
+    setActionMessage("Like failed");
+  }
+}, [user?.id, queryClient]);
+
+const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
+  if (!user?.id) {
+    setActionMessage("Login required");
+    return;
+  }
+  try {
+    const next = await toggleHotspotSave({ 
+      userId: user.id, 
+      hotspotId: hotspot.id, 
+      hotspotName: hotspot.name 
+    });
+    queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
+    setActionMessage(next ? "Saved" : "Unsaved");
+  } catch (error) {
+    console.error("Toggle hotspot save failed:", error);
+    setActionMessage("Save failed");
+  }
+}, [user?.id, queryClient]);
 
 
 
@@ -489,10 +530,14 @@ const toggleTripSaveInUi = useCallback(async (item: PopularTrip) => {
         hotspot={selectedHotspot}
         onClose={() => setSelectedHotspot(null)}
         onVisit={handleVisit}
+        onLike={(id, name) => toggleHotspotLikeInUi(hotspots.find(h => h.id === id) as ExploreHotspot || {id, name})}
+        onSave={(id, name) => toggleHotspotSaveInUi(hotspots.find(h => h.id === id) as ExploreHotspot || {id, name})}
         onWishlist={toggleWishlistInUi}
         onFavorite={toggleFavoriteInUi}
         onAddToTrip={() => setShowTripSelector(true)}
         isVisited={selectedMeta?.visited ?? false}
+        isLiked={selectedMeta?.likedByMe ?? false}
+        isSaved={selectedMeta?.savedByMe ?? false}
         isWishlist={selectedMeta?.wishlist ?? false}
         isFavorite={selectedMeta?.favorite ?? false}
         canGoPrevious={navigationState.canGoPrevious}
@@ -591,18 +636,22 @@ const toggleTripSaveInUi = useCallback(async (item: PopularTrip) => {
                 <div className="space-y-2 p-3">
                   <p className="line-clamp-2 text-xs text-slate-700">{hotspot.description}</p>
 
-                  <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 text-center text-xs">
                     <div className="rounded-lg border border-slate-200 p-2">
                       <p className="text-slate-500">Visits</p>
                       <p className="font-semibold text-slate-900">{hotspot.visitCount}</p>
                     </div>
                     <div className="rounded-lg border border-slate-200 p-2">
-                      <p className="text-slate-500">Reviews</p>
-                      <p className="font-semibold text-slate-900">{hotspot.reviewCount}</p>
+                      <p className="text-slate-500">Likes</p>
+                      <p className="font-semibold text-slate-900">{hotspot.likesCount}</p>
                     </div>
                     <div className="rounded-lg border border-slate-200 p-2">
-                      <p className="text-slate-500">Rating</p>
-                      <p className="font-semibold text-slate-900">{hotspot.averageRating.toFixed(1)}</p>
+                      <p className="text-slate-500">Saves</p>
+                      <p className="font-semibold text-slate-900">{hotspot.savesCount}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 p-2">
+                      <p className="text-slate-500">Views</p>
+                      <p className="font-semibold text-slate-900">{hotspot.viewsCount || 0}</p>
                     </div>
                   </div>
 
@@ -627,12 +676,32 @@ const toggleTripSaveInUi = useCallback(async (item: PopularTrip) => {
                     )}
                   </div>
 
-                  <div className="flex gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <button
+                      onClick={() => {
+                        void toggleHotspotLikeInUi(hotspot);
+                      }}
+                      className={`rounded-lg px-3 py-1.5 font-medium text-xs border border-slate-200 hover:bg-slate-50 ${
+                        hotspot.likedByMe ? "bg-rose-100 text-rose-700" : "text-slate-700"
+                      }`}
+                    >
+                      ❤️ {hotspot.likedByMe ? "Liked" : "Like"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        void toggleHotspotSaveInUi(hotspot);
+                      }}
+                      className={`rounded-lg px-3 py-1.5 font-medium text-xs border border-slate-200 hover:bg-slate-50 ${
+                        hotspot.savedByMe ? "bg-amber-100 text-amber-700" : "text-slate-700"
+                      }`}
+                    >
+                      💾 {hotspot.savedByMe ? "Saved" : "Save"}
+                    </button>
                     <button
                       onClick={() => {
                         void toggleWishlistInUi(hotspot.id);
                       }}
-                      className={`flex-1 rounded-lg px-3 py-1.5 font-medium ${
+                      className={`rounded-lg px-3 py-1.5 font-medium text-xs ${
                         hotspot.wishlist
                           ? "bg-amber-100 text-amber-700"
                           : "border border-slate-200 text-slate-700"
@@ -650,9 +719,9 @@ const toggleTripSaveInUi = useCallback(async (item: PopularTrip) => {
                         setMapFocusId(hotspot.id);
                         setSelectedHotspot(null);
                       }}
-                      className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 font-medium text-white"
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 font-medium text-xs text-white"
                     >
-                      Open map
+                      🗺️ Map
                     </button>
                   </div>
                 </div>

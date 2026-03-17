@@ -6,6 +6,7 @@ import { MapResizeFix } from "./MapResizeFix";
 import MobileMapFix from "./MobileMapFix";
 import { GeolocationControl } from "./GeolocationControl";
 import type { LatLngExpression, Map } from 'leaflet';
+import type { Map as LeafletMap } from 'leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 
@@ -239,7 +240,7 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
 
 
   return (
-<div className="relative w-full h-[100dvh] min-h-[500px] overflow-hidden">
+<div className={`relative w-full ${compact ? 'h-[400px]' : 'h-[100dvh] min-h-[500px]'} overflow-hidden`}>
       <MapContainer
         preferCanvas={true}
         renderer={L.canvas({ padding: 0.5 })}
@@ -250,6 +251,11 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
         ref={(instance) => {
           if (instance !== null) {
             mapRef.current = instance;
+          }
+        }}
+        whenReady={() => {
+          if (mapRef.current && typeof mapRef.current.invalidateSize === 'function') {
+            setTimeout(() => mapRef.current!.invalidateSize(), compact ? 300 : 100);
           }
         }}
       >

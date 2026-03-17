@@ -14,8 +14,9 @@ export default function TripBuilder({ onComplete }: TripBuilderProps) {
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(""); 
 
   const handleCreate = async () => {
     if (!user?.id) {
@@ -36,8 +37,8 @@ export default function TripBuilder({ onComplete }: TripBuilderProps) {
       description: description.trim(),
       startDate: startDate || undefined,
       endDate: endDate || undefined,
-      visibility: "private",
-    });
+      visibility,
+    }); 
 
     setLoading(false);
 
@@ -107,6 +108,32 @@ export default function TripBuilder({ onComplete }: TripBuilderProps) {
             />
           </div>
         </div>
+
+        {/* Visibility Toggle */}
+        <div className="pt-2">
+          <label className="flex items-center gap-3 text-sm font-medium text-slate-700 mb-1">
+            <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2A7FFF] focus:ring-offset-2">
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  visibility === 'public'
+                    ? 'translate-x-6'
+                    : 'translate-x-1'
+                }`}
+              />
+              <span
+                className={`absolute mx-1 block h-4 w-4 rounded-full shadow-md transition-colors duration-200 ease-in-out ${
+                  visibility === 'public'
+                    ? 'bg-emerald-400'
+                    : 'bg-slate-300'
+                }`}
+              />
+            </span>
+            <span className="flex items-center gap-1">
+              {visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+            </span>
+          </label>
+          <p className="text-xs text-slate-500">Public trips appear in discovery for others to explore</p>
+        </div> 
 
         {message && (
           <p className={`text-sm ${message.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
