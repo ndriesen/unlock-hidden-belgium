@@ -41,7 +41,7 @@ function getFirstImage(hotspot: Hotspot): string {
   if (hotspot.images && hotspot.images.length > 0) {
     return hotspot.images[0];
   }
-  return "/images/placeholder-image.jfif";
+  return "/images/placeholder-image.svg";
 }
 
 function formatDistance(distanceKm: number | undefined): string {

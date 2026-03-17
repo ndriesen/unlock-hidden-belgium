@@ -148,7 +148,7 @@ export async function getPublicProfileData(userId: string): Promise<PublicProfil
   }
   const visitedHotspots = (hotspotsRes.data || []).map((h: any) => {
     const rawImages = h.hotspots?.images || [];
-    const firstImage = rawImages[0] || "/images/placeholder-image.jfif";
+    const firstImage = rawImages[0] || "/images/placeholder-image.svg";
     return {
       id: h.hotspots?.id || `demo-hot${Math.random()}`,
       name: h.hotspots?.name || 'Hidden Gem',
@@ -165,10 +165,7 @@ export async function getPublicProfileData(userId: string): Promise<PublicProfil
       id: 'demo-h1', 
       name: 'Secret Castle', 
       province: 'Vlaanderen', 
-      images: ["/images/placeholder-image.jfif"],
-      image_url: '/images/placeholder-image.jfif',
-      visited_at: '2024-03-20',
-      latitude: 50.85,
+      images: ["/images/placeholder-image.svg"],image_url: '/images/placeholder-image.svg',visited_at: '2024-03-20',latitude: 50.85,
       longitude: 4.35,
       category: 'castle'
     },
@@ -176,10 +173,7 @@ export async function getPublicProfileData(userId: string): Promise<PublicProfil
       id: 'demo-h2', 
       name: 'Forest Lake', 
       province: 'Wallonie', 
-      images: ["/images/placeholder-image.jfif"],
-      image_url: '/images/placeholder-image.jfif',
-      visited_at: '2024-03-18',
-      latitude: 50.5,
+      images: ["/images/placeholder-image.svg"],      image_url: '/images/placeholder-image.svg',      visited_at: '2024-03-18',      latitude: 50.5,
       longitude: 4.0,
       category: 'nature'
     }
@@ -193,11 +187,11 @@ export async function getPublicProfileData(userId: string): Promise<PublicProfil
   const photos = allPhotos.map((p: any) => ({
     id: p.id,
     storage_path: p.storage_path,
-    public_url: p.storage_path ? supabase.storage.from("trip-media").getPublicUrl(p.storage_path).data.publicUrl : '/images/placeholder-image.jfif',
+    public_url: p.storage_path ? supabase.storage.from("trip-media").getPublicUrl(p.storage_path).data.publicUrl : '/images/placeholder-image.svg',
     created_at: p.created_at,
   })) || [
-    { id: 'demo-p1', storage_path: '', public_url: '/images/placeholder-image.jfif', created_at: '2024-03-20' },
-    { id: 'demo-p2', storage_path: '', public_url: '/images/placeholder-image.jfif', created_at: '2024-03-19' }
+{ id: 'demo-p1', storage_path: '', public_url: '/images/placeholder-image.svg', created_at: '2024-03-20' },
+{ id: 'demo-p2', storage_path: '', public_url: '/images/placeholder-image.svg', created_at: '2024-03-19' }
   ];
   const badgesList = (badgesRes.data || []).map((b: any) => ({
     id: b.badges?.id || `demo-${Math.random()}`,

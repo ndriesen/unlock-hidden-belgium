@@ -297,7 +297,7 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
                   alt="Preview"
                   fill
                   className="object-cover"
-                  fallbackUrl="/images/placeholder-image.jfif"
+                  fallbackUrl="/images/placeholder-image.svg"
                 />
               </div>
             )}
