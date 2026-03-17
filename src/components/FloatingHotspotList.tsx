@@ -43,17 +43,30 @@ export default function FloatingHotspotList({
       <div className={`overflow-y-auto max-h-96 transition-all ${isExpanded ? 'max-h-96 py-4' : 'max-h-0 py-0'}`}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-6 pb-6">
           {hotspots.slice(0, 8).map((hotspot) => (
-            <HotspotCard
-              key={hotspot.id}
-              hotspot={{
-                ...hotspot,
-                images: hotspot.images || [],
-                category: typeof hotspot.category === 'string' 
-                  ? hotspot.category 
-                  : hotspot.category.name || "Unknown"
-              }}
-              className="h-64 shadow-lg hover:shadow-xl transition-all group"
-            />
+            <div className="h-64 shadow-lg hover:shadow-xl transition-all group">
+              <HotspotCard
+                key={hotspot.id}
+                hotspot={{
+                  id: hotspot.id,
+                  name: hotspot.name,
+                  description: hotspot.description,
+                  category: typeof hotspot.category === 'string'
+                    ? hotspot.category
+                    : hotspot.category?.name || "Unknown",
+                  province: hotspot.province,
+                  imageUrl: hotspot.images?.[0] || undefined,
+                  visitCount: hotspot.visit_count || 0,
+                  likesCount: hotspot.likes_count || 0,
+                  savesCount: hotspot.saves_count || 0,
+                  viewsCount: hotspot.views_count || 0,
+                }}
+                onLike={() => {}}
+                onSave={() => {}}
+                onWishlist={() => hotspot.id}
+                onFavorite={() => hotspot.id}
+                onMap={() => hotspot.id}
+              />
+            </div>
           ))}
         </div>
       </div>

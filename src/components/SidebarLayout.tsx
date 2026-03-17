@@ -306,7 +306,7 @@ export default function SidebarLayout({
                 </button>
 
                 {unifiedDropdownOpen && (
-                  <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+                  <div className="absolute -right-4 mt-3 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
                     {/* Tab Headers */}
                     <div className="flex border-b border-slate-200">
                       <button

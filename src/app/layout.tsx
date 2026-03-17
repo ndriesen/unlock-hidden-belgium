@@ -41,10 +41,10 @@ export default function RootLayout({
             <SearchProvider>
               <ToastProvider>
                 <AuthModalProvider>
-                  <AuthLoadingGate>
-                    <SidebarLayout>{children}</SidebarLayout>
-                  </AuthLoadingGate>
-                <AuthModal />
+                    <AuthLoadingGate>
+                      <SidebarLayout>{children}</SidebarLayout>
+                    </AuthLoadingGate>
+                  <AuthModal />
                 </AuthModalProvider>
               </ToastProvider>
             </SearchProvider>

@@ -74,7 +74,7 @@ const displayName = getSafeDisplay(category);
       return hotspot.images[0];
     }
     // Fallback to placeholder - avoids 429 rate limiting from external sources
-    return "/images/placeholder-image.svg";
+    return "/images/placeholder-image.png";
   };
 
   if (!hotspots || hotspots.length === 0) {

@@ -32,6 +32,9 @@ import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
 import { GlassButton } from "@/components/ui/glass-button";
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import HotspotCard from "@/components/ui/HotspotCard";
+import toast from "@/components/Toast"
+import { useToast } from "@/context/ToastContext";
 
 const MapContainer = dynamic(
   () => import("@/components/Map/MapContainer"),
@@ -89,6 +92,7 @@ type ExploreSortMode = "popular" | "reviews" | "rating";
 export default function ExplorePage() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
+  const addToast = useToast();
 
   const queryClient = useQueryClient();
 
@@ -127,13 +131,12 @@ const hotspots = rawHotspots;
   const [provinceFilter, setProvinceFilter] = useState("");
   const [sortMode, setSortMode] = useState<ExploreSortMode>("popular");
   const [showAllHotspots, setShowAllHotspots] = useState(false);
-
-  const [actionMessage, setActionMessage] = useState("");
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
   const [mapFocusId, setMapFocusId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showTripSelector, setShowTripSelector] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [Toast, setToast] = useState<string | null>(null);
 
   // Removed loadExplore - React Query handles fetching
 
@@ -302,17 +305,17 @@ const hotspots = rawHotspots;
   const toggleWishlistInUi = useCallback(
     async (hotspotId: string) => {
       if (!user?.id) {
-        setActionMessage("Login required.");
+        addToast("Login required.");
         return;
       }
 
       queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
       try {
         const next = await toggleWishlist(user.id, hotspotId);
-        setActionMessage(next ? "Added to wishlist" : "Removed from wishlist");
+        addToast(next ? "Added to wishlist" : "Removed from wishlist");
       } catch (error) {
         console.error("Wishlist toggle failed:", error);
-        setActionMessage("Could not update wishlist.");
+        addToast("Could not update wishlist.");
       }
     },
     [user?.id, queryClient]
@@ -321,17 +324,17 @@ const hotspots = rawHotspots;
   const toggleFavoriteInUi = useCallback(
     async (hotspotId: string) => {
       if (!user?.id) {
-        setActionMessage("Login required.");
+        addToast("Login required.");
         return;
       }
 
       queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
       try {
         const next = await toggleFavorite(user.id, hotspotId);
-        setActionMessage(next ? "Added to favorites" : "Removed from favorites");
+        addToast(next ? "Added to favorites" : "Removed from favorites");
       } catch (error) {
         console.error("Favorite toggle failed:", error);
-        setActionMessage("Could not update favorites.");
+        addToast("Could not update favorites.");
       }
     },
     [user?.id, queryClient]
@@ -340,23 +343,23 @@ const hotspots = rawHotspots;
   const handleVisit = useCallback(
     async (hotspotId: string) => {
       if (!user?.id) {
-        setActionMessage("Login required.");
+        addToast("Login required.");
         return;
       }
 
       const alreadyVisited = hotspots.find((hotspot) => hotspot.id === hotspotId)?.visited;
       if (alreadyVisited) {
-        setActionMessage("Already marked as visited.");
+        addToast("Already marked as visited.");
         return;
       }
 
       queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
       try {
         await markVisited(user.id, hotspotId);
-        setActionMessage("Visited hotspot. +50 XP earned.");
+        addToast("Visited hotspot. +50 XP earned.");
       } catch (error) {
         console.error("Visit update failed:", error);
-        setActionMessage("Could not mark visited.");
+        addToast("Could not mark visited.");
       }
     },
     [hotspots, user?.id, queryClient]
@@ -364,37 +367,37 @@ const hotspots = rawHotspots;
 
 const toggleTripLikeInUi = useCallback(async (item: PopularTrip) => {
   if (!user?.id) {
-    setActionMessage("Login required");
+    addToast("Login required");
     return;
   }
   try {
     const next = await toggleTripLike({ tripId: item.id, userId: user.id, tripTitle: item.title });
     queryClient.invalidateQueries({ queryKey: queryKeys.popularTrips(user.id) });
-    setActionMessage(next ? "Liked" : "Unliked");
+    addToast(next ? "Liked" : "Unliked");
   } catch (error) {
     console.error("Toggle like failed:", error);
-    setActionMessage("Like failed");
+    addToast("Like failed");
   }
 }, [user?.id, queryClient]);
 
 const toggleTripSaveInUi = useCallback(async (item: PopularTrip) => {
   if (!user?.id) {
-    setActionMessage("Login required");
+    addToast("Login required");
     return;
   }
   try {
     const next = await toggleTripSave({ tripId: item.id, userId: user.id, tripTitle: item.title });
     queryClient.invalidateQueries({ queryKey: queryKeys.popularTrips(user.id) });
-    setActionMessage(next ? "Saved" : "Unsaved");
+    addToast(next ? "Saved" : "Unsaved");
   } catch (error) {
     console.error("Toggle save failed:", error);
-    setActionMessage("Save failed");
+    addToast("Save failed");
   }
 }, [user?.id, queryClient]);
 
 const toggleHotspotLikeInUi = useCallback(async (hotspot: ExploreHotspot) => {
   if (!user?.id) {
-    setActionMessage("Login required");
+    addToast("Login required");
     return;
   }
   try {
@@ -404,16 +407,16 @@ const toggleHotspotLikeInUi = useCallback(async (hotspot: ExploreHotspot) => {
       hotspotName: hotspot.name 
     });
     queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
-    setActionMessage(next ? "Liked" : "Unliked");
+    addToast(next ? "Liked" : "Unliked");
   } catch (error) {
     console.error("Toggle hotspot like failed:", error);
-    setActionMessage("Like failed");
+    addToast("Like failed");
   }
 }, [user?.id, queryClient]);
 
 const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
   if (!user?.id) {
-    setActionMessage("Login required");
+    addToast("Login required");
     return;
   }
   try {
@@ -423,10 +426,10 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
       hotspotName: hotspot.name 
     });
     queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
-    setActionMessage(next ? "Saved" : "Unsaved");
+    addToast(next ? "Saved" : "Unsaved");
   } catch (error) {
     console.error("Toggle hotspot save failed:", error);
-    setActionMessage("Save failed");
+    addToast("Save failed");
   }
 }, [user?.id, queryClient]);
 
@@ -543,7 +546,7 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
             favoriteIds={favoriteIds}
             loading={loading}
             onSelect={handleMapSelect}
-            onToast={setActionMessage}
+            onToast={addToast}
           />
         </div>
       </section>
@@ -569,12 +572,12 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
         positionLabel={navigationState.positionLabel}
         showTripSelector={showTripSelector}
         onShowTripSelector={setShowTripSelector}
-        onTripUpdated={() => setActionMessage("Trip updated.")}
+        onTripUpdated={() => addToast("Trip updated.")}
       />
 
-      {actionMessage && (
+      {Toast && (
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-          {actionMessage}
+          {Toast}
         </p>
       )}
 
@@ -615,140 +618,47 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
             <p className="text-sm text-slate-600">No hotspots found for this filter set.</p>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-            {visibleHotspots.map((hotspot, index) => (
-              <article
-                key={hotspot.id}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-              >
-                <div className="relative h-32 w-full">
-                  <Link href={`/hotspots/${hotspot.id}`} className="block h-full">
-                    <Image
-                      src={hotspot.imageUrl ?? "/public/images/placeholder.jpg"} 
-                      alt={hotspot.name}
-                      fill
-                      sizes="(max-width: 768px) 100vw, 33vw"
-                      className="object-cover"
-                      priority={index < 5}
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                      <p className="text-sm font-semibold text-white">{hotspot.name}</p>
-                      <p className="text-[11px] text-white/85">
-                        {hotspot.category} - {hotspot.province}
-                      </p>
-                    </div>
-                  </Link>
 
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      void toggleFavoriteInUi(hotspot.id);
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+                {visibleHotspots.map((hotspot) => (
+                  <HotspotCard
+                    key={hotspot.id}
+                    hotspot={{
+                      id: hotspot.id,
+                      name: hotspot.name,
+                      description: hotspot.description,
+                      category: hotspot.category,
+                      province: hotspot.province,
+                      latitude: hotspot.latitude ?? undefined,
+                      longitude: hotspot.longitude ?? undefined,
+                      imageUrl: hotspot.imageUrl,
+                      visitCount: hotspot.visitCount,
+                      likesCount: hotspot.likesCount,
+                      savesCount: hotspot.savesCount,
+                      viewsCount: hotspot.viewsCount,
+                      visited: hotspot.visited,
+                      wishlist: hotspot.wishlist,
+                      favorite: hotspot.favorite,
+                      likedByMe: hotspot.likedByMe,
+                      savedByMe: hotspot.savedByMe,
                     }}
-                    className={`absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm ${
-                      hotspot.favorite ? "text-rose-600" : "text-slate-600"
-                    }`}
-                    aria-label={hotspot.favorite ? "Remove from favorites" : "Add to favorites"}
-                  >
-                    <span aria-hidden="true" className="text-[16px] leading-none">♡</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2 p-3">
-                  <p className="line-clamp-2 text-xs text-slate-700">{hotspot.description}</p>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 text-center text-xs">
-                    <div className="rounded-lg border border-slate-200 p-2">
-                      <p className="text-slate-500">Visits</p>
-                      <p className="font-semibold text-slate-900">{hotspot.visitCount}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 p-2">
-                      <p className="text-slate-500">Likes</p>
-                      <p className="font-semibold text-slate-900">{hotspot.likesCount}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 p-2">
-                      <p className="text-slate-500">Saves</p>
-                      <p className="font-semibold text-slate-900">{hotspot.savesCount}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 p-2">
-                      <p className="text-slate-500">Views</p>
-                      <p className="font-semibold text-slate-900">{hotspot.viewsCount || 0}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 text-[11px]">
-                    {hotspot.visited && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">
-                        <span aria-hidden="true" className="text-[13px] leading-none">✓</span>
-                        Visited
-                      </span>
-                    )}
-                    {hotspot.wishlist && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">
-                        <span aria-hidden="true" className="text-[13px] leading-none">⟟</span>
-                        Wishlist
-                      </span>
-                    )}
-                    {hotspot.favorite && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">
-                        <span aria-hidden="true" className="text-[13px] leading-none">♡</span>
-                        Favorite
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <button
-                      onClick={() => {
-                        void toggleHotspotLikeInUi(hotspot);
-                      }}
-                      className={`rounded-lg px-3 py-1.5 font-medium text-xs border border-slate-200 hover:bg-slate-50 ${
-                        hotspot.likedByMe ? "bg-rose-100 text-rose-700" : "text-slate-700"
-                      }`}
-                    >
-                      ❤️ {hotspot.likedByMe ? "Liked" : "Like"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        void toggleHotspotSaveInUi(hotspot);
-                      }}
-                      className={`rounded-lg px-3 py-1.5 font-medium text-xs border border-slate-200 hover:bg-slate-50 ${
-                        hotspot.savedByMe ? "bg-amber-100 text-amber-700" : "text-slate-700"
-                      }`}
-                    >
-                      💾 {hotspot.savedByMe ? "Saved" : "Save"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        void toggleWishlistInUi(hotspot.id);
-                      }}
-                      className={`rounded-lg px-3 py-1.5 font-medium text-xs ${
-                        hotspot.wishlist
-                          ? "bg-amber-100 text-amber-700"
-                          : "border border-slate-200 text-slate-700"
-                      }`}
-                    >
-                      <span aria-hidden="true" className="text-[14px] leading-none">⟟</span>{" "}
-                      {hotspot.wishlist ? "Wishlisted" : "Wishlist"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (!hasCoordinates(hotspot)) {
-                          setActionMessage("This hotspot has no coordinates yet.");
-                          return;
-                        }
-                        setMapFocusId(hotspot.id);
-                        setSelectedHotspot(null);
-                      }}
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 font-medium text-xs text-white"
-                    >
-                      🗺️ Map
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))}
+                    onLike={(h) => toggleHotspotLikeInUi(h as any)}
+                    onSave={(h) => toggleHotspotSaveInUi(h as any)}
+                    onWishlist={toggleWishlistInUi}
+                    onFavorite={toggleFavoriteInUi}
+                    onMap={(id) => {
+                      const selected = hotspots.find(h => h.id === id);
+                      if (!selected || !hasCoordinates(selected)) {
+                        addToast("This hotspot has no coordinates yet.");
+                        return;
+                      }
+                      setMapFocusId(id);
+                      setSelectedHotspot(null);
+                    }}
+                  />
+                ))}
+              
+            
           </div>
         </section>
       )}
