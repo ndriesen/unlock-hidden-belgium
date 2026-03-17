@@ -14,6 +14,8 @@ interface HotspotSheetProps {
   isVisited: boolean;
   isWishlist: boolean;
   isFavorite: boolean;
+  isLiked: boolean;
+  isSaved: boolean;
   canGoPrevious: boolean;
   canGoNext: boolean;
   onPrevious: () => void;
@@ -31,9 +33,11 @@ export default function HotspotSheet({
   onAddToTrip,
   onWishlist,
   onFavorite,
-  isVisited,
+isVisited,
   isWishlist,
   isFavorite,
+  isLiked,
+  isSaved,
   canGoPrevious,
   canGoNext,
   onPrevious,
