@@ -457,6 +457,16 @@ export default function SidebarLayout({
                           <button
                             onClick={() => {
                               setUnifiedDropdownOpen(false);
+                              router.push("/partnerships-referral");
+                            }}
+                            className="block w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg"
+                          >
+                            Partnerships & referrals
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setUnifiedDropdownOpen(false);
                               router.push("/legal");
                             }}
                             className="block w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg"

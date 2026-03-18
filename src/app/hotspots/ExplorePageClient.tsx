@@ -25,6 +25,7 @@ import {
 import { queryKeys } from '@/lib/react-query/queryKeys';
 
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
+import { supabase } from "@/lib/Supabase/browser-client";
 import { createSignedMediaUrl } from "@/lib/services/media";
 import { markVisited, toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
@@ -749,7 +750,7 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
               <div className="relative h-24">
                 <Link href={`/trip/${trip.id}`} className="block h-full">
                   <Image
-                    src={tripCoverUrls[trip.id]}
+src={tripCoverUrls[trip.id] || trip.coverImage || "https://images.unsplash.com/photo-1527631746610-bca00a040d60"}
                     alt={trip.title}
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
