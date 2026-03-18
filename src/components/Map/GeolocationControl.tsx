@@ -14,6 +14,13 @@ function SafeGeolocationControl({ autoLocate, hotspots = [] }: GeolocationContro
   const map = useMap() as L.Map;
   const markerRef = useRef<L.Marker | null>(null);
   const circleRef = useRef<L.Circle | null>(null);
+  const userIcon = L.icon({
+    iconUrl: "/locationPointer.svg",
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  });
+
 
   const locate = useCallback(() => {
     if (!map) return;
@@ -36,7 +43,9 @@ function SafeGeolocationControl({ autoLocate, hotspots = [] }: GeolocationContro
       map.setView(e.latlng, 12, { animate: true });
 
       if (markerRef.current) markerRef.current.setLatLng(e.latlng);
-      else markerRef.current = L.marker(e.latlng).addTo(map).bindPopup("You are here");
+      else markerRef.current = L.marker(e.latlng, {
+        icon: userIcon
+      }).addTo(map).bindPopup("You are here");
 
       if (circleRef.current) circleRef.current.setLatLng(e.latlng).setRadius(e.accuracy ?? 50);
       else circleRef.current = L.circle(e.latlng, {

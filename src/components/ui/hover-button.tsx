@@ -44,7 +44,7 @@ export default function AnimatedButton({icon = "★", label = "Action", onClick,
           animate={{ opacity: isHovered ? 1 : 0 }}
           transition={{ duration: 0.2, delay: isHovered ? 0.1 : 0 }}
         >
-          <span className="text-white text-xs whitespace-nowrap">
+          <span className="text-teal-950 text-xs italic whitespace-nowrap">
             {label}
           </span>
         </motion.div>
