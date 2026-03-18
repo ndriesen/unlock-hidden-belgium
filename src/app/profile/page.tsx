@@ -489,7 +489,7 @@ export default function ProfilePage() {
   // Profile tabs
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'preferences' as const, label: 'Buddy Preferences', icon: '👥' },
+    { id: 'preferences' as const, label: 'Buddies', icon: '👥' },
     { id: 'badges' as const, label: 'Badges', icon: '🏆' },
   ];
 
@@ -597,7 +597,7 @@ export default function ProfilePage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as "badges" | "overview" | "preferences")}
-                className={`px-6 py-4 font-semibold text-sm flex items-center gap-2 border-b-2 transition-all ${
+                className={`px-4 py-4 font-semibold text-sm flex items-center gap-2 border-b-2 transition-all ${
                   activeTab === tab.id
                     ? 'border-emerald-500 text-emerald-700 bg-emerald-50'
                     : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-200'

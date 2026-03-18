@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useSearch } from "@/context/SearchContext";
-
+import { GlassButton } from "@/components/ui/glass-button";
 import { fetchMyHotspots, MyHotspotEntry } from "@/lib/services/myHotspots";
 import { toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
@@ -50,7 +50,7 @@ export default function MyHotspotsPage() {
   const [entries, setEntries] = useState<MyHotspotEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
+  const [showFilters, setShowFilters] = useState(false);
   const { searchQuery, setSearchQuery } = useSearch();
   const [provinceFilter, setProvinceFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -243,14 +243,38 @@ const mapHotspots = useMemo<Hotspot[]>(
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+      <section className="rounded-2xl p-3 shadow-sm border border-slate-300 bg-slate-100/30 dark:bg-slate-500/100 backdrop-blur-md">
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-2 font-semibold text-emerald-700 hover:bg-emerald-100"
-        >
-          + Add Hotspot
-        </button>
+        <div className="flex justify-center gap-4">
+          <GlassButton
+            size="sm"
+            contentClassName="text-slate-800"
+            onClick={() => setIsAddModalOpen(true)}
+          >
+            + Add Hotspot
+          </GlassButton>
+
+          <GlassButton
+            size="sm"
+            contentClassName="text-slate-800"
+            onClick={() => setShowFilters(prev => !prev)}
+          >
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </GlassButton>
+
+          <GlassButton
+            size="sm"
+            contentClassName="text-slate-800"
+            onClick={() => setShowMap((prev) => !prev)}
+          >
+            {showMap ? "Hide map" : "Show map"}
+          </GlassButton>
+        </div>
+        <div
+          className={`overflow-hidden transition-all duration-300 ${
+            showFilters ? "max-h-[1000px] opacity-100 mt-3" : "max-h-0 opacity-0"
+          }`}
+          >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <input
             value={searchQuery}
@@ -293,11 +317,7 @@ const mapHotspots = useMemo<Hotspot[]>(
             ))}
           </div>
 
-          <button
-            onClick={() => setShowMap((prev) => !prev)}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800">
-            {showMap ? "Hide map" : "Show map"}
-          </button>
+
 
           <select
             value={mapStyle}
@@ -311,6 +331,7 @@ const mapHotspots = useMemo<Hotspot[]>(
             <option value="retro">Retro</option>
             <option value="terrain">Terrain</option>
           </select>
+          </div>
         </div>
       </section>
 
@@ -392,7 +413,7 @@ const mapHotspots = useMemo<Hotspot[]>(
 
 
       {!loading && !errorMessage && filteredEntries.length > 0 && (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
           {filteredEntries.map((entry, index) => (
             <article key={entry.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="relative h-32 w-full">
@@ -427,6 +448,32 @@ const mapHotspots = useMemo<Hotspot[]>(
                 </button>
               </div>
 
+              <div className="flex flex-wrap gap-1.5 text-[11px]">
+                {entry.visited && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">
+                    <span aria-hidden="true" className="text-[13px] leading-none">✓</span>
+                    Visited
+                  </span>
+                )}
+                {entry.wishlist && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">
+                    <span aria-hidden="true" className="text-[13px] leading-none">⟟</span>
+                    Wishlist
+                  </span>
+                )}
+                {entry.favorite && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">
+                    <span aria-hidden="true" className="text-[13px] leading-none">♡</span>
+                    Favorite
+                  </span>
+                )}
+                {entry.visitedAt && (
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
+                    {formatDate(entry.visitedAt)}
+                  </span>
+                )}
+              </div>
+
               <div className="space-y-2 p-3">
                 <p className="line-clamp-2 text-xs text-slate-700">{entry.description}</p>
 
@@ -453,31 +500,7 @@ const mapHotspots = useMemo<Hotspot[]>(
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 text-[11px]">
-                  {entry.visited && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">
-                      <span aria-hidden="true" className="text-[13px] leading-none">✓</span>
-                      Visited
-                    </span>
-                  )}
-                  {entry.wishlist && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">
-                      <span aria-hidden="true" className="text-[13px] leading-none">⟟</span>
-                      Wishlist
-                    </span>
-                  )}
-                  {entry.favorite && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">
-                      <span aria-hidden="true" className="text-[13px] leading-none">♡</span>
-                      Favorite
-                    </span>
-                  )}
-                  {entry.visitedAt && (
-                    <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
-                      {formatDate(entry.visitedAt)}
-                    </span>
-                  )}
-                </div>
+
               </div>
             </article>
           ))}
