@@ -25,6 +25,7 @@ import {
 import { queryKeys } from '@/lib/react-query/queryKeys';
 
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
+import { createSignedMediaUrl } from "@/lib/services/media";
 import { markVisited, toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
 import HotspotPanel from "@/components/HotspotPanel";
@@ -125,7 +126,8 @@ export default function ExplorePage() {
 
   const loading = baseHotspotsQuery.isLoading || tripsQuery.isLoading || mentionsQuery.isLoading;
   const errorMessage = baseHotspotsQuery.error ? (baseHotspotsQuery.error as Error).message : '';
-const hotspots = rawHotspots;
+  const hotspots = rawHotspots;
+  const [tripCoverUrls, setTripCoverUrls] = useState<Record<string, string>>({});
   const { searchQuery, setSearchQuery } = useSearch();
   const [categoryFilter, setCategoryFilter] = useState("");
   const [provinceFilter, setProvinceFilter] = useState("");
@@ -241,6 +243,28 @@ const hotspots = rawHotspots;
       setMapFocusId(null);
     }
   }, [filteredHotspots, mapFocusId]);
+
+// Use signed URLs instead of public (bucket not public)
+  useEffect(() => {
+    const loadTripCovers = async () => {
+      console.log('Loading signed URLs for trips');
+      const newUrls: Record<string, string> = {};
+      for (const trip of trips) {
+        if (trip.coverImage?.startsWith('http')) {
+          newUrls[trip.id] = trip.coverImage;
+          continue;
+        }
+        const signedUrl = await createSignedMediaUrl(trip.coverImage);
+        console.log(`Signed for ${trip.id}:`, signedUrl);
+        newUrls[trip.id] = signedUrl || 'https://images.unsplash.com/photo-1527631746610-bca00a040d60';
+      }
+      setTripCoverUrls(newUrls);
+    };
+
+    if (trips.length > 0) {
+      loadTripCovers();
+    }
+  }, [trips]);
 
   const handleMapSelect = useCallback((hotspot: Hotspot) => {
     setSelectedHotspot(hotspot);
@@ -432,6 +456,7 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
     addToast("Save failed");
   }
 }, [user?.id, queryClient]);
+
 
 
 
@@ -722,9 +747,9 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
           {trips.map((trip, index) => (
             <article key={trip.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="relative h-24">
-  <Link href={`/trip/${trip.id}`} className="block h-full">
+                <Link href={`/trip/${trip.id}`} className="block h-full">
                   <Image
-                    src={trip.coverImage}
+                    src={tripCoverUrls[trip.id]}
                     alt={trip.title}
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
@@ -736,7 +761,7 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
 
               <div className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900">#{index + 1} {trip.title}</p>
+                  <p className="text-sm font-semibold text-slate-900">{trip.title}</p>
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
                     Score {trip.score}
                   </span>

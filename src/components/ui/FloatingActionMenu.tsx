@@ -23,8 +23,7 @@ export default function FloatingActionMenu({ actions }: FloatingActionMenuProps)
   return (
     <div
       className="relative flex items-center"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+
     >
       {/* ACTIONS */}
       <AnimatePresence>
