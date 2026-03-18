@@ -2,7 +2,6 @@
 
 import { useEffect, useState, use } from 'react';
 import { getPublicProfileData, type PublicProfileData } from '@/lib/services/publicProfiles';
-import { type Hotspot } from '@/types/hotspot';
 import { ProfileTabs } from '@/components/profile/ProfileTabs';
 import { OverviewSection } from '@/components/profile/OverviewSection';
 import { HotspotGrid } from '@/components/profile/HotspotGrid';
@@ -48,7 +47,9 @@ export default function PublicProfilePage({
     );
   }
 
-  if (error || !data?.profile) {
+  const profile = data?.profile;
+
+  if (error || !profile) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center p-8 max-w-md">
@@ -61,8 +62,6 @@ export default function PublicProfilePage({
       </div>
     );
   }
-
-  const stats = data.stats;
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -91,7 +90,10 @@ export default function PublicProfilePage({
       case 'buddies':
         return <BuddiesList buddies={data.buddies} />;
       case 'activity':
-        return <ActivityFeed activities={data.activities} />;
+        return (
+          <ActivityFeed 
+            activities={data.activities}/>
+        );
       default:
         return <OverviewSection data={data} />;
     }
@@ -104,7 +106,6 @@ export default function PublicProfilePage({
         onTabChange={setActiveTab}
       />
 
-      
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
           {renderTabContent()}
@@ -113,4 +114,3 @@ export default function PublicProfilePage({
     </div>
   );
 }
-

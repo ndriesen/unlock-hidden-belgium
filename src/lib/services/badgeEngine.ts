@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/Supabase/browser-client";
 import { addXp } from "./xpEngine";
+import { recordActivity } from "./activity";
 
 interface Hotspot {
   id: string;
@@ -149,6 +150,14 @@ const stats = await computeUserStats(userId, normalized);
     }
 
     unlocked.push(badge);
+    await recordActivity({
+      actorId: userId,
+      activityType: "badge_earned",
+      entityType: "badge",
+      entityId: badge.id,
+      message: `earned the ${badge.name} badge`,
+      notifyActor: true, // 🔥 zichzelf notificeren
+});
   }
 
   return unlocked;

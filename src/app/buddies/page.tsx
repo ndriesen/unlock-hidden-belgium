@@ -11,8 +11,10 @@ import {
   fetchBuddyRequests,
   fetchFilteredBuddyProfiles,
   getOrCreateConversation,
-  calculateBuddyMatchScore
+  calculateBuddyMatchScore,
+  createBuddyRequest
 } from "@/lib/services/buddies";
+import { supabase } from "@/lib/Supabase/browser-client";
 import { useToast } from '@/context/ToastContext';
 
 
@@ -31,9 +33,9 @@ export default function BuddiesPage() {
   const [requests, setRequests] = useState<BuddyRequest[]>([]);
   const [sourceWarning, setSourceWarning] = useState("");
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
+const [appliedFilters, setAppliedFilters] = useState({
     city: "",
-    style: "balanced" as TravelStyle,
+    style: [] as TravelStyle[],
     interests: [] as string[],
     availability: "Flexible"
   });
@@ -63,13 +65,21 @@ export default function BuddiesPage() {
     loadData();
   }, [user]);
 
-  // Refetch profiles on filter change
+// Refetch profiles on applied filter change - only when explicitly applied
   useEffect(() => {
-    if (!user || Object.keys(filters).every(key => !filters[key as keyof typeof filters])) return;
+    if (!user) return;
+
+    const hasActiveFilters =
+      appliedFilters.city.length > 0 ||
+      appliedFilters.interests.length > 0 ||
+      appliedFilters.style.length > 0 ||
+      appliedFilters.availability !== 'Flexible';
+
+    if (!hasActiveFilters) return;
 
     const refetch = async () => {
       try {
-        const { profiles: newProfiles } = await fetchFilteredBuddyProfiles(user.id, filters);
+        const { profiles: newProfiles } = await fetchFilteredBuddyProfiles(user.id, appliedFilters);
         setProfiles(newProfiles);
         addToast('Profiles updated based on your filters');
       } catch (error) {
@@ -79,29 +89,27 @@ export default function BuddiesPage() {
     };
 
     refetch();
-  }, [filters.city, filters.style, filters.interests, filters.availability, user, addToast]);
+  }, [appliedFilters.city, appliedFilters.style, appliedFilters.availability, appliedFilters.interests.length, user]);
 
-  // Filter profiles based on current filters
+// Filter profiles based on current applied filters
   const filteredProfiles = useMemo(() => {
     return profiles
       .map(profile => ({
         ...profile,
         score: calculateBuddyMatchScore(profile, {
-          city: filters.city,
-          interests: filters.interests,
-          style: filters.style
+          city: appliedFilters.city,
+          interests: appliedFilters.interests,
+          style: appliedFilters.style
         })
       }))
       .sort((a, b) => b.score - a.score);
-  }, [profiles, filters]);
+  }, [profiles, appliedFilters]);
 
-  const handleFiltersChange = useCallback((newFilters: typeof filters) => {
-    setFilters(newFilters);
+  const handleApplyFilters = useCallback((newFilters: typeof appliedFilters) => {
+    setAppliedFilters(newFilters);
   }, []);
 
-  const handleSearchChange = useCallback((query: string) => {
-    // Search handled in TopMatches component
-  }, []);
+
 
   const handleOpenChat = useCallback(async (buddyUserId: string) => {
     if (!user) return;
@@ -120,6 +128,32 @@ export default function BuddiesPage() {
   const handlePlanTrip = useCallback((buddyUserId: string) => {
     setOpenPlanWith(buddyUserId);
   }, []);
+
+  const handleJoinAdventure = useCallback(async (id: string) => {
+    try {
+      const { data: request } = await supabase
+        .from('buddy_requests')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+      
+      if (!request || !user?.id) throw new Error('Request not found');
+      
+      await createBuddyRequest(user.id, {
+        city: 'Flexible',
+        style: 'balanced' as TravelStyle,
+        interests: [],
+        note: 'Interested in joining your adventure!'
+      });
+      addToast('Buddy request sent!');
+      // Refresh requests
+      const newRequests = await fetchBuddyRequests();
+      setRequests(newRequests);
+    } catch (error: any) {
+      console.error('Send request error:', error);
+      addToast(error.message || 'Failed to send request');
+    }
+  }, [user, addToast]);
 
   if (!user) {
     return (
@@ -153,28 +187,27 @@ export default function BuddiesPage() {
       <main className="space-y-6">
         {/* Filters */}
         <BuddyFilters 
-          onFiltersChange={handleFiltersChange}
-          initialFilters={filters}
+          initialFilters={appliedFilters}
+          onApplyFilters={handleApplyFilters}
         />
 
         {/* Top Matches */}
         <TopMatches 
           profiles={filteredProfiles} 
-          onSearchChange={handleSearchChange}
           onChatOpen={handleOpenChat}
           onPlanTrip={handlePlanTrip}
+          onSearchChange={() => {}}
         />
 
         {/* Nearby Explorers */}
         <NearbyExplorers 
           profiles={filteredProfiles} 
-          cityFilter={filters.city}
+          cityFilter={appliedFilters.city}
           onChatOpen={handleOpenChat}
           onPlanTrip={handlePlanTrip}
         />
 
-        {/* Buddy Requests */}
-        <BuddyRequestsFeed requests={requests} onMessage={handleOpenChat} onJoinAdventure={(id) => addToast('Joined request ' + id.slice(0,8))} />
+        <BuddyRequestsFeed requests={requests} onMessage={handleOpenChat} onJoinAdventure={handleJoinAdventure} />
 
         {/* Trip Companions */}
         <TripCompanions profiles={filteredProfiles} />

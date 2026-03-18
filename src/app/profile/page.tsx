@@ -498,7 +498,7 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="text-center space-y-4">
         <div className="relative mx-auto w-32 h-32">
-          <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-4xl font-bold shadow-2xl">
+<div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-4xl font-bold shadow-2xl">
             {avatarUrl ? (
               <Image
                 src={avatarUrl}
@@ -515,6 +515,10 @@ export default function ProfilePage() {
             ✏️
             <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
           </label>
+          {/* TODO: Follow button for public profiles only (see TODO.md)
+          <label className="absolute -bottom-2 -left-2 bg-white p-2 rounded-full shadow-lg cursor-pointer" onClick={handleToggleFollow}>
+            {isFollowing ? '✓' : '+'}
+          </label> */}
         </div>
         <div className="space-y-2">
           {editingUsername ? (

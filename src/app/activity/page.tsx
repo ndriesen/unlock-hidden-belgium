@@ -21,6 +21,23 @@ function formatDate(value: string): string {
   }).format(date);
 }
 
+function getNotificationText(activity: ActivityItem) {
+  switch (activity.type) {
+    case "trip_liked":
+      return "liked your trip";
+    case "buddy_request_sent":
+      return "sent you a buddy request";
+    case "buddy_request_accepted":
+      return "accepted your buddy request";
+    case "badge_earned":
+      return activity.message;
+    case "new_follower":
+      return "started following you";
+    default:
+      return activity.message;
+  }
+}
+
 export default function ActivityPage() {
   const { user } = useAuth();
 
@@ -152,7 +169,7 @@ export default function ActivityPage() {
                     <p className="text-sm font-semibold text-slate-900">
                       {notification.activity.actorName}
                     </p>
-                    <p className="text-sm text-slate-700">{notification.activity.message}</p>
+                    <p className="text-sm text-slate-700">{getNotificationText(notification.activity)}</p>
                     <p className="text-xs text-slate-500 mt-1">
                       {formatDate(notification.createdAt)}
                     </p>

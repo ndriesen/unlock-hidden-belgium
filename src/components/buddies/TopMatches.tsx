@@ -20,7 +20,7 @@ export function TopMatches({ profiles, onSearchChange, onChatOpen, onPlanTrip }:
       score: calculateBuddyMatchScore(profile, {
         city: '',
         interests: [],
-        style: 'balanced'
+        style: ['balanced']
       })
     }))
     .sort((a, b) => b.score - a.score);

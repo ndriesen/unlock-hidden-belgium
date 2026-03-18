@@ -1,6 +1,9 @@
 "use client";
 
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { isFollowing, toggleFollow } from '@/lib/services/follows';
 import { PublicProfileData } from '@/lib/services/publicProfiles';
 
 interface OverviewSectionProps {
@@ -10,10 +13,47 @@ interface OverviewSectionProps {
 export function OverviewSection({ data }: OverviewSectionProps) {
   const profile = data.profile;
   const stats = data.stats;
+  const { user: currentUser } = useAuth();
+
+  const [isFollowingState, setIsFollowingState] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   if (!profile) {
     return <div className="text-center py-12 text-slate-500">Profile not found</div>;
   }
+
+  const showFollowButton = Boolean(
+  currentUser?.id && profile?.id && currentUser.id !== profile.id
+);
+
+  useEffect(() => {
+    async function checkFollowing() {
+      if (currentUser?.id && profile?.id && currentUser.id !== profile.id) {
+        try {
+          const following = await isFollowing(currentUser.id, profile.id);
+          setIsFollowingState(following);
+        } catch (error) {
+          console.error('Error checking follow status:', error);
+        }
+      }
+    }
+    checkFollowing();
+  }, [currentUser?.id, profile.id]);
+
+  const handleToggleFollow = async () => {
+    console.log(currentUser?.id && profile.id)
+    if (!currentUser?.id || currentUser.id === profile.id || followLoading) return;
+
+    setFollowLoading(true);
+    try {
+      const newStatus = await toggleFollow(currentUser.id, profile.id);
+      setIsFollowingState(newStatus);
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   const level = stats.level;
   const xpForNext = 500; // From gamification service
@@ -23,7 +63,36 @@ export function OverviewSection({ data }: OverviewSectionProps) {
     <div className="space-y-6">
       {/* Hero */}
       <div className="relative bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-8 text-white overflow-hidden mb-8">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/10" />
+        {/* Follow button */}
+        {currentUser ? (
+          showFollowButton ? (
+            <button
+              type="button"
+              className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm p-3 rounded-2xl shadow-2xl cursor-pointer hover:shadow-3xl hover:bg-white transition-all flex items-center gap-1.5 text-sm font-bold border border-emerald-200/50 hover:border-emerald-300 text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-xl"
+              disabled={followLoading}
+              onClick={handleToggleFollow}
+              title={isFollowingState ? 'Unfollow' : 'Follow'}
+              
+            >
+              {followLoading ? (
+                <div className="w-4 h-4 border-2 border-slate-500 border-t-emerald-500 rounded-full animate-spin" />
+              ) : isFollowingState ? (
+                <span className="text-emerald-600">✓ Following</span>
+              ) : (
+                <span>+ Follow</span>
+              )}
+            </button>
+          ) : null
+        ) : (
+          <a
+            href="/auth/signin"
+            className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm p-3 rounded-2xl shadow-2xl cursor-pointer hover:shadow-3xl hover:bg-white transition-all flex items-center gap-1.5 text-sm font-bold border border-slate-200/50 hover:border-slate-300 text-slate-900"
+            title="Log in to follow"
+          >
+            + Follow
+          </a>
+        )}
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/10" />
         <div className="relative max-w-md mx-auto text-center">
           <div className="relative w-28 h-28 mx-auto mb-6 shadow-2xl shadow-black/20 rounded-full overflow-hidden ring-4 ring-white/30">
             {profile.avatarUrl ? (
@@ -115,4 +184,3 @@ export function OverviewSection({ data }: OverviewSectionProps) {
     </div>
   );
 }
-

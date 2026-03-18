@@ -46,7 +46,7 @@ import {
 export {
   getOrCreateConversation,
   getMessages,
-  sendMessage,
+  sendMessage
 };
 export type { ConversationId, Message };
 
@@ -284,7 +284,7 @@ export async function fetchFilteredBuddyProfiles(
   currentUserId: string,
   filters: {
     city?: string;
-    style?: TravelStyle;
+    style?: TravelStyle[];
     interests?: string[];
     availability?: string;
   }
@@ -300,13 +300,13 @@ export async function fetchFilteredBuddyProfiles(
   if (filters.city) {
     query = query.ilike("city", `%${filters.city}%`);
   }
-  if (filters.style) {
-    query = query.eq("travel_style", filters.style);
+  if (filters.style && filters.style.length > 0 && filters.style.length < 3) {
+    query = query.in("travel_style", filters.style);
   }
   if (filters.interests?.length) {
     query = query.contains("interests", filters.interests);
   }
-  if (filters.availability) {
+  if (filters.availability && filters.availability !== 'Flexible') {
     query = query.eq("availability", filters.availability);
   }
 
@@ -318,15 +318,13 @@ export async function fetchFilteredBuddyProfiles(
   };
 }
 
-
-
 export function calculateBuddyMatchScore(
   profile: BuddyProfile,
   preferences: {
     city: string;
     interests: string[];
-    style: TravelStyle;
-  } = { city: '', interests: [], style: 'balanced' }
+    style?: TravelStyle[];
+  } = { city: '', interests: [], style: undefined }
 ): number {
 
 
@@ -335,7 +333,7 @@ export function calculateBuddyMatchScore(
   ).length;
 
   const overlapScore = overlap * 18;
-  const styleScore = profile.style === preferences.style ? 28 : 8;
+  const styleScore = preferences.style ? preferences.style.includes(profile.style) ? 28 : 8 : 20;
   const cityScore =
     preferences.city &&
     profile.city.toLowerCase() === preferences.city.toLowerCase()

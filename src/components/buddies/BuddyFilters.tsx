@@ -5,46 +5,42 @@ import { TravelStyle } from '@/lib/services/buddies';
 import { BUDDY_INTEREST_OPTIONS } from '@/lib/services/buddies';
 
 interface BuddyFiltersProps {
-  onFiltersChange: (filters: {
+  initialFilters: {
     city: string;
-    style: TravelStyle;
-    interests: string[];
-    availability: string;
-  }) => void;
-  initialFilters?: {
-    city: string;
-    style: TravelStyle;
+    style: TravelStyle[];
     interests: string[];
     availability: string;
   };
+  onApplyFilters: (filters: {
+    city: string;
+    style: TravelStyle[];
+    interests: string[];
+    availability: string;
+  }) => void;
 }
 
 export function BuddyFilters({ 
-  onFiltersChange, 
-  initialFilters = { city: '', style: 'balanced', interests: [], availability: 'Flexible' }
+  initialFilters, 
+  onApplyFilters
 }: BuddyFiltersProps) {
   const [city, setCity] = useState(initialFilters.city);
-  const [style, setStyle] = useState<TravelStyle>(initialFilters.style);
+  const [style, setStyle] = useState<TravelStyle[]>(initialFilters.style);
   const [selectedInterests, setSelectedInterests] = useState<string[]>(initialFilters.interests);
   const [availability, setAvailability] = useState(initialFilters.availability);
 
-  const debouncedChange = useCallback(() => {
-    const timeoutId = setTimeout(() => {
-      onFiltersChange({ city, style, interests: selectedInterests, availability });
-    }, 300);
-    return () => clearTimeout(timeoutId);
-  }, [city, style, selectedInterests, availability, onFiltersChange]);
+  // Sync from prop when applied filters change
+  useEffect(() => {
+    setCity(initialFilters.city);
+    setStyle(initialFilters.style);
+    setSelectedInterests(initialFilters.interests);
+    setAvailability(initialFilters.availability);
+  }, [initialFilters]);
 
   const toggleInterest = useCallback((interest: string) => {
     setSelectedInterests(prev => 
       prev.includes(interest) ? prev.filter(i => i !== interest) : [...prev, interest]
     );
   }, []);
-
-  // Update parent on changes
-  useEffect(() => {
-    debouncedChange();
-  }, [city, style, selectedInterests, availability, debouncedChange]);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
@@ -74,9 +70,15 @@ export function BuddyFilters({
           ].map(({ id, label }) => (
             <button
               key={id}
-              onClick={() => setStyle(id)}
+              onClick={() => {
+                setStyle(prev => 
+                  prev.includes(id) 
+                    ? prev.filter(s => s !== id) 
+                    : [...prev, id]
+                );
+              }}
               className={`p-3 rounded-xl border-2 transition-all duration-200 text-sm font-medium ${
-                style === id 
+                style.includes(id) 
                   ? 'border-emerald-400 bg-emerald-50 text-emerald-800 shadow-md' 
                   : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:shadow-sm'
               }`}
@@ -85,6 +87,10 @@ export function BuddyFilters({
             </button>
           ))}
         </div>
+        {style.length > 0 && style.length < 3 && (
+          <p className="text-xs text-slate-500 mt-1">{style.length} styles selected</p>
+        )}
+        {style.length === 3 && <p className="text-xs text-emerald-600 mt-1 font-medium">All styles (no filter)</p>}
       </div>
 
       {/* Interests */}
@@ -126,6 +132,29 @@ export function BuddyFilters({
           <option value="This month">This month</option>
           <option value="Next month">Next month</option>
         </select>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-3 pt-2">
+        <button
+          onClick={() => onApplyFilters({ city, style: style.length === 3 ? [] : style, interests: selectedInterests, availability })}
+          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl focus:ring-4 focus:ring-emerald-500 focus:ring-opacity-50"
+        >
+          🔍 Search
+        </button>
+        <button
+          onClick={() => {
+            const defaults = { city: '', style: [] as TravelStyle[], interests: [], availability: 'Flexible' };
+            setCity(defaults.city);
+            setStyle(defaults.style);
+            setSelectedInterests(defaults.interests);
+            setAvailability(defaults.availability);
+            onApplyFilters(defaults);
+          }}
+          className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all duration-200"
+        >
+          Clear
+        </button>
       </div>
     </div>
   );
