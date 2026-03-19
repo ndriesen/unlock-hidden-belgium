@@ -84,7 +84,7 @@ export default function Sidebar({ collapsed, onNavigate }: SidebarProps) {
   ];
 
   return (
-    <aside className="h-full bg-slate-950 text-slate-100 flex flex-col justify-between px-3 py-4 transition-all duration-300 border-r border-white/10">
+    <aside className="h-full rounded-tr-lg bg-slate-950 text-slate-100 flex flex-col justify-between px-3 py-4 transition-all duration-300 border-r border-white/10">
       <div className="space-y-4">
         <div className={`px-2 ${collapsed ? "text-center" : ""}`}>
           <div className="inline-flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">

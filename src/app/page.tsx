@@ -486,7 +486,7 @@ export default function Home() {
   // State for ranked hotspots
   const [rankedHotspots, setRankedHotspots] = useState<Hotspot[]>([]);
 
-// Mock hotspots fallback + ranked for FeaturedHotspots (pre-login)
+  // Mock hotspots fallback + ranked for FeaturedHotspots (pre-login)
   useEffect(() => {
     // Use mocks if no real data
     if (questCandidates.length === 0) {
@@ -562,14 +562,14 @@ export default function Home() {
           loading={!userDataLoaded}
           selectedCategory={selectedCategory}
         />
-
+        {/* Main Content - Discovery First 
         <div className="max-w-4xl mx-auto px-4 py-8">
           <CategoryExplorer
             selectedCategory={selectedCategory}
             onCategoryChange={handleCategoryChange}
             categories={categories}
           />
-        </div>
+        </div>*/}
 
         <FeaturedHotspots 
           hotspots={questCandidates.slice(8, 16).filter(h => !selectedCategory || h.category === getSafeDisplay(selectedCategory))}

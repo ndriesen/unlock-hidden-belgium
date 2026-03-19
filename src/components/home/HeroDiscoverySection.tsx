@@ -31,7 +31,7 @@ export default function HeroDiscoverySection({
   return (
     <section className="relative h-[40vh] sm:h-[45vh] md:h-[50vh] lg:h-[55vh] overflow-hidden">
       {/* Adventure-themed background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-slate-900/90 to-indigo-900">
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-slate-900/90 to-indigo-900 rounded-lg">
         {/* Subtle map visualization overlay - reduced intensity for mobile */}
         <div className="absolute inset-0 opacity-30 sm:opacity-35">
           <div className="absolute top-16 left-8 w-24 h-24 bg-white/20 rounded-full blur-lg sm:blur-xl" />
@@ -50,19 +50,19 @@ export default function HeroDiscoverySection({
 
       <div className="relative z-10 container mx-auto px-4 h-full flex flex-col items-center justify-center text-center text-white py-6 sm:py-8 md:py-12 lg:py-16">
         <div className="max-w-xl sm:max-w-2xl mx-auto space-y-4 sm:space-y-5 md:space-y-6">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight tracking-tight">
             Hi <span className="text-emerald-400 drop-shadow-md">{name}</span>, ready for your next
             <span className="block bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-lg sm:drop-shadow-xl">
               adventure?
             </span>
           </h1>
 
-<p className="text-lg sm:text-xl md:text-2xl text-white/95 max-w-md mx-auto leading-relaxed font-medium">
+<p className="text-sm sm:text-md md:text-lg italic text-white/95 max-w-md mx-auto leading-relaxed font-medium">
             Discover hidden gems near you, curated for true explorers.
           </p>
 
           {/* Visual cue pointing down to trending section */}
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <div className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 animate-bounce">
             <svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white/60 w-6 h-8 drop-shadow-lg">
               <path d="M3 10L12 20L21 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>

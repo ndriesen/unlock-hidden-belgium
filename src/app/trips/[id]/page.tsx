@@ -13,7 +13,9 @@ import { getTripLocations, startLocationTracking, stopLocationTracking, isLocati
 import TripHero from "@/components/trips/TripHero";
 import TripHighlights from "@/components/trips/TripHighlights";
 import TripRouteMap from "@/components/trips/TripRouteMap";
+import TripTimeline from "@/components/trips/TripTimeline";
 import CreateMemoryModal from "@/components/trips/CreateMemoryModal";
+import { GlassButton } from "@/components/ui/glass-button";
 
 function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse bg-slate-200 rounded ${className}`} />;
@@ -412,21 +414,79 @@ export default function TripDetailPage() {
 
             <div className="bg-white rounded-2xl p-4 shadow-sm">
               {!showAddStop ? (
-                <button onClick={() => setShowAddStop(true)} className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-[#2A7FFF] hover:text-[#2A7FFF]">+ Add Stop</button>
+                <button onClick={() => setShowAddStop(true)} className="w-full py-4 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all font-medium text-lg">+ Add Stop</button>
               ) : (
-                <div className="space-y-3">
-                  <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search places..." className="w-full px-3 py-2 rounded-xl border border-slate-200" autoFocus />
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-2 block">Search hotspots or enter custom location</label>
+                    <input 
+                      type="text" 
+                      value={searchTerm} 
+                      onChange={(e) => setSearchTerm(e.target.value)} 
+                      placeholder="e.g. 'Eiffel Tower' or 'Custom location name'" 
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none bg-white" 
+                      autoFocus 
+                    />
+                  </div>
                   {searchResults.length > 0 && (
-                    <div className="max-h-48 overflow-y-auto space-y-2">
+                    <div className="max-h-48 overflow-y-auto space-y-2 border rounded-2xl border-slate-200 bg-white shadow-sm">
                       {searchResults.map(hotspot => (
-                        <button key={hotspot.id} onClick={() => handleAddStop(hotspot)} className="w-full p-2 rounded-lg border border-slate-100 hover:border-[#2A7FFF] flex items-center gap-2 text-left">
-{hotspot.images?.[0] && <div className="relative w-10 h-10 rounded overflow-hidden"><Image src={hotspot.images[0]} alt={hotspot.name} fill className="object-cover" sizes="40px" /></div>}
-<p className="text-xs text-slate-500">{getCategoryDisplay(hotspot.category)}</p>
+                        <button 
+                          key={hotspot.id} 
+                          onClick={() => handleAddStop(hotspot)} 
+                          className="w-full p-3 rounded-xl border border-transparent hover:border-slate-200 hover:bg-slate-50 flex items-center gap-3 text-left transition-all"
+                        >
+                          {hotspot.images?.[0] && (
+                            <div className="relative w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
+                              <Image src={hotspot.images[0]} alt={hotspot.name} fill className="object-cover" sizes="48px" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-slate-900 truncate">{hotspot.name}</p>
+                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                              <span>{getCategoryDisplay(hotspot.category)}</span>
+                              {hotspot.province && <span>• {hotspot.province}</span>}
+                            </p>
+                          </div>
+                          <div className="text-emerald-500 text-xs font-medium">Select</div>
                         </button>
                       ))}
                     </div>
                   )}
-                  <button onClick={() => { setShowAddStop(false); setSearchTerm(""); }} className="text-sm text-slate-500">Cancel</button>
+                  <div className="flex gap-2 pt-2">
+                    <button 
+                      onClick={async () => {
+                        if (searchTerm.trim() && trip && user) {
+                          // Add custom stop - creates hotspot-less stop for manual entry
+                          await addHotspotToTrip({
+                            tripId: trip.id,
+                            hotspot: {
+                              id: 'custom-' + Date.now(),
+                              name: searchTerm.trim(),
+                              category: 'custom',
+                              province: '',
+                              images: [],
+                              latitude: 0,
+                              longitude: 0,
+                            } as any
+                          });
+                          await refreshTrip();
+                          setShowAddStop(false);
+                          setSearchTerm('');
+                        }
+                      }}
+                      disabled={!searchTerm.trim()}
+                      className="flex-1 px-4 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+                    >
+                      ➕ Add '{searchTerm}' (Custom)
+                    </button>
+                    <button 
+                      onClick={() => { setShowAddStop(false); setSearchTerm(''); }} 
+                      className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-2xl transition-all text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -438,19 +498,78 @@ export default function TripDetailPage() {
                 {trip.stops.map((stop, index) => {
                   const img = stop.media[0]?.signedUrl || stop.photoUrl || "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
                   return (
-                    <div key={stop.id} className="bg-white rounded-2xl p-3 shadow-sm flex gap-3">
-<div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                    <div key={stop.id} className="bg-white rounded-2xl p-4 shadow-sm flex gap-4 items-start hover:shadow-md transition-shadow">
+                      <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
                         <Image src={img} alt={stop.name} fill className="object-cover" sizes="80px" />
-                        <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-[#2A7FFF] text-white text-xs flex items-center justify-center">{index + 1}</div>
+                        <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-[#2A7FFF] text-white text-xs flex items-center justify-center font-bold shadow-lg">{index + 1}</div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900">{stop.name}</p>
-                        <p className="text-xs text-slate-500">{stop.category} • {stop.province}</p>
-                        <textarea value={stop.note} onChange={(e) => handleStopNoteChange(stop.id, e.target.value)} placeholder="Add note..." className="w-full text-xs mt-1 p-1 bg-slate-50 rounded border-0" rows={1} />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <button onClick={() => handleOpenMemoryModal(stop.id, stop.name, stop.hotspotId)} className="text-emerald-600 text-xs p-1">📷</button>
-                        <button onClick={() => handleRemoveStop(stop.id)} className="text-red-500 text-xs p-1">✕</button>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-semibold text-slate-900 text-sm leading-tight">{stop.name}</p>
+                            <p className="text-xs text-slate-500">{stop.category} • {stop.province}</p>
+                          </div>
+                          <div className="flex flex-col gap-1 ml-2">
+                            <button 
+                              onClick={() => handleOpenMemoryModal(stop.id, stop.name, stop.hotspotId)} 
+                              className="text-emerald-600 hover:text-emerald-700 text-sm p-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
+                              title="Add photos/memory"
+                            >
+                              📷
+                            </button>
+                            <button 
+                              onClick={() => handleRemoveStop(stop.id)} 
+                              className="text-red-500 hover:text-red-600 text-sm p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                              title="Remove stop"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Note textarea */}
+                        <textarea 
+                          value={stop.note} 
+                          onChange={(e) => handleStopNoteChange(stop.id, e.target.value)} 
+                          placeholder="Add note or memory..." 
+                          className="w-full text-xs p-2 bg-slate-50 rounded-lg border border-slate-200 focus:border-slate-300 focus:ring-1 focus:ring-slate-300 resize-none h-12" 
+                        />
+                        
+                        {/* Visit date editor */}
+                        <div className="flex items-center gap-2 pt-1">
+                          {editingVisitedAt === stop.id ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="date"
+                                value={visitedAtValue}
+                                onChange={(e) => setVisitedAtValue(e.target.value)}
+                                className="text-xs px-2 py-1 rounded-md border border-slate-200 bg-white focus:ring-1 focus:ring-slate-300 h-8"
+                              />
+                              <button
+                                onClick={() => handleSaveVisitedAt(stop.id)}
+                                className="text-xs px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md font-medium transition-colors h-8"
+                              >
+                                ✓ Save
+                              </button>
+                              <button
+                                onClick={() => setEditingVisitedAt(null)}
+                                className="text-xs px-2 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md transition-colors h-8"
+                              >
+                                ✕ Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenVisitedAtEdit(stop.id, stop.visitedAt)}
+                              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 hover:underline bg-slate-100 px-3 py-1.5 rounded-md transition-colors text-left w-full"
+                            >
+                              {stop.visitedAt 
+                                ? <span>📅 {new Date(stop.visitedAt).toLocaleDateString('en-CA')}</span>
+                                : <span>➕ Add visit date</span>
+                              }
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -460,164 +579,99 @@ export default function TripDetailPage() {
           </div>
         )}
 
-        {activeTab === "timeline" && (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500">Set the date you visited each stop to see your timeline</p>
-            {sortedStopsByTime.map((stop, index) => {
-              const img = stop.media[0]?.signedUrl || stop.photoUrl || "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
-              return (
-                <div key={stop.id} className="relative pl-8">
-                  {/* Timeline connector */}
-                  {index < sortedStopsByTime.length - 1 && (
-                    <div className="absolute left-4 top-12 bottom-0 w-0.5 bg-slate-200" />
-                  )}
-                  {/* Timeline dot */}
-                  <div className="absolute left-2 top-4 w-5 h-5 rounded-full bg-[#2A7FFF] border-2 border-white" />
-                  
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
-                        <Image src={img} alt={stop.name} fill className="object-cover" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-slate-900">{stop.name}</p>
-                        <p className="text-xs text-slate-500">{stop.category} • {stop.province}</p>
-                        
-                        {/* Visited date picker */}
-                        <div className="mt-2">
-                          {editingVisitedAt === stop.id ? (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="date"
-                                value={visitedAtValue}
-                                onChange={(e) => setVisitedAtValue(e.target.value)}
-                                className="text-xs px-2 py-1 rounded border border-slate-200"
-                              />
-                              <button
-                                onClick={() => handleSaveVisitedAt(stop.id)}
-                                className="text-xs text-emerald-600 font-medium"
-                              >
-                                ✓
-                              </button>
-                              <button
-                                onClick={() => setEditingVisitedAt(null)}
-                                className="text-xs text-slate-500"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => handleOpenVisitedAtEdit(stop.id, stop.visitedAt)}
-                              className="text-xs text-[#2A7FFF] hover:underline"
-                            >
-                              {stop.visitedAt 
-                                ? `Visited: ${new Date(stop.visitedAt).toLocaleDateString()}`
-                                : "+ Add visit date"
-                              }
-                            </button>
-                          )}
-                        </div>
-                        
-                        {/* Photo count */}
-                        {stop.media.length > 0 && (
-                          <p className="text-xs text-slate-400 mt-1">{stop.media.length} photos</p>
-                        )}
-                      </div>
-                      
-                      <button 
-                        onClick={() => handleOpenMemoryModal(stop.id, stop.name, stop.hotspotId)}
-                        className="text-emerald-600 p-2"
-                      >
-                        📷
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {trip.stops.length === 0 && (
-              <div className="text-center py-8 text-slate-500">No stops yet. Add stops in the Route tab!</div>
-            )}
-          </div>
-        )}
+{activeTab === "timeline" && <TripTimeline stops={sortedStopsByTime} />}
 
         {activeTab === "memories" && (
           <div className="space-y-4">
             <TripHighlights photos={allTripPhotos} />
             {trip.stops.map((stop, index) => {
-              const hasMemory = stop.media.length > 0 || (stop.note && stop.note.trim().length > 0);
               return (
-                <div key={stop.id} className="bg-white rounded-2xl p-4 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-[#2A7FFF]/10 text-[#2A7FFF] text-xs flex items-center justify-center">{index + 1}</span>
-                    <p className="font-semibold">📍 {stop.name}</p>
+                <div key={stop.id} className="group relative bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                  {/* Persistent hover button in top-right */}
+                  <div className="flex justify-end">
+                  <GlassButton 
+                    size="sm"
+                    contentClassName="text-slate-800"
+                    onClick={() => handleOpenMemoryModal(stop.id, stop.name, stop.hotspotId)}
+                    title="Add/edit memories & photos"
+                  >
+                    📷
+                  </GlassButton>
                   </div>
-                  {hasMemory ? (
-                    <>
-                      {stop.media.length > 0 && (
-                        <div className="grid grid-cols-3 gap-2 mb-2">
-                          {stop.media.map((m, photoIndex) => {
-                            const isCover = trip.coverImage === m.storagePath;
-                            return (
-                              <div key={m.id} className="relative group">
-                                <div className="relative aspect-square rounded-lg overflow-hidden">
-                                  <Image src={m.signedUrl} alt={m.caption || ""} fill className="object-cover" />
-                                  {/* Overlay with actions */}
-                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                                    <button
-                                      onClick={async () => {
-                                        if (!user) return;
-                                        await setTripCoverImage({
-                                          tripId: trip.id,
-                                          userId: user.id,
-                                          storagePath: m.storagePath,
-                                        });
-                                        await refreshTrip();
-                                      }}
-                                      className={`p-1.5 rounded-full text-white text-xs ${isCover ? 'bg-emerald-500' : 'bg-white/20 hover:bg-white/40'}`}
-                                      title={isCover ? "Cover photo" : "Set as cover"}
-                                    >
-                                      {isCover ? '✓' : '📷'}
-                                    </button>
-                                    <button
-                                      onClick={async () => {
-                                        if (!user) return;
-                                        await toggleTripMediaHighlight({
-                                          mediaId: m.id,
-                                          userId: user.id,
-                                          isHighlight: !m.isHighlight,
-                                        });
-                                        await refreshTrip();
-                                      }}
-                                      className={`p-1.5 rounded-full text-white text-xs ${m.isHighlight ? 'bg-amber-500' : 'bg-white/20 hover:bg-white/40'}`}
-                                      title={m.isHighlight ? "Remove from highlights" : "Add to highlights"}
-                                    >
-                                      {m.isHighlight ? '⭐' : '☆'}
-                                    </button>
-                                  </div>
-                                  {/* Highlight badge */}
-                                  {m.isHighlight && (
-                                    <div className="absolute top-1 right-1">
-                                      <span className="text-xs">⭐</span>
-                                    </div>
-                                  )}
-                                </div>
+
+                  <div className="flex items-center gap-2 mb-3 pl-2">
+                    <span className="w-7 h-7 rounded-full bg-[#2A7FFF]/10 text-[#2A7FFF] text-xs flex items-center justify-center font-semibold shadow-sm">{index + 1}</span>
+                    <p className="font-semibold text-lg flex-1">{stop.name}</p>
+                  </div>
+                  
+                  {stop.media.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
+                      {stop.media.slice(0, 8).map((m, photoIndex) => {
+                        const isCover = trip.coverImage === m.storagePath;
+                        return (
+                          <div key={m.id} className="relative group/photo">
+                            <div className="relative aspect-square rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                              <Image src={m.signedUrl} alt={m.caption || ""} fill className="object-cover" />
+                              {/* Photo overlay actions */}
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                                <button
+                                  onClick={async () => {
+                                    if (!user) return;
+                                    await setTripCoverImage({
+                                      tripId: trip.id,
+                                      userId: user.id,
+                                      storagePath: m.storagePath,
+                                    });
+                                    await refreshTrip();
+                                  }}
+                                  className={`p-2 rounded-xl text-white text-xs font-semibold shadow-lg ${isCover ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+                                  title={isCover ? "Cover photo ✓" : "Set as cover"}
+                                >
+                                  {isCover ? '⭐ Cover' : '📷 Cover'}
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (!user) return;
+                                    await toggleTripMediaHighlight({
+                                      mediaId: m.id,
+                                      userId: user.id,
+                                      isHighlight: !m.isHighlight,
+                                    });
+                                    await refreshTrip();
+                                  }}
+                                  className={`p-2 rounded-xl text-white text-xs font-semibold shadow-lg ${m.isHighlight ? 'bg-amber-500 hover:bg-amber-600' : 'bg-yellow-500 hover:bg-yellow-600'}`}
+                                  title={m.isHighlight ? "Remove highlight" : "Add highlight"}
+                                >
+                                  {m.isHighlight ? '⭐ Featured' : '⭐ Feature'}
+                                </button>
                               </div>
-                            );
-                          })}
+                              {/* Highlight badge */}
+                              {m.isHighlight && (
+                                <div className="absolute top-1 right-1 z-10">
+                                  <span className="text-xs bg-amber-500 text-white px-1.5 py-0.5 rounded font-bold shadow-md">★</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {stop.media.length > 8 && (
+                        <div className="col-span-1 aspect-square bg-slate-100 rounded-xl flex items-center justify-center text-xs text-slate-500 font-medium hover:bg-slate-200 transition-colors">
+                          +{stop.media.length - 8} more
                         </div>
                       )}
-                      {stop.note && <p className="text-sm text-slate-600 italic">"{stop.note}"</p>}
-                    </>
+                    </div>
                   ) : (
-                    <div className="text-center py-4">
-                      <button 
-                        onClick={() => handleOpenMemoryModal(stop.id, stop.name, stop.hotspotId)}
-                        className="text-sm text-emerald-600 font-medium"
-                      >
-                        + Add memories
-                      </button>
+                    <div className="h-32 md:h-48 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center text-slate-500 text-sm font-medium group-hover/parent:text-emerald-600 transition-colors">
+                      No photos yet
+                    </div>
+                  )}
+                  
+                  {stop.note && (
+                    <div className="pt-2 border-t border-slate-200">
+                      <p className="text-sm text-slate-700 italic bg-slate-50 p-3 rounded-xl border-l-4 border-emerald-400">
+                        "{stop.note}"
+                      </p>
                     </div>
                   )}
                 </div>

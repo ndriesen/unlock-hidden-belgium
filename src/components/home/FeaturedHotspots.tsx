@@ -82,7 +82,7 @@ const displayName = getSafeDisplay(category);
   }
 
   return (
-    <section className="py-8 bg-white">
+    <section className="py-8 bg-white  rounded-lg">
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="flex items-center justify-between mb-6">

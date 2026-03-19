@@ -220,7 +220,7 @@ export default function SidebarLayout({
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div
-        className="fixed inset-0 z-40 bg-slate-900/45 md:hidden"
+        className="z-40 bg-slate-900/45 md:hidden"
         hidden={!mobileMenuOpen}
         onClick={() => setMobileMenuOpen(false)}
       />
@@ -550,7 +550,7 @@ export default function SidebarLayout({
                   <span className="text-[11px] font-medium">{tab.label}</span>
                   {tab.badge && tab.badge > 0 && (
                     <span className="absolute right-2 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[2px] font-semibold text-white">
-                      {tab.badge > 9 ? "9+" : tab.badge}
+                      {tab.badge > 9 ? "9+" : tab.badge > 9 ? "" : tab.badge}
                     </span>
                   )}
                 </button>
