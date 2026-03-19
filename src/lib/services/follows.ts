@@ -54,22 +54,20 @@ export async function toggleFollow(followerId: string, followedId: string): Prom
 
     console.log('Followed successfully:', data);
 
-    // Record activity (ignore if recordActivity not available)
-    // When someone follows another user
+    // Record activity
     try {
-      
- // 1️⃣ Activity for FOLLOWED user
-  await recordActivity({
-    actorId: followerId,
-    activityType: "new_follower",
-    entityType: "user",
-    entityId: followedId,
-    message: "started following you",
-    visibility: "private",              // 🔥 KEY CHANGE
-    notifyUserIds: [followedId],
-  });
+      // Activity for FOLLOWED user
+      await recordActivity({
+        actorId: followerId,
+        activityType: "new_follower",
+        entityType: "user",
+        entityId: followedId,
+        message: "started following you",
+        visibility: "private",
+        notifyUserIds: [followedId],
+      });
 
-      // 2️⃣ Activity for the actor (follower) to show "You started following {username}"
+      // Activity for FOLLOWER
       const { data: followedUser } = await supabase
         .from("users")
         .select("username")
@@ -78,18 +76,16 @@ export async function toggleFollow(followerId: string, followedId: string): Prom
 
       const username = followedUser?.username ?? "Explorer";
 
-      // 2️⃣ Activity for FOLLOWER (actor)
       await recordActivity({
         actorId: followerId,
         activityType: "new_following",
         entityType: "user",
         entityId: followedId,
         message: `You started following ${username}`,
-        visibility: "private",              // 🔥 KEY CHANGE
+        visibility: "private",
         notifyUserIds: [followerId],
         notifyActor: false,
       });
-
      
     } catch (activityError) {
       console.warn("Activity record skipped:", activityError);
@@ -137,3 +133,55 @@ export async function getFollowingCount(userId: string): Promise<number> {
   return count ?? 0;
 }
 
+export interface Follower {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  city: string | null;
+}
+
+export async function getFollowers(userId: string): Promise<Follower[]> {
+  const { data, error } = await supabase
+    .from("user_follows")
+    .select(`
+      follower_id,
+      users!follower_id (id, username, avatar_url, city)
+    `)
+    .eq("followed_id", userId)
+    .eq("status", "accepted");
+
+  if (error) {
+    console.error('getFollowers error:', error);
+    return [];
+  }
+
+  return (data || []).map((row: any) => ({
+    id: row.follower_id,
+    name: row.users?.username || row.users?.email?.split('@')[0] || 'Explorer',
+    avatarUrl: row.users?.avatar_url || null,
+    city: row.users?.city || null,
+  }));
+}
+
+export async function getFollowing(userId: string): Promise<Follower[]> {
+  const { data, error } = await supabase
+    .from("user_follows")
+    .select(`
+      followed_id,
+      users!followed_id (id, username, avatar_url, city)
+    `)
+    .eq("follower_id", userId)
+    .eq("status", "accepted");
+
+  if (error) {
+    console.error('getFollowing error:', error);
+    return [];
+  }
+
+  return (data || []).map((row: any) => ({
+    id: row.followed_id,
+    name: row.users?.username || row.users?.email?.split('@')[0] || 'Explorer',
+    avatarUrl: row.users?.avatar_url || null,
+    city: row.users?.city || null,
+  }));
+}

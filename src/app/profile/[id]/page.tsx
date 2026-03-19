@@ -2,14 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import { getPublicProfileData, type PublicProfileData } from '@/lib/services/publicProfiles';
-import { ProfileTabs } from '@/components/profile/ProfileTabs';
 import { OverviewSection } from '@/components/profile/OverviewSection';
-import { HotspotGrid } from '@/components/profile/HotspotGrid';
-import { PhotosGallery } from '@/components/profile/PhotosGallery';
-import { BadgesGrid } from '@/components/profile/BadgesGrid';
-import { BuddiesList } from '@/components/profile/BuddiesList';
-import { ActivityFeed } from '@/components/profile/ActivityFeed';
-import { TripsList } from '@/components/profile/TripsList';
 
 export default function PublicProfilePage({ 
   params 
@@ -18,7 +11,6 @@ export default function PublicProfilePage({
 }) {
   const id = use(params).id;
   const [data, setData] = useState<PublicProfileData | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -63,52 +55,11 @@ export default function PublicProfilePage({
     );
   }
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'overview':
-        return <OverviewSection data={data} />;
-      case 'trips':
-        return <TripsList trips={data.trips} />;
-      case 'hotspots':
-        return (
-          <div className="space-y-8">
-            <HotspotGrid 
-              hotspots={data.recentHotspots} 
-              title="Recent Visits" 
-              limit={6} 
-            />
-            <HotspotGrid 
-              hotspots={data.visitedHotspots} 
-              title="All Visited" 
-            />
-          </div>
-        );
-      case 'photos':
-        return <PhotosGallery photos={data.photos} />;
-      case 'badges':
-        return <BadgesGrid badges={data.badges} />;
-      case 'buddies':
-        return <BuddiesList buddies={data.buddies} />;
-      case 'activity':
-        return (
-          <ActivityFeed 
-            activities={data.activities}/>
-        );
-      default:
-        return <OverviewSection data={data} />;
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
-      <ProfileTabs 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab}
-      />
-
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
-          {renderTabContent()}
+          <OverviewSection data={data} />
         </div>
       </main>
     </div>
