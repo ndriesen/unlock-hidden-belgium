@@ -213,7 +213,6 @@ export default function SidebarLayout({
     { href: "/", label: "Home", icon: Home },
     { href: "/hotspots", label: "Explore", icon: Compass },
     { href: "/trips", label: "Trips", icon: Route },
-    { href: "/activity", label: "Activity", icon: Bell, badge: unreadCount },
     { href: "/profile", label: "Profile", icon: User },
   ];
 
@@ -306,7 +305,7 @@ export default function SidebarLayout({
                 </button>
 
                 {unifiedDropdownOpen && (
-                  <div className="absolute -right-4 mt-3 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+                  <div className="absolute -right-4 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
                     {/* Tab Headers */}
                     <div className="flex border-b border-slate-200">
                       <button
@@ -533,7 +532,7 @@ export default function SidebarLayout({
         <LegalFooter />
 
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur">
-          <div className="grid grid-cols-5">
+          <div className="grid grid-cols-4">
             {mobileTabs.map((tab) => {
               const active = isActive(pathname, tab.href);
               const Icon = tab.icon;
@@ -548,11 +547,6 @@ export default function SidebarLayout({
                 >
                   <Icon className="w-4 h-4" />
                   <span className="text-[11px] font-medium">{tab.label}</span>
-                  {tab.badge && tab.badge > 0 && (
-                    <span className="absolute right-2 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[2px] font-semibold text-white">
-                      {tab.badge > 9 ? "9+" : tab.badge > 9 ? "" : tab.badge}
-                    </span>
-                  )}
                 </button>
               );
             })}

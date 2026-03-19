@@ -31,7 +31,7 @@ import { markVisited, toggleWishlist, toggleFavorite } from "@/lib/services/gami
 import { Hotspot } from "@/types/hotspot";
 import HotspotPanel from "@/components/HotspotPanel";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
-import { GlassButton } from "@/components/ui/glass-button";
+import { AnimatedGlassButton } from "@/components/ui/glass-button-hover";
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import HotspotCard from "@/components/ui/HotspotCard";
@@ -470,39 +470,34 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
           Browse all hotspots, check visits and reviews at a glance, and discover popular trips shared by users.
         </p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap justify-center items-center gap-2">
           <Link
             href="/pricing"
             className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
           >
             Upgrade to Spotly Plus
           </Link>
-          <Link
-            href="/activity"
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800"
-          >
-            Open Activity
-          </Link>
-        </div>
-      </section>
-
-      <section className="rounded-2xl p-3 shadow-sm border border-slate-300 bg-slate-100/30 dark:bg-slate-900/30 backdrop-blur-md">
         <div className="flex justify-center gap-4">
-          <GlassButton
+   
+          <AnimatedGlassButton
             size="sm"
-            contentClassName="text-slate-800"
+            icon="╋"
+            label="Add Hotspot"
+            contentClassName="text-blue-500 font-bold"
             onClick={() => setIsAddModalOpen(true)}
           >
             + Add Hotspot
-          </GlassButton>
+          </AnimatedGlassButton>
 
-          <GlassButton
+          <AnimatedGlassButton
             size="sm"
-            contentClassName="text-slate-800"
+            icon="🔎︎"
+            label="Show Filters"
+            contentClassName="text-blue-500 font-bold"
             onClick={() => setShowFilters(prev => !prev)}
           >
             {showFilters ? "Hide Filters" : "Show Filters"}
-          </GlassButton>
+          </AnimatedGlassButton>
         </div>
 
         {/* Animated filter panel */}
@@ -556,6 +551,11 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
             </select>
           </div>
         </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl p-3 shadow-sm border border-slate-300 bg-slate-100/30 dark:bg-slate-900/30 backdrop-blur-md">
+
       </section>
       
       {/* Interactive Map Section */}

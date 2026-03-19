@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useSearch } from "@/context/SearchContext";
-import { GlassButton } from "@/components/ui/glass-button";
+import { AnimatedGlassButton } from "@/components/ui/glass-button-hover";
 import { fetchMyHotspots, MyHotspotEntry } from "@/lib/services/myHotspots";
 import { toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
@@ -246,29 +246,37 @@ const mapHotspots = useMemo<Hotspot[]>(
       <section className="rounded-2xl p-3 shadow-sm border border-slate-300 bg-slate-100/30 dark:bg-slate-500/100 backdrop-blur-md">
 
         <div className="flex justify-center gap-4">
-          <GlassButton
+          <AnimatedGlassButton
             size="sm"
-            contentClassName="text-slate-800"
+            icon="╋"
+            label="Add Hotspot"
+            contentClassName="text-slate-800 font-bold"
             onClick={() => setIsAddModalOpen(true)}
           >
             + Add Hotspot
-          </GlassButton>
+          </AnimatedGlassButton>
 
-          <GlassButton
+          <AnimatedGlassButton
             size="sm"
-            contentClassName="text-slate-800"
+            icon="🔎︎"
+            label="Show Filters"
+            contentClassName="text-slate-800 font-bold"
             onClick={() => setShowFilters(prev => !prev)}
           >
             {showFilters ? "Hide Filters" : "Show Filters"}
-          </GlassButton>
-
-          <GlassButton
+          </AnimatedGlassButton>
+          
+          <AnimatedGlassButton
             size="sm"
-            contentClassName="text-slate-800"
-            onClick={() => setShowMap((prev) => !prev)}
+            icon="🗺️"
+            label="Show Map"
+            contentClassName="text-slate-800 font-bold"
+            onClick={() => setShowFilters(prev => !prev)}
           >
-            {showMap ? "Hide map" : "Show map"}
-          </GlassButton>
+            {showFilters ? "Hide Map" : "Show Map"}
+          </AnimatedGlassButton>
+
+  
         </div>
         <div
           className={`overflow-hidden transition-all duration-300 ${
