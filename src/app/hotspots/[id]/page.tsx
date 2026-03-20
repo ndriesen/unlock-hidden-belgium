@@ -15,6 +15,7 @@ import { toggleWishlist, markVisited } from "@/lib/services/gamification";
 import { toggleHotspotLike, toggleHotspotSave, recordHotspotView } from "@/lib/services/hotspotSocial";
 import { MediaVisibility } from "@/lib/services/media";
 import { Hotspot, getSafeDisplay } from "@/types/hotspot";
+import FloatingActionMenu from "@/components/ui/FloatingActionMenu"
 
 const MapView = dynamic(() => import("@/components/Map/MapView"), {
   ssr: false,
@@ -44,6 +45,8 @@ interface HotspotRow {
   latitude: number | string | null;
   longitude: number | string | null;
 }
+
+
 
 /**
  * Safely parse images field from Supabase.
@@ -91,6 +94,7 @@ export default function HotspotDetailPage() {
   const [savedByMe, setSavedByMe] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
+  const [showFullDesc, setShowFullDesc] = useState(false);
 
   // Organized media for Polarsteps-like display
   const [personalPhotos, setPersonalPhotos] = useState<{id: string; signedUrl: string; caption: string; visibility: string; createdAt: string; uploadedBy: string}[]>([]);
@@ -103,7 +107,11 @@ export default function HotspotDetailPage() {
   const [uploadMessage, setUploadMessage] = useState("");
   const [actionMessage, setActionMessage] = useState(""); // For like/save feedback
 
-
+  const handleOpenMap = useCallback(() => {
+      if (!hotspot) return;
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${hotspot.latitude},${hotspot.longitude}`;
+      window.open(url, "_blank");
+    }, [hotspot]);
 
   useEffect(() => {
     if (!hotspotId) return;
@@ -273,8 +281,6 @@ export default function HotspotDetailPage() {
     }
   }, [user, hotspot]);
 
-
-
   const handleToggleLike = useCallback(async () => {
     if (!user || !hotspot) {
       setActionMessage("Login required.");
@@ -434,7 +440,6 @@ export default function HotspotDetailPage() {
             showArrows={true}
             onLike={handleToggleLike}
             isLiked={likedByMe}
-
           />
 
           {/* Text overlay on top of carousel */}
@@ -444,8 +449,109 @@ export default function HotspotDetailPage() {
               {getSafeDisplay(hotspot.category)} - {hotspot.province}
             </p>
           </div>
+                  <div className="absolute top-25 left-5 mt-3 flex justify-end z-[94]">
+          <FloatingActionMenu
+            actions={[
+              {
+                icon: likedByMe ? "❤️" : "🤍",
+                label: likedByMe ? "Liked" : "Like",
+                onClick: handleToggleLike,
+                className: likedByMe
+                  ? "bg-transparent text-slate-800"
+                  : "bg-transparent text-slate-800",
+              },
+              {
+                icon: savedByMe ? "⛊" : "⛉",
+                label: savedByMe ? "Saved" : "Save",
+                onClick: handleToggleSave,
+                className: savedByMe
+                  ? "bg-transparent text-slate-800"
+                  : "bg-transparent text-slate-800",
+              },
+              {
+                icon: wishlistedByMe ? "🍀" : "☘︎",
+                label: wishlistedByMe ? "Wishlisted" : "Wishlist",
+                onClick: handleToggleWishlist,
+                className: wishlistedByMe
+                  ? "bg-transparent text-slate-800"
+                  : "bg-transparent text-slate-800",
+              },
+              {
+                icon:"🌍",
+                label: "Map",
+                onClick: () => handleOpenMap,
+                className: "bg-transparent text-slate-800",
+              },
+            ]}
+          />
+        </div>
         </div>
 
+        <div className="absolute bottom-5 right-5 flex justify-end z-[94]">
+          <FloatingActionMenu
+            actions={[
+              {
+                icon: likedByMe ? "❤️" : "🤍",
+                label: likedByMe ? "Liked" : "Like",
+                onClick: handleToggleLike,
+                className: likedByMe
+                  ? "bg-transparent text-slate-800"
+                  : "bg-transparent text-slate-800",
+              },
+              {
+                icon: savedByMe ? "⛊" : "⛉",
+                label: savedByMe ? "Saved" : "Save",
+                onClick: handleToggleSave,
+                className: savedByMe
+                  ? "bg-transparent text-slate-800"
+                  : "bg-transparent text-slate-800",
+              },
+              {
+                icon: wishlistedByMe ? "🍀" : "☘︎",
+                label: wishlistedByMe ? "Wishlisted" : "Wishlist",
+                onClick: handleToggleWishlist,
+                className: wishlistedByMe
+                  ? "bg-transparent text-slate-800"
+                  : "bg-transparent text-slate-800",
+              },
+              {
+                icon:"🌍",
+                label: "Map",
+                onClick: () => handleOpenMap,
+                className: "bg-transparent text-slate-800",
+              },
+            ]}
+          />
+        </div>
+
+        <section className="bg-white rounded-2xl p-6 border border-slate-100">
+
+        
+        {/* Stats */}
+        <div className="flex justify-center items-center gap-6 text-sm text-slate-500 mb-6">
+          <span>📍 {hotspot.province}</span>
+          <span className="w-px h-5 bg-slate-300" />
+          <span>❤️ {hotspot.likes_count ?? 0}</span>
+          <span className="w-px h-5 bg-slate-300" />
+          <span>👁 {hotspot.views_count ?? 0}</span>
+        </div>
+
+        {/* Description */}
+        <div className="mb-6 leading-relaxed">
+          <p className={`prose prose-slate max-w-prose line-clamp-3 md:line-clamp-none ${showFullDesc ? 'max-h-none' : ''}`}>
+            {hotspot.description}
+          </p>
+          {hotspot.description && hotspot.description.length > 200 && (
+            <button
+              onClick={() => setShowFullDesc(!showFullDesc)}
+              className="mt-4 text-emerald-600 font-semibold hover:text-emerald-700 transition-colors text-sm flex items-center gap-1"
+            >
+              {showFullDesc ? 'Read less' : 'Read more'} 
+              <span className={`w-4 h-4 transition-transform ${showFullDesc ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+          )}
+        </div>
+      </section>
         <div className="p-4 space-y-3">
           <p className="text-sm text-slate-700">{hotspot.description}</p>
 
