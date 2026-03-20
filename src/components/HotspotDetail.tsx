@@ -109,6 +109,8 @@ export default function HotspotDetail({
           showCounter={true}
           showArrows={true}
           className="rounded-t-xl"
+          onLike={() => onFavorite?.(hotspot.id)}
+          isLiked={isFavorite}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
 

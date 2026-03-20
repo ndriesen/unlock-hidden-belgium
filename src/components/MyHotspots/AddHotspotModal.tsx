@@ -8,6 +8,7 @@ import { addHotspot } from "@/lib/services/addHotspot";
 import { awardXP } from "@/lib/services/gamification";
 import { useAuth } from "@/context/AuthContext";
 import OptimizedImage from "@/components/ui/OptimizedImage";
+import MapPickerModal from './MapPickerModal'; 
 
 interface AddHotspotModalProps {
   isOpen: boolean;
@@ -19,10 +20,17 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
   const { user } = useAuth();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
-  const [province, setProvince] = useState("");
+  const [address, setAddress] = useState(""); 
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [selectedLat, setSelectedLat] = useState<number | undefined>();
+  const [selectedLng, setSelectedLng] = useState<number | undefined>(); 
   const [description, setDescription] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [latitude, setLatitude] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [caption, setCaption] = useState("");
+  const [photoVisibility, setPhotoVisibility] = useState<'private' | 'shared'>('shared');
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [latitude, setLatitude] = useState(""); 
   const [longitude, setLongitude] = useState("");
   const [visibility, setVisibility] = useState<"private" | "shared">("shared");
   const [loading, setLoading] = useState(false);
@@ -95,11 +103,14 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
     if (!isOpen) {
       setName("");
       setCategory("");
-      setProvince("");
+      setAddress("");
+      setShowMapPicker(false);
+      setSelectedLat(undefined);
+      setSelectedLng(undefined);
       setDescription("");
-      setImageUrl("");
-      setLatitude("");
-      setLongitude("");
+      setFiles([]);
+      setCaption("");
+      setPhotoVisibility('shared');
       setVisibility("private");
       setError("");
       setSuccessMessage("");
@@ -123,18 +134,15 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
     setSuccessMessage("");
 
     try {
-      const parsedLat = latitude ? parseFloat(latitude) : undefined;
-      const parsedLng = longitude ? parseFloat(longitude) : undefined;
-
       const result = await addHotspot({
         userId: user.id,
         name: name.trim(),
         category: category.trim(),
-        province: province.trim() || undefined,
+        province: address.trim() || undefined,
         description: description.trim() || undefined,
-        imageUrl: imageUrl.trim() || undefined,
-        latitude: parsedLat,
-        longitude: parsedLng,
+        // imageUrl: imageUrl.trim() || undefined, // Removed stale
+        latitude: selectedLat,
+        longitude: selectedLng,
         visibility,
       });
 
@@ -143,7 +151,7 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
       // Show appropriate feedback
       if (result.approved) {
         setSuccessMessage("✅ Your hotspot was added and is live!");
-        setTimeout(() => {
+      setTimeout(() => {
           onAdded({
             id: result.id,
             name: result.name,
@@ -169,7 +177,7 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
           longitude: result.longitude,
           description: result.description,
           images: result.images,
-        });
+        }); 
         setTimeout(() => {
           onClose();
         }, 2000);
@@ -188,7 +196,9 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      
     >
+      
       <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col">
        <div className="overflow-y-auto p-6 space-y-4 flex-1" style={{WebkitOverflowScrolling: "touch"}}>
         <div className="flex items-center justify-between sticky top-0 bg-white z-10">
@@ -227,7 +237,7 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
               className="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
             />
           </div>
-
+</div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Category *</label>
             <div ref={comboRef} className="relative">
@@ -263,14 +273,26 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Province / Location</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Address / Location</label>
             <input
-              value={province}
-              onChange={(e) => setProvince(e.target.value)}
-              placeholder="Brussels, Antwerp"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="e.g. Grand Place, Brussels or update via map"
               className="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
             />
-          </div>
+            {selectedLat && selectedLng && (
+              <p className="mt-2 text-xs text-emerald-600 bg-emerald-50 p-2 rounded-lg">
+                📍 {selectedLat.toFixed(4)}, {selectedLng.toFixed(4)} selected
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowMapPicker(true)}
+              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 mt-1"
+            >
+              🗺️ Set location on map
+            </button>
+          </div> 
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
@@ -284,53 +306,47 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Image URL</label>
-            <input
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            />
-            {imageUrl && (
-              <div className="mt-2 relative w-full h-32 rounded-lg overflow-hidden bg-slate-100">
-                <OptimizedImage
-                  src={imageUrl}
-                  alt="Preview"
-                  fill
-                  className="object-cover"
-                  fallbackUrl="/images/placeholder-image.png"
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Latitude</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-3">📸 Photos <span className="text-emerald-600">(Optional)</span></label>
+            <div className="space-y-2">
               <input
-                type="number"
-                step="any"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="50.85"
-                className="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                ref={fileInputRef}
+                multiple
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setFiles(Array.from(e.target.files));
+                  }
+                }}
+                className="w-full file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 border border-slate-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Longitude</label>
-              <input
-                type="number"
-                step="any"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="4.35"
-                className="w-full border border-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
+              {files.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                  {files.map((file, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={file.name}
+                        className="w-full h-20 object-cover rounded-lg shadow-md"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFiles(files.filter((_, i) => i !== index))}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {files.length > 0 && (
+                <p className="text-xs text-slate-500 mt-1">{files.length} photo{files.length !== 1 ? 's' : ''} selected</p>
+              )}
             </div>
           </div>
-          <p className="text-xs text-slate-500">Optional: Leave empty for automatic geocoding via OpenStreetMap</p>
 
-          <div>
+          <div> 
             <label className="block text-sm font-medium text-slate-700 mb-1">Visibility</label>
             <div className="flex gap-3">
               <button
@@ -374,7 +390,16 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
           </button>
         </div>
       </div>
+      <MapPickerModal 
+        isOpen={showMapPicker} 
+        onClose={() => setShowMapPicker(false)} 
+        onConfirm={(lat, lng, addr) => {
+          setAddress(addr);
+          setSelectedLat(lat);
+          setSelectedLng(lng);
+          setShowMapPicker(false);
+        }} 
+      />
     </div>
-   </div>
   );
 }
