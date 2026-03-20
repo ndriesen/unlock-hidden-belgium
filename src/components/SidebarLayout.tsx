@@ -219,8 +219,9 @@ export default function SidebarLayout({
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div
-        className="z-40 bg-slate-900/45 md:hidden"
-        hidden={!mobileMenuOpen}
+        className={`fixed inset-0 z-40 bg-slate-900/45 md:hidden transition-opacity duration-300 ${
+          mobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
+        }`}
         onClick={() => setMobileMenuOpen(false)}
       />
 

@@ -307,7 +307,7 @@ export default function GalleryCarousel({
 
         {/* Image Counter */}
         {showCounter && images.length > 1 && (
-          <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-black/60 text-white text-sm font-medium backdrop-blur-sm">
+          <div className="absolute top-2 left-2 px-3 py-1.5 rounded-full bg-black/60 text-white text-sm font-medium backdrop-blur-sm">
             {currentIndex + 1} / {images.length}
           </div>
         )}

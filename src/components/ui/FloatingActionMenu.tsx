@@ -31,7 +31,7 @@ export default function FloatingActionMenu({ actions }: FloatingActionMenuProps)
         exit={{ opacity: 0, x: 10 }}
         transition={{ duration: 0.2 }}
         className="
-          flex items-center gap-1.5 mr-[-12px] px-1 py-0.5
+          flex items-center gap-0 mr-[-12px] px-1 py-0.5
           bg-white/50 backdrop-blur-xl
           border border-white/30
           rounded-l-full

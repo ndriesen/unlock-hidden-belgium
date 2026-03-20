@@ -555,9 +555,6 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
         </div>
       </section>
 
-      <section className="rounded-2xl p-3 shadow-sm border border-slate-300 bg-slate-100/30 dark:bg-slate-900/30 backdrop-blur-md">
-
-      </section>
       
       {/* Interactive Map Section */}
       <section className="rounded-2xl overflow-hidden shadow-xl border border-slate-200">

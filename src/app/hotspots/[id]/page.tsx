@@ -462,7 +462,7 @@ export default function HotspotDetailPage() {
               {getSafeDisplay(hotspot.category)} - {hotspot.province}
             </p>
           </div>
-          <div className="absolute bottom-4 right-4 mt-3 flex justify-end z-[94]">
+          <div className="absolute bottom-2 right-2 mt-3 flex justify-end z-[94]">
           <FloatingActionMenu
             actions={[
               {
@@ -504,7 +504,7 @@ export default function HotspotDetailPage() {
 
         
         {/* Stats */}
-        <div className="flex justify-center items-center gap-6 text-sm text-slate-500 mb-6">
+        <div className="flex justify-center items-center gap-4 text-sm text-slate-500 mb-6">
           <span>📍 {hotspot.province}</span>
           <span className="w-px h-5 bg-slate-300" />
           <span> ✔ {hotspot.visit_count ?? 0}</span>

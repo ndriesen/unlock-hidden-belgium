@@ -15,9 +15,16 @@ const glassButtonVariants = cva(
         lg: "text-lg font-medium",
         icon: "h-10 w-10",
       },
+      color: {
+        default: "text-slate-800 bg-white/20 border-white/30",
+        primary: "text-white bg-emerald-500 border-emerald-400",
+        secondary: "text-slate-900 bg-slate-400 border-slate-300",
+        danger: "text-white bg-red-500 border-red-400",
+      },
     },
     defaultVariants: {
       size: "default",
+      color: "default",
     },
   }
 );
@@ -43,14 +50,15 @@ export interface GlassButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof glassButtonVariants> {
   contentClassName?: string;
+  color?: "default" | "primary" | "secondary" | "danger"; // optioneel
 }
 
 const GlassButton = React.forwardRef<HTMLButtonElement, GlassButtonProps>(
-  ({ className, children, size, contentClassName, ...props }, ref) => {
+  ({ className, children, size, color, contentClassName, ...props }, ref) => {
     return (
       <div
         className={cn(
-          "glass-button-wrap relative inline-block rounded-full",
+          "glass-button-wrap relative inline-block rounded-full z-50",
           className
         )}
       >
@@ -58,8 +66,8 @@ const GlassButton = React.forwardRef<HTMLButtonElement, GlassButtonProps>(
           ref={ref}
           {...props}
           className={cn(
-            "glass-button relative rounded-full bg-white/20 backdrop-blur-xl border border-white/30 shadow-lg shadow-white/20 hover:shadow-2xl hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/40 transition-all",
-            glassButtonVariants({ size })
+            "glass-button relative rounded-full backdrop-blur-xl shadow-lg shadow-white/20 hover:shadow-2xl focus:outline-none focus:ring-2 transition-all",
+            glassButtonVariants({ size, color })
           )}
         >
           {/* Extra shimmer layer */}
