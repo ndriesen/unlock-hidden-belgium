@@ -3,7 +3,8 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react"
+import {FunnelPlus, MapPinPlus, Map} from "lucide-react"
 import { useAuth } from "@/context/AuthContext";
 import { useSearch } from "@/context/SearchContext";
 import { AnimatedGlassButton } from "@/components/ui/glass-button-hover";
@@ -13,6 +14,7 @@ import { Hotspot } from "@/types/hotspot";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
 import HotspotPanel from "@/components/HotspotPanel";
 import HotspotSheet from "@/components/HotspotSheet";
+
 const MapContainer = dynamic(
   () => import("@/components/Map/MapContainer").then((mod) => mod.default),
   { ssr: false }
@@ -248,7 +250,7 @@ const mapHotspots = useMemo<Hotspot[]>(
         <div className="flex justify-center gap-4">
           <AnimatedGlassButton
             size="sm"
-            icon="╋"
+            icon= { <MapPinPlus/> }
             label="Add Hotspot"
             contentClassName="text-slate-800 font-bold"
             onClick={() => setIsAddModalOpen(true)}
@@ -258,7 +260,7 @@ const mapHotspots = useMemo<Hotspot[]>(
 
           <AnimatedGlassButton
             size="sm"
-            icon="🔎︎"
+            icon = { <FunnelPlus/>  }
             label="Show Filters"
             contentClassName="text-slate-800 font-bold"
             onClick={() => setShowFilters(prev => !prev)}
@@ -268,12 +270,12 @@ const mapHotspots = useMemo<Hotspot[]>(
           
           <AnimatedGlassButton
             size="sm"
-            icon="🗺️"
+            icon={ <Map/>}
             label="Show Map"
             contentClassName="text-slate-800 font-bold"
-            onClick={() => setShowFilters(prev => !prev)}
+            onClick={() => setShowMap(prev => !prev)}
           >
-            {showFilters ? "Hide Map" : "Show Map"}
+            {showMap ? "Hide Map" : "Show Map"}
           </AnimatedGlassButton>
 
   

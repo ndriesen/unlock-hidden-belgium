@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {FunnelPlus, MapPinPlus, Map} from "lucide-react"
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
@@ -481,9 +482,9 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
    
           <AnimatedGlassButton
             size="sm"
-            icon="╋"
+            icon= {<MapPinPlus className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-12 transition-all duration-500"/>}
             label="Add Hotspot"
-            contentClassName="text-blue-500 font-bold"
+            contentClassName="text-slate-600 font-bold"
             onClick={() => setIsAddModalOpen(true)}
           >
             + Add Hotspot
@@ -491,9 +492,9 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
 
           <AnimatedGlassButton
             size="sm"
-            icon="🔎︎"
+            icon={<FunnelPlus className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-12 transition-all duration-500"/>}
             label="Show Filters"
-            contentClassName="text-blue-500 font-bold"
+            contentClassName="text-slate-600 font-bold"
             onClick={() => setShowFilters(prev => !prev)}
           >
             {showFilters ? "Hide Filters" : "Show Filters"}

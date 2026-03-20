@@ -432,6 +432,9 @@ export default function HotspotDetailPage() {
             aspectRatio="16/9"
             showCounter={true}
             showArrows={true}
+            onLike={handleToggleLike}
+            isLiked={likedByMe}
+
           />
 
           {/* Text overlay on top of carousel */}
@@ -478,18 +481,7 @@ export default function HotspotDetailPage() {
             </div>
           )}
 
-        {/* Like button anchored top-right of hero carousel */}
-        <div className="absolute top-25 right-15 z-40 pt-2 pr-2">
-          <button
-            onClick={handleToggleLike}
-            className="bg-white/98 backdrop-blur-xl rounded-3xl p-3 shadow-2xl hover:scale-[1.15] active:scale-[0.95] transition-all duration-250 border border-white/60 hover:border-red-200 hover:shadow-red-500/30"
-            style={{ width: '64px', height: '64px' }}
-          >
-            <span className={`w-full h-full flex items-center justify-center text-xl font-bold rounded-3xl transition-all duration-250 ${likedByMe ? "text-red-500 drop-shadow-2xl shadow-red-500/40 bg-red-50/30" : "text-slate-400"}`}>
-              ♥
-            </span>
-          </button>
-        </div>
+
 
           <div className="grid grid-cols-2 gap-2">
             <button

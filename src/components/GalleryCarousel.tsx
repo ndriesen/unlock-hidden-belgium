@@ -3,7 +3,28 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 
-interface GalleryCarouselProps {
+
+export interface Hotspot {
+  id: string
+  name: string
+  description?: string
+  category: string
+  province: string
+  latitude?: number
+  longitude?: number
+  imageUrl?: string
+  visitCount?: number
+  likesCount?: number
+  savesCount?: number
+  viewsCount?: number
+  visited?: boolean
+  wishlist?: boolean
+  favorite?: boolean
+  likedByMe?: boolean
+  savedByMe?: boolean
+}
+
+export interface GalleryCarouselProps {
   images: string[];
   alt: string;
   aspectRatio?: "4/3" | "16/9" | "3/2" | "1/1";
@@ -11,6 +32,8 @@ interface GalleryCarouselProps {
   showArrows?: boolean;
   onImageClick?: (index: number) => void;
   className?: string;
+  onLike: () => void
+  isLiked?: boolean  
 }
 
 export default function GalleryCarousel({
@@ -21,6 +44,8 @@ export default function GalleryCarousel({
   showArrows = true,
   onImageClick,
   className = "",
+  isLiked,
+  onLike,
 }: GalleryCarouselProps) {
   // Ensure images is always an array, handle null/undefined
   const images = Array.isArray(imagesProp) ? imagesProp : [];
@@ -72,14 +97,50 @@ export default function GalleryCarousel({
   };
 
   const handleScroll = () => {
+      requestAnimationFrame(() => {
+        const container = scrollRef.current;
+        if (!container) return;
+
+        const { scrollLeft, clientWidth } = container;
+        const newIndex = Math.min(
+          images.length - 1,
+          Math.max(0, Math.round(scrollLeft / clientWidth))
+        );
+        setCurrentIndex(newIndex);
+        checkScrollCapabilities();
+      });
+    };
+
+    const handleScrollEnd = () => {
     const container = scrollRef.current;
     if (!container) return;
 
-    const { scrollLeft, clientWidth, scrollWidth } = container;
-    const newIndex = Math.round(scrollLeft / clientWidth);
-    setCurrentIndex(newIndex);
-    checkScrollCapabilities();
+    const { scrollLeft, clientWidth } = container;
+    const index = Math.round(scrollLeft / clientWidth);
+
+    container.scrollTo({
+      left: index * clientWidth,
+      behavior: "smooth",
+    });
   };
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    let timeout: NodeJS.Timeout;
+
+    const onScroll = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(handleScrollEnd, 100); // triggers after swipe stops
+    };
+
+    container.addEventListener("scroll", onScroll);
+
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+    };
+  }, []);
 
   const handleImageClick = (index: number) => {
     if (onImageClick) {
@@ -94,6 +155,19 @@ export default function GalleryCarousel({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && lightboxImage) {
         setLightboxImage(null);
+      }
+      if (e.key === "ArrowRight") {
+        if (!lightboxImage) return;
+          const currentIdx = images.indexOf(lightboxImage);
+        setLightboxImage(images[(currentIdx + 1) % images.length]);
+      }
+
+      if (e.key === "ArrowLeft") {
+        if (!lightboxImage) return;
+          const currentIdx = images.indexOf(lightboxImage);
+        setLightboxImage(
+          images[(currentIdx - 1 + images.length) % images.length]
+        );
       }
     };
 
@@ -126,38 +200,61 @@ export default function GalleryCarousel({
           ref={scrollRef}
           onScroll={handleScroll}
           className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          style={{
+            WebkitOverflowScrolling: "touch", // iOS momentum
+            scrollBehavior: "smooth",
+          }}
         >
           {images.map((image, index) => (
             <div
               key={`${image}_${index}`}
-              className={`relative w-full flex-shrink-0 snap-center ${aspectRatioClasses[aspectRatio]}`}
+              className={`relative w-full flex-shrink-0 snap-center transition-transform duration-300 ${
+                index === currentIndex ? "scale-100" : "scale-95"
+              } ${aspectRatioClasses[aspectRatio]}`}
             >
+                      {/* Favorite corner button */}
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onLike()
+              }}
+              className={`absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm ${
+                isLiked? "text-rose-600" : "text-slate-600"
+              }`}
+              aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
+            >
+              <span aria-hidden="true" className="text-[16px] leading-none">{isLiked ? "♥" : "♡"}</span>
+            </button>
+
               <button
                 onClick={() => handleImageClick(index)}
-                className="absolute inset-0 w-full h-full cursor-zoom-in"
+                onDoubleClick={() => onLike()}
+                className="absolute inset-0 w-full h-full cursor-zoom-in z-50"
                 aria-label={`View image ${index + 1}`}
               >
                 <Image
                   src={image}
                   alt={`${alt} - Image ${index + 1}`}
                   fill
+
                   sizes="100vw"
                   className="object-cover"
-                  priority={index === 0}
+                  priority={index === currentIndex || index === currentIndex + 1}
+                  
                 />
               </button>
             </div>
           ))}
         </div>
-
+        
         {/* Navigation Arrows */}
         {showArrows && images.length > 1 && (
           <>
             <button
               onClick={() => scrollTo("left")}
               disabled={!canScrollLeft}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg text-slate-800 transition-all duration-200 hover:bg-white ${
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-[50] w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg text-slate-800 transition-all duration-200 hover:bg-white z-50${
                 canScrollLeft
                   ? "opacity-80 hover:opacity-100"
                   : "opacity-0 pointer-events-none"
@@ -183,7 +280,7 @@ export default function GalleryCarousel({
             <button
               onClick={() => scrollTo("right")}
               disabled={!canScrollRight}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg text-slate-800 transition-all duration-200 hover:bg-white ${
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-[50] w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg text-slate-800 transition-all duration-200 hover:bg-white z-50${
                 canScrollRight
                   ? "opacity-80 hover:opacity-100"
                   : "opacity-0 pointer-events-none"
@@ -235,6 +332,7 @@ export default function GalleryCarousel({
                     ? "bg-white w-4"
                     : "bg-white/50 hover:bg-white/75"
                 }`}
+
                 aria-label={`Go to image ${index + 1}`}
               />
             ))}
@@ -280,7 +378,7 @@ export default function GalleryCarousel({
                   const prevIdx = currentIdx > 0 ? currentIdx - 1 : images.length - 1;
                   setLightboxImage(images[prevIdx]);
                 }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-[100] w-12 h-12 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
                 aria-label="Previous image"
               >
                 <svg
@@ -306,7 +404,7 @@ export default function GalleryCarousel({
                   const nextIdx = currentIdx < images.length - 1 ? currentIdx + 1 : 0;
                   setLightboxImage(images[nextIdx]);
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-[100] w-12 h-12 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
                 aria-label="Next image"
               >
                 <svg
