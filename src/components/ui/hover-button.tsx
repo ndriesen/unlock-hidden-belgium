@@ -3,8 +3,9 @@
 import * as React from "react"
 import { motion } from "framer-motion"
 
+
 interface AnimatedButtonProps {
-  icon: string
+  icon: React.ReactNode
   label?: string
   onClick?: (e?: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void
   className?: string
@@ -24,7 +25,7 @@ export default function AnimatedButton({icon = "★", label = "Action", onClick,
         onHoverStart={() => setIsHovered(true)}
         onHoverEnd={() => setIsHovered(false)}
         transition={{ duration: 0.3 }}
-        className="bg-slate-300 flex items-center justify-center overflow-hidden relative"
+        className=" flex items-center justify-center overflow-hidden relative"
         style={{ borderRadius: 32 }}
       >
         <motion.div

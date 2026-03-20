@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import AnimatedButton from "@/components/ui/hover-button"
 
 interface Action {
-  icon:string
+  icon: React.ReactNode
   label: string
   onClick: () => void
   className?: string
@@ -21,55 +21,73 @@ export default function FloatingActionMenu({ actions }: FloatingActionMenuProps)
   const toggle = () => setOpen((prev) => !prev)
 
   return (
-    <div
-      className="relative flex items-center"
-
-    >
-      {/* ACTIONS */}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 10 }}
-            transition={{ duration: 0.2 }}
-            className="flex gap-2 mr-2"
-          >
-            {actions.map((action, index) => (
-              <motion.div
-                key={index}
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <AnimatedButton
-                  icon={action.icon}
-                  label={action.label}
-                  onClick={(e) => {
-                    e?.stopPropagation()
-                    action.onClick()
-                    setOpen(false) // close after click
-                  }}
-                  className={action.className}
-                />
-              </motion.div>
-            ))}
-            
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* MAIN BUTTON */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          toggle()
-        }}
-        className="h-10 w-10 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg hover:scale-105 transition"
+    <div className="relative flex items-center">
+  {/* ACTIONS */}
+  <AnimatePresence>
+    {open && (
+      <motion.div
+        initial={{ opacity: 0, x: 10 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 10 }}
+        transition={{ duration: 0.2 }}
+        className="
+          flex items-center gap-1.5 mr-[-12px] px-1 py-0.5
+          bg-white/50 backdrop-blur-xl
+          border border-white/30
+          rounded-l-full
+          shadow-lg
+        "
       >
-        +
-      </button>
-    </div>
+        {actions.map((action, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, x: 20, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 10, scale: 0.95 }}
+            transition={{ delay: index * 0.05 }}
+          >
+            <AnimatedButton
+              icon={action.icon}
+              label={action.label}
+              onClick={(e) => {
+                e?.stopPropagation()
+                action.onClick()
+                setOpen(false)
+              }}
+              className={`
+                bg-transparent shadow-none hover:bg-white/30
+                h-8 px-2 text-sm
+                ${action.className ?? ""}
+              `}
+            />
+          </motion.div>
+        ))}
+      </motion.div>
+    )}
+  </AnimatePresence>
+
+  {/* MAIN BUTTON */}
+  <motion.button
+    animate={{ rotate: open ? 45 : 0 }}
+    transition={{ duration: 0.2 }}
+    onClick={(e) => {
+      e.stopPropagation()
+      toggle()
+    }}
+    className="
+      h-11 w-11
+      rounded-full
+      bg-white/90 hover:bg-white backdrop-blur-xl
+      border border-white/40
+      text-slate-900
+      flex items-center justify-center
+      shadow-lg
+      hover:scale-105
+      transition
+    "
+  >
+    +
+  </motion.button>
+</div>
   )
 }

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { Heart } from "lucide-react";
 import ReviewsSection from "@/components/ReviewsSection";
 import GalleryCarousel from "@/components/GalleryCarousel";
 import TripMemoriesGallery from "@/components/TripMemoriesGallery";
@@ -16,6 +17,8 @@ import { toggleHotspotLike, toggleHotspotSave, recordHotspotView } from "@/lib/s
 import { MediaVisibility } from "@/lib/services/media";
 import { Hotspot, getSafeDisplay } from "@/types/hotspot";
 import FloatingActionMenu from "@/components/ui/FloatingActionMenu"
+import { GlassButton } from "@/components/ui/glass-button";
+import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
 
 const MapView = dynamic(() => import("@/components/Map/MapView"), {
   ssr: false,
@@ -96,6 +99,11 @@ export default function HotspotDetailPage() {
   const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
   const [showFullDesc, setShowFullDesc] = useState(false);
 
+    // Memory modal state
+    const [showMemoryModal, setShowMemoryModal] = useState(false);
+    const [selectedHotspotId, setSelectedHotspotId] = useState("");
+
+
   // Organized media for Polarsteps-like display
   const [personalPhotos, setPersonalPhotos] = useState<{id: string; signedUrl: string; caption: string; visibility: string; createdAt: string; uploadedBy: string}[]>([]);
   const [communityPhotos, setCommunityPhotos] = useState<{id: string; signedUrl: string; caption: string; visibility: string; createdAt: string; uploadedBy: string}[]>([]);
@@ -107,6 +115,11 @@ export default function HotspotDetailPage() {
   const [uploadMessage, setUploadMessage] = useState("");
   const [actionMessage, setActionMessage] = useState(""); // For like/save feedback
 
+  const handleOpenMemoryModal = (hotspotId: string) => {
+    setSelectedHotspotId(hotspotId);
+    setShowMemoryModal(true);
+  };
+  
   const handleOpenMap = useCallback(() => {
       if (!hotspot) return;
       const url = `https://www.google.com/maps/dir/?api=1&destination=${hotspot.latitude},${hotspot.longitude}`;
@@ -449,11 +462,11 @@ export default function HotspotDetailPage() {
               {getSafeDisplay(hotspot.category)} - {hotspot.province}
             </p>
           </div>
-                  <div className="absolute top-25 left-5 mt-3 flex justify-end z-[94]">
+          <div className="absolute bottom-4 right-4 mt-3 flex justify-end z-[94]">
           <FloatingActionMenu
             actions={[
               {
-                icon: likedByMe ? "❤️" : "🤍",
+                icon: likedByMe ? "❤️" : <Heart/>,
                 label: likedByMe ? "Liked" : "Like",
                 onClick: handleToggleLike,
                 className: likedByMe
@@ -485,43 +498,6 @@ export default function HotspotDetailPage() {
             ]}
           />
         </div>
-        </div>
-
-        <div className="absolute bottom-5 right-5 flex justify-end z-[94]">
-          <FloatingActionMenu
-            actions={[
-              {
-                icon: likedByMe ? "❤️" : "🤍",
-                label: likedByMe ? "Liked" : "Like",
-                onClick: handleToggleLike,
-                className: likedByMe
-                  ? "bg-transparent text-slate-800"
-                  : "bg-transparent text-slate-800",
-              },
-              {
-                icon: savedByMe ? "⛊" : "⛉",
-                label: savedByMe ? "Saved" : "Save",
-                onClick: handleToggleSave,
-                className: savedByMe
-                  ? "bg-transparent text-slate-800"
-                  : "bg-transparent text-slate-800",
-              },
-              {
-                icon: wishlistedByMe ? "🍀" : "☘︎",
-                label: wishlistedByMe ? "Wishlisted" : "Wishlist",
-                onClick: handleToggleWishlist,
-                className: wishlistedByMe
-                  ? "bg-transparent text-slate-800"
-                  : "bg-transparent text-slate-800",
-              },
-              {
-                icon:"🌍",
-                label: "Map",
-                onClick: () => handleOpenMap,
-                className: "bg-transparent text-slate-800",
-              },
-            ]}
-          />
         </div>
 
         <section className="bg-white rounded-2xl p-6 border border-slate-100">
@@ -530,6 +506,8 @@ export default function HotspotDetailPage() {
         {/* Stats */}
         <div className="flex justify-center items-center gap-6 text-sm text-slate-500 mb-6">
           <span>📍 {hotspot.province}</span>
+          <span className="w-px h-5 bg-slate-300" />
+          <span> ✔ {hotspot.visit_count ?? 0}</span>
           <span className="w-px h-5 bg-slate-300" />
           <span>❤️ {hotspot.likes_count ?? 0}</span>
           <span className="w-px h-5 bg-slate-300" />
@@ -553,32 +531,7 @@ export default function HotspotDetailPage() {
         </div>
       </section>
         <div className="p-4 space-y-3">
-          <p className="text-sm text-slate-700">{hotspot.description}</p>
 
-          <div className="grid gap-2 grid-cols-2 md:grid-cols-5 text-sm">
-            <div className="rounded-xl border border-slate-200 p-3">
-              <p className="text-xs text-slate-500">Visits</p>
-              <p className="font-semibold text-slate-900">{hotspot.visit_count ?? 0}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-3">
-              <p className="text-xs text-slate-500">Likes</p>
-              <p className="font-semibold text-slate-900">{hotspot.likes_count ?? 0}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-3">
-              <p className="text-xs text-slate-500">Saves</p>
-              <p className="font-semibold text-slate-900">{hotspot.saves_count ?? 0}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-3">
-              <p className="text-xs text-slate-500">Views</p>
-              <p className="font-semibold text-slate-900">{hotspot.views_count ?? 0}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-3">
-              <p className="text-xs text-slate-500">Coordinates</p>
-              <p className="font-semibold text-slate-900">
-                {hotspot.latitude.toFixed(4)}, {hotspot.longitude.toFixed(4)}
-              </p>
-            </div>
-          </div>
 
           {combineWith.length > 0 && (
             <div className="rounded-xl border border-slate-200 p-3">
@@ -587,26 +540,6 @@ export default function HotspotDetailPage() {
             </div>
           )}
 
-
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={handleToggleSave}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-                savedByMe ? "bg-amber-100 text-amber-700" : "bg-slate-900 text-white"
-              }`}
-            >
-              💾 {savedByMe ? "Saved" : "Save"}
-            </button>
-            <button
-              onClick={handleToggleWishlist}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-                wishlistedByMe ? "bg-amber-100 text-amber-700" : "bg-slate-900 text-white"
-              }`}
-            >
-              <span aria-hidden="true" className="text-[16px] leading-none">⟟</span> {wishlistedByMe ? "Wishlisted" : "Wishlist"}
-            </button>
-          </div>
 
           <button
             onClick={handleMarkVisited}
@@ -619,54 +552,52 @@ export default function HotspotDetailPage() {
             ✓ Mark as visited (+XP)
           </button>
 
-          <div id="upload-section" className="rounded-2xl border border-slate-200 p-3 space-y-2">
-            <p className="text-sm font-semibold text-slate-900">Add your photo</p>
-            <div className="grid gap-2 md:grid-cols-4">
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              />
-              <input
-                value={uploadCaption}
-                onChange={(event) => setUploadCaption(event.target.value)}
-                placeholder="Caption"
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              />
-              <select
-                value={uploadVisibility}
-                onChange={(event) => setUploadVisibility(event.target.value as MediaVisibility)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              >
-                <option value="private">Private</option>
-                <option value="friends">Friends</option>
-                <option value="public">Public</option>
-              </select>
-              <button
-                onClick={handleUpload}
-                disabled={uploading}
-                className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {uploading ? "Uploading..." : "Upload"}
-              </button>
-            </div>
-            {uploadMessage && <p className="text-xs text-slate-600">{uploadMessage}</p>}
-          </div>
+          
         </div>
       </section>
 
-      {/* Polarsteps-style Photo Gallery - Personal photos only with toggle */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900 mb-4">Trip Memories</h2>
-        <TripMemoriesGallery
-          personal={personalPhotos}
-          community={communityPhotos}
-          inspiration={hotspot.images ?? []}
-          currentUserId={user?.id}
-          hotspotName={hotspot.name}
-        />
-      </section>
+      {/* Trip Memories Section */}
+<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm relative z-40">
+  <div className="flex items-center justify-between mb-4">
+    <h2 className="text-lg font-semibold text-slate-900">Trip Memories</h2>
+
+    {/* GlassButton met safeguard en z-index */}
+    <GlassButton
+      size="sm"
+      color="secondary"
+      contentClassName="text-slate-800"
+      className="relative z-50" // altijd boven overlays
+      onClick={() => {
+        if (hotspot?.id) {
+          handleOpenMemoryModal(hotspot.id);
+        }
+      }}
+      title="Add/edit memories & photos"
+    >
+      📷
+    </GlassButton>
+  </div>
+
+  <TripMemoriesGallery
+    personal={personalPhotos}
+    community={communityPhotos}
+    inspiration={hotspot?.images ?? []}
+    currentUserId={user?.id}
+    hotspotName={hotspot?.name ?? ""}
+  />
+
+  {/* AddHotspotModal */}
+  {showMemoryModal && hotspot?.id && (
+    <AddHotspotModal
+      isOpen={showMemoryModal}
+      onClose={() => setShowMemoryModal(false)}
+      onAdded={(newHotspot) => {
+        console.log("Memory added for hotspot:", newHotspot);
+        setShowMemoryModal(false);
+      }}
+    />
+  )}
+</section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm space-y-2">
         <div className="flex items-center justify-between">
