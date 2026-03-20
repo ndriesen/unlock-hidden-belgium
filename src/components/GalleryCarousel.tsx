@@ -219,7 +219,7 @@ export default function GalleryCarousel({
                 e.stopPropagation()
                 onLike()
               }}
-              className={`absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm ${
+              className={`absolute right-2 top-2 z-[75] inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm ${
                 isLiked? "text-rose-600" : "text-slate-600"
               }`}
               aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}

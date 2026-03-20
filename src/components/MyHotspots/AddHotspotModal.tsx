@@ -24,7 +24,7 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
   const [imageUrl, setImageUrl] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
-  const [visibility, setVisibility] = useState<"private" | "shared">("private");
+  const [visibility, setVisibility] = useState<"private" | "shared">("shared");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -184,13 +184,14 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4 mx-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col">
+       <div className="overflow-y-auto p-6 space-y-4 flex-1" style={{WebkitOverflowScrolling: "touch"}}>
+        <div className="flex items-center justify-between sticky top-0 bg-white z-10">
           <h2 className="text-xl font-bold text-slate-900">Add a Hotspot</h2>
           <button
             onClick={onClose}
@@ -356,7 +357,7 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-2 p-4 border-t border-slate-200">
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
@@ -374,5 +375,6 @@ export default function AddHotspotModal({ isOpen, onClose, onAdded }: AddHotspot
         </div>
       </div>
     </div>
+   </div>
   );
 }
