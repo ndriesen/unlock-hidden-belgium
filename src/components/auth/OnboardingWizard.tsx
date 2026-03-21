@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, MapPin, Users, User, Globe, ArrowRight, AlertCircle } from 'lucide-react';
 import { UserProfile, ExplorationStyle } from '@/types/user';
+import { createClient } from '@/lib/Supabase/browser-client';
+
+
+
 
 const INTERESTS: string[] = [
   'Hidden cafés',
@@ -19,7 +23,7 @@ const INTERESTS: string[] = [
 ];
 
 interface OnboardingWizardProps {
-  onComplete: (data: Pick<UserProfile, 'interests' | 'exploration_style' | 'city'>) => Promise<void>;
+  onComplete: (data: Pick<UserProfile, 'interests' | 'exploration_style' | 'city' | 'country'>) => Promise<void>;
   onSkip?: () => void;
   userId: string;
 }
@@ -29,9 +33,23 @@ export default function OnboardingWizard({ onComplete, onSkip, userId }: Onboard
   const [interests, setInterests] = useState<string[]>([]);
   const [explorationStyle, setExplorationStyle] = useState<ExplorationStyle>('solo');
   const [city, setCity] = useState('');
+  const [country, setCountry] = useState('');
   const [loading, setLoading] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [error, setError] = useState('');
+  const supabase = createClient();
+
+  const [countries, setCountries] = useState<{code: string; name: string}[]>([]);
+
+  useEffect(() => {
+    const fetchCountries = async () => {
+      const { data, error } = await supabase.from('countries').select('*').order('name');
+      if (!error && data) setCountries(data);
+    };
+    fetchCountries();
+  }, []);
+
+
 
   const getProgressWidth = () => {
     switch (activeStep) {
@@ -65,6 +83,8 @@ export default function OnboardingWizard({ onComplete, onSkip, userId }: Onboard
           );
           const data = await response.json();
           const cityName = data.address?.city || data.address?.town || data.address?.village || 'Unknown City';
+          const countryName = data.address?.country || '';
+          setCountry(countryName);
           setCity(cityName);
           setError('');
         } catch {
@@ -82,42 +102,50 @@ export default function OnboardingWizard({ onComplete, onSkip, userId }: Onboard
   }, []);
 
   const handleNext = async () => {
-    switch (activeStep) {
-      case 1:
-        if (interests.length === 0) {
-          setError('Select at least one interest');
-          return;
-        }
-        setActiveStep(2);
-        setError('');
+  switch (activeStep) {
+    case 1:
+      if (interests.length === 0) {
+        setError('Select at least one interest');
         return;
-      case 2:
-        setActiveStep(3);
-        setError('');
+      }
+      setActiveStep(2);
+      setError('');
+      return;
+    case 2:
+      setActiveStep(3);
+      setError('');
+      return;
+    case 3:
+      if (!city.trim()) {
+        setError('City is required');
         return;
-      case 3:
-        if (!city.trim()) {
-          setError('City is required');
-          return;
-        }
-        break;
-    }
+      }
+      if (!country.trim()) {
+        setError('Country is required');
+        return;
+      }
+      break;
+  }
 
-    setLoading(true);
-    setError('');
+  setLoading(true);
+  setError('');
 
-    try {
-      await onComplete({
-        interests,
-        exploration_style: explorationStyle,
-        city: city.trim(),
-      });
-    } catch (e) {
-      setError('Failed to save. Try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    // Vind de country naam via de code
+    const selectedCountry = countries.find(c => c.code === country)?.name || country;
+
+    await onComplete({
+      interests,
+      exploration_style: explorationStyle,
+      city: city.trim(),
+      country: selectedCountry, // <-- nu naam ipv ISO-code
+    });
+  } catch (e) {
+    setError('Failed to save. Try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSkip = () => {
     onSkip?.();
@@ -264,6 +292,8 @@ export default function OnboardingWizard({ onComplete, onSkip, userId }: Onboard
                   </>
                 )}
               </motion.button>
+              <div className="space-y-3">
+              {/* City input */}
               <div className="relative">
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
@@ -271,9 +301,25 @@ export default function OnboardingWizard({ onComplete, onSkip, userId }: Onboard
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   placeholder="e.g. Brussels, Antwerp..."
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-12 pr-4 py-3 mb-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+
+              {/* Country dropdown */}
+              <div className="relative">
+                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border rounded-xl"
+                >
+                  <option value="">Select your country</option>
+                  {countries.map((c, index) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
             </div>
             {error && (
               <p className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
