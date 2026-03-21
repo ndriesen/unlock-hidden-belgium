@@ -5,7 +5,7 @@ export interface UserProfile {
   interests: string[];
   exploration_style: 'solo' | 'friends' | 'meet_new' | null;
   city: string | null;
-  country?: string | null;
+  country: string | null;
   travel_style: string;
   onboarding_completed: boolean;
   avatar_url?: string | null;

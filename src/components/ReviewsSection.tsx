@@ -18,7 +18,7 @@ interface Review {
   } | null;
 }
 
-type SortMode = "recent" | "rating";
+type SortMode = "recent" | "highest" | "lowest" | "relevant";
 
 export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
   const { user } = useAuth();
@@ -29,6 +29,7 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -56,18 +57,44 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
   }, [hotspotId]);
 
   const sortedReviews = useMemo(() => {
-    const copy = [...reviews];
+  const copy = [...reviews];
 
-    if (sortMode === "rating") {
+  switch (sortMode) {
+    case "highest":
       return copy.sort((a, b) => b.rating - a.rating);
-    }
 
-    return copy.sort((a, b) => {
-      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return bDate - aDate;
-    });
-  }, [reviews, sortMode]);
+    case "lowest":
+      return copy.sort((a, b) => a.rating - b.rating);
+
+    case "relevant":
+      return copy.sort((a, b) => {
+        const score = (r: Review) => {
+          const ratingWeight = r.rating * 2;
+
+          const dateWeight = r.created_at
+            ? new Date(r.created_at).getTime() / 1_000_000_000
+            : 0;
+
+          const hasCommentWeight = r.comment ? 2 : 0;
+
+          return ratingWeight + dateWeight + hasCommentWeight;
+        };
+
+        return score(b) - score(a);
+      });
+
+    case "recent":
+    default:
+      return copy.sort((a, b) => {
+        const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bDate - aDate;
+      });
+  }
+}, [reviews, sortMode]);
+
+  const visibleReviews = expanded ? sortedReviews : sortedReviews.slice(0, 5);
+  const hasMore = sortedReviews.length > 5;
 
   const averageRating = useMemo(() => {
     if (!reviews.length) return 0;
@@ -88,6 +115,7 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
     };
 
   const submitReview = async () => {
+    if (submitting) return;
     if (!user) {
       setMessage("Login required to post a review.");
       return;
@@ -115,18 +143,20 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
       user_avatar: user?.user_metadata?.avatar_url || '',
     };
 
-    const { error } = await supabase.from("reviews").insert(payload);
+    try {
+      await addReview(user!.id, hotspotId, rating, comment.trim());
 
-    if (error) {
+      setComment("");
+      setRating(5);
+      setMessage("Review posted. +XP earned!");
+      await reloadReviews();
+
+    } catch (error) {
       console.error("Review submit error:", error);
       setMessage("Could not save review right now.");
+    } finally {
       setSubmitting(false);
-      return;
     }
-
-    // Use new reviews service
-    await addReview(user!.id, hotspotId, rating, comment);
-
 
     setComment("");
     setRating(5);
@@ -152,7 +182,9 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
             className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
           >
             <option value="recent">Most recent</option>
-            <option value="rating">Highest rating</option>
+            <option value="highest">Highest rating</option>
+            <option value="lowest">Lowest rating</option>
+            <option value="relevant">Most relevant</option>
           </select>
         </div>
       </div>
@@ -198,11 +230,26 @@ export default function ReviewsSection({ hotspotId }: { hotspotId: string }) {
           <p className="text-sm text-gray-500">No reviews yet.</p>
         )}
 
-        {sortedReviews.map((review) => (
+                {hasMore && (
+        <p
+          onClick={() => {
+            setExpanded(!expanded);
+            window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+          }}
+          className="text-sm text-slate-700 cursor-pointer hover:underline text-right"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </p>
+      )}
+
+        {visibleReviews.map((review) => (
+            
+          
           <article
             key={review.id}
             className="p-3 rounded-xl border border-slate-200 bg-white"
           >
+
             <div className="flex items-center justify-between gap-3 mb-2">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-200 flex-shrink-0">

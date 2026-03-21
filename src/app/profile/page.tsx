@@ -741,13 +741,19 @@ export default function ProfilePage() {
                         <button
                           key={option.value}
                           onClick={() => setBuddyStyle(option.value)}
-                          className={`p-4 rounded-xl border-2 font-semibold transition-all ${
-                            buddyStyle === option.value
+                          className={`flex items-center justify-center p-4 rounded-xl border-2 font-semibold transition-all 
+                            ${buddyStyle === option.value
                               ? 'border-emerald-500 bg-emerald-50 text-emerald-800 shadow-md'
-                              : 'border-slate-200 hover:border-slate-300'
-                          }`}
+                              : 'border-slate-200 hover:border-slate-300'}
+                          `}
                         >
-                          {option.label}
+                          {/* Korte tekst + responsieve text size */}
+                          <span className="sm:hidden text-xs">
+                            {option.value === 'slow' ? 'Slow' : option.value === 'balanced' ? 'Balanced' : 'Active'}
+                          </span>
+                          <span className="hidden sm:inline text-sm md:text-base lg:text-lg">
+                            {option.label}
+                          </span>
                         </button>
                       ))}
                     </div>
