@@ -80,6 +80,7 @@ export default function FloatingActionMenu({ actions }: FloatingActionMenuProps)
       bg-white/90 hover:bg-white backdrop-blur-xl
       border border-white/40
       text-slate-900
+      text-3xl
       flex items-center justify-center
       shadow-lg
       hover:scale-105

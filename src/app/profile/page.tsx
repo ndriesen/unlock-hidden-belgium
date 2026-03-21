@@ -680,7 +680,7 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'preferences' && (
-            <div className="max-w-2xl space-y-6">
+            <div className="space-y-6">
               <h2 className="text-2xl font-bold text-slate-900">Buddy Preferences</h2>
               <p className="text-slate-600">Set your travel style to find perfect companions</p>
 

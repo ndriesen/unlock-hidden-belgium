@@ -95,7 +95,6 @@ export default function HotspotDetailPage() {
   const [wishlistedByMe, setWishlistedByMe] = useState(false);
   const [likedByMe, setLikedByMe] = useState(false);
   const [savedByMe, setSavedByMe] = useState(false);
-  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
   const [showFullDesc, setShowFullDesc] = useState(false);
 
@@ -115,6 +114,20 @@ export default function HotspotDetailPage() {
   const [uploadMessage, setUploadMessage] = useState("");
   const [actionMessage, setActionMessage] = useState(""); // For like/save feedback
 
+  const mediaUrls = useMemo(() => {
+    if (!hotspot) return [];
+
+    const personalUrls = personalPhotos.map(p => p.signedUrl);
+    const communityUrls = communityPhotos.map(c => c.signedUrl);
+    const baseImages = hotspot.images ?? [];
+
+    return Array.from(new Set([
+      ...personalUrls,
+      ...communityUrls,
+      ...baseImages
+    ]));
+  }, [personalPhotos, communityPhotos, hotspot?.images]);
+
   const handleOpenMemoryModal = (hotspotId: string) => {
     setSelectedHotspotId(hotspotId);
     setShowMemoryModal(true);
@@ -127,20 +140,18 @@ export default function HotspotDetailPage() {
     }, [hotspot]);
 
   useEffect(() => {
-    if (!hotspotId) return;
+    if (!hotspotId || !hotspot) return;
 
     const viewedKey = `hotspot-viewed-${hotspotId}`;
-    const alreadyViewed = sessionStorage.getItem(viewedKey);
-    if (alreadyViewed) return;
+    if (sessionStorage.getItem(viewedKey)) return;
 
     const trackView = async () => {
       try {
         await recordHotspotView(
           user?.id ?? null,
           hotspotId,
-          hotspot?.name ?? "hotspot"
+          hotspot.name
         );
-
         sessionStorage.setItem(viewedKey, "true");
       } catch (err) {
         console.error("View tracking failed", err);
@@ -148,7 +159,7 @@ export default function HotspotDetailPage() {
     };
 
     trackView();
-  }, [hotspotId, user?.id]);
+  }, [hotspotId, hotspot?.name, user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -245,7 +256,7 @@ export default function HotspotDetailPage() {
       const priorityUrls = [...personalUrls, ...communityUrls, ...baseImages];
       const dedup = Array.from(new Set([...priorityUrls]));
 
-      setMediaUrls(dedup);
+
 
       // Set organized media
       setPersonalPhotos(organizedMedia.personal);
@@ -412,15 +423,14 @@ export default function HotspotDetailPage() {
     setUploadFile(null);
     setUploadCaption(""); 
 
-    const media = await fetchHotspotMedia({
-      hotspotId: hotspot.id,
-      userId: user.id,
-      limit: 16,
-    });
+const organizedMedia = await fetchOrganizedHotspotMedia({
+  hotspotId: hotspot.id,
+  userId: user.id,
+  limit: 50,
+});
 
-    const uploaded = media.map((item) => item.signedUrl);
-    const baseImages = hotspot.images ?? [];
-    setMediaUrls(Array.from(new Set([...uploaded, ...baseImages])));
+setPersonalPhotos(organizedMedia.personal);
+setCommunityPhotos(organizedMedia.community);
   };
 
   if (loading) {
@@ -440,8 +450,11 @@ export default function HotspotDetailPage() {
     );
   }
 
+  
+
   return (
     <div className="space-y-6">
+      <div className="relative overflow-hidden">
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       {/* Hero Carousel - shows personal photos first, then fallback to inspiration */}
         <div className="relative">
@@ -557,47 +570,47 @@ export default function HotspotDetailPage() {
       </section>
 
       {/* Trip Memories Section */}
-<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm relative z-40">
-  <div className="flex items-center justify-between mb-4">
-    <h2 className="text-lg font-semibold text-slate-900">Trip Memories</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm relative z-40">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900">Trip Memories</h2>
 
-    {/* GlassButton met safeguard en z-index */}
-    <GlassButton
-      size="sm"
-      color="secondary"
-      contentClassName="text-slate-800"
-      className="relative z-50" // altijd boven overlays
-      onClick={() => {
-        if (hotspot?.id) {
-          handleOpenMemoryModal(hotspot.id);
-        }
-      }}
-      title="Add/edit memories & photos"
-    >
-      📷
-    </GlassButton>
-  </div>
+          {/* GlassButton met safeguard en z-index */}
+          <GlassButton
+            size="sm"
+            color="secondary"
+            contentClassName="text-slate-800"
+            className="relative z-50" // altijd boven overlays
+            onClick={() => {
+              if (hotspot?.id) {
+                handleOpenMemoryModal(hotspot.id);
+              }
+            }}
+            title="Add/edit memories & photos"
+          >
+            📷
+          </GlassButton>
+        </div>
 
-  <TripMemoriesGallery
-    personal={personalPhotos}
-    community={communityPhotos}
-    inspiration={hotspot?.images ?? []}
-    currentUserId={user?.id}
-    hotspotName={hotspot?.name ?? ""}
-  />
+        <TripMemoriesGallery
+          personal={personalPhotos}
+          community={communityPhotos}
+          inspiration={hotspot?.images ?? []}
+          currentUserId={user?.id}
+          hotspotName={hotspot?.name ?? ""}
+        />
 
-  {/* AddHotspotModal */}
-  {showMemoryModal && hotspot?.id && (
-    <AddHotspotModal
-      isOpen={showMemoryModal}
-      onClose={() => setShowMemoryModal(false)}
-      onAdded={(newHotspot) => {
-        console.log("Memory added for hotspot:", newHotspot);
-        setShowMemoryModal(false);
-      }}
-    />
-  )}
-</section>
+        {/* AddHotspotModal */}
+        {showMemoryModal && hotspot?.id && (
+          <AddHotspotModal
+            isOpen={showMemoryModal}
+            onClose={() => setShowMemoryModal(false)}
+            onAdded={(newHotspot) => {
+              console.log("Memory added for hotspot:", newHotspot);
+              setShowMemoryModal(false);
+            }}
+          />
+        )}
+      </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm space-y-2">
         <div className="flex items-center justify-between">
@@ -640,6 +653,7 @@ export default function HotspotDetailPage() {
           </p>
         </div>
       )}
+      </div>
     </div>
   );
 }
