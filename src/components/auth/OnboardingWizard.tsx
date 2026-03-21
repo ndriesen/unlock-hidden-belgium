@@ -138,7 +138,7 @@ export default function OnboardingWizard({ onComplete, onSkip, userId }: Onboard
       interests,
       exploration_style: explorationStyle,
       city: city.trim(),
-      country: selectedCountry, // <-- nu naam ipv ISO-code
+      country: selectedCountry, 
     });
   } catch (e) {
     setError('Failed to save. Try again.');
@@ -314,8 +314,8 @@ export default function OnboardingWizard({ onComplete, onSkip, userId }: Onboard
                   className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border rounded-xl"
                 >
                   <option value="">Select your country</option>
-                  {countries.map((c, index) => (
-                  <option key={c.code} value={c.code}>{c.name}</option>
+                  {countries.map((c) => (
+                    <option key={c.code} value={c.name}>{c.name}</option> // hier value=name
                   ))}
                 </select>
               </div>
