@@ -98,7 +98,7 @@ export default function MapPickerModal({ isOpen, onClose, onConfirm }: MapPicker
         </div>
 
         {/* Map: Full height */}
-        <div className="w-full h-[60vh] relative leaflet-mobile-fixed leaflet-gpu-accelerated rounded-b-3xl overflow-hidden" style={{ minHeight: '500px' }}>
+        <div className="flex-1 w-full relative rounded-b-3xl overflow-hidden min-h-[300px] md:min-h-[500px]">
           <MapContainer 
             center={position}
             zoom={13}

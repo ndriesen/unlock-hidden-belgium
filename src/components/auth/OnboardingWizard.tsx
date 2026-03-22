@@ -7,8 +7,6 @@ import { UserProfile, ExplorationStyle } from '@/types/user';
 import { createClient } from '@/lib/Supabase/browser-client';
 
 
-
-
 const INTERESTS: string[] = [
   'Hidden cafés',
   'Viewpoints',

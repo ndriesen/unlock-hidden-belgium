@@ -56,7 +56,7 @@ isVisited,
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", stiffness: 320, damping: 34 }}
-        className="fixed bottom-0 left-0 right-0 z-[1000] h-[80vh] rounded-t-3xl bg-white shadow-2xl md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-[10010] h-[80vh] rounded-t-3xl bg-white shadow-2xl md:hidden"
       >
         <div className="space-y-2 border-b border-slate-200 px-4 pb-3 pt-2">
           <div className="mx-auto h-1.5 w-12 rounded-full bg-zinc-300" />

@@ -9,6 +9,8 @@ import type { LatLngExpression, Map } from 'leaflet';
 import type { Map as LeafletMap } from 'leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
+import { motion, AnimatePresence } from "framer-motion";
+import { Fullscreen, Minimize } from "lucide-react";
 
 
 // Task 9: Leaflet Next.js icon fix
@@ -25,6 +27,8 @@ import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImper
 
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { Hotspot } from "@/types/hotspot";
+
+
 
 
 interface Props {
@@ -130,6 +134,15 @@ function mapTileConfig(style: Props["mapStyle"], isDark: boolean) {
   };
 }
 
+function getPlatform(): "ios" | "android" | "desktop" {
+  const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
+
+  if (/android/i.test(ua)) return "android";
+  if (/iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream) return "ios";
+  return "desktop";
+}
+
+
 function FitToHotspots({ hotspots, enabled }: { hotspots: Hotspot[]; enabled: boolean }) {
   const map = useMap();
 
@@ -179,6 +192,8 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
   const mapRef = useRef<L.Map | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
 
   useImperativeHandle(ref, () => ({
     flyTo: (coords: [number, number], zoom = 14) => {
@@ -186,6 +201,13 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
       mapRef.current.flyTo(coords, zoom, { duration: 0.8 });
     },
   }));
+  useEffect(() => {
+  document.body.style.overflow = isFullscreen ? "hidden" : "auto";
+
+  setTimeout(() => {
+    mapRef.current?.invalidateSize();
+  }, 200);
+}, [isFullscreen]);
 
   useEffect(() => {
     if (selectedHotspotId === undefined) return;
@@ -204,6 +226,8 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
     media.addEventListener("change", listener);
     return () => media.removeEventListener("change", listener);
   }, []);
+
+
 
   const useCanvas = hotspots.length > 1500;
   const tile = useMemo(() => mapTileConfig(mapStyle, isDark), [mapStyle, isDark]);
@@ -238,9 +262,81 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
     [onSelect, preventZoom]
   );
 
+  const handleGoToCurrentLocation = () => {
+    if (!navigator.geolocation || !navigator.permissions) {
+      alert("Your browser does not support geolocation.");
+      return;
+    }
+
+    // Check de huidige permissie-status
+    navigator.permissions.query({ name: "geolocation" }).then((result) => {
+      if (result.state === "granted") {
+        // Toegang al toegestaan
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const coords: [number, number] = [
+              position.coords.latitude,
+              position.coords.longitude,
+            ];
+            mapRef.current?.flyTo(coords, 14);
+          },
+          (error) => {
+            console.error(error);
+            alert("Unable to access your location.");
+          }
+        );
+      } else if (result.state === "prompt") {
+        // Browser zal prompt tonen
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const coords: [number, number] = [
+              position.coords.latitude,
+              position.coords.longitude,
+            ];
+            mapRef.current?.flyTo(coords, 14);
+          },
+          (error) => {
+            if (error.code === error.PERMISSION_DENIED) {
+              setShowLocationPrompt(true);
+            } else {
+              alert("Unable to access your location.");
+            }
+          }
+        );
+      } else if (result.state === "denied") {
+        // Permissie geweigerd → toon instructies
+        setShowLocationPrompt(true);
+      }
+
+      // Update als permissie verandert (optioneel)
+      result.onchange = () => {
+        if (result.state === "granted") {
+          setShowLocationPrompt(false);
+        }
+      };
+    });
+  };
+
+  const [platform, setPlatform] = useState<"ios" | "android" | "desktop">("desktop");
+
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    setPlatform(getPlatform());
+  }
+}, []);
 
   return (
-<div className={`relative w-full ${compact ? 'h-[400px]' : 'h-[100dvh] min-h-[500px]'} overflow-hidden`}>
+    <div
+  className={`
+    ${isFullscreen 
+      ? "fixed inset-0 z-[9999] bg-black w-screen h-screen"
+      : "relative w-full"
+    }
+    ${!isFullscreen && (compact ? 'h-[400px]' : 'h-[100dvh] min-h-[500px]')}
+    overflow-hidden
+  `}
+
+    >
       <MapContainer
         preferCanvas={true}
         renderer={L.canvas({ padding: 0.5 })}
@@ -248,6 +344,7 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
         zoom={8}
         className="w-full h-full leaflet-mobile-fixed leaflet-gpu-accelerated"
         zoomControl={false}
+        doubleClickZoom={false}
         ref={(instance) => {
           if (instance !== null) {
             mapRef.current = instance;
@@ -279,7 +376,7 @@ updateWhenIdle={true}
           }}
         />
         {/* Geolocation: Functional locate control when autoLocate=true */}
-{autoLocate && hotspots.length > 0 && <GeolocationControl hotspots={hotspots} />}
+
       
 
 {viewMode === "markers" && enableClustering && hotspotCoordinates.length > 100 && (
@@ -342,6 +439,39 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
 {/* Locate UI moved to GeolocationControl for functionality */}
         <FitToHotspots hotspots={hotspots} enabled={autoFit} />
       </MapContainer>
+      
+      <div className="absolute inset-0 pointer-events-none z-[1000]">
+  
+        {/* RIGHT CONTROLS */}
+        <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto">
+          
+          {/* Locate */}
+          <button
+          onClick={() => handleGoToCurrentLocation()}
+          className="bg-white p-3 rounded-xl shadow-lg active:scale-95 transition"
+          >
+            📍
+          </button>
+
+          {/* Heatmap toggle (voorbeeld) */}
+          {/* <HeatmapToggle /> */}
+          
+        </div>
+        
+        {/* LEFT CONTROLS */}
+        <div className="absolute top-4 left-4 pointer-events-auto">
+          <button
+            onClick={() => setIsFullscreen(prev => !prev)}
+            className="bg-white p-3 rounded-xl shadow-lg active:scale-95 transition"
+          >
+            {isFullscreen ? <Minimize size={20} /> : <Fullscreen size={20} />}
+          </button>
+        </div>
+
+      </div>
+
+
+      
 
       {loading && (
         <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center text-emerald-700 font-semibold pointer-events-none">
@@ -354,6 +484,60 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
           {hotspots.length} hotspots loaded • Click markers to explore
         </div>
       )}
+
+      <AnimatePresence>
+        {showLocationPrompt && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              className="fixed inset-0 z-[10010] bg-black/30"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLocationPrompt(false)}
+            />
+
+            {/* Modal */}
+            <motion.div
+              className="fixed z-[10020] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-white rounded-xl shadow-xl p-6"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+            >
+              <h3 className="text-lg font-semibold mb-4">Enable Location</h3>
+              <p className="mb-6">
+                {platform === "ios" && (
+                  <>Go to Settings → Safari → Location → Allow While Using App</>
+                )}
+                {platform === "android" && (
+                  <>Go to Settings → Chrome → Site Settings → Location → Allow</>
+                )}
+                {platform === "desktop" && (
+                  <>Please enable location access in your browser settings.</>
+                )}
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowLocationPrompt(false)}
+                  className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    alert(
+                      "Your browser blocked location access. Please enable it in your browser settings."
+                    );
+                  }}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  Enable Location
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 });
@@ -398,7 +582,7 @@ function ZoomAwareMarkers({
 
     return () => clearTimeout(timeout);
   }, [visibleCount, hotspots.length]);
-
+  
 
 // Viewport-based marker rendering (Task 6) + progressive load
   const [bounds, setBounds] = useState<any>(map.getBounds());
@@ -410,6 +594,8 @@ function ZoomAwareMarkers({
   useMapEvents({
     moveend: () => setBounds(map.getBounds()),
   });
+
+  
 
   const visibleHotspots = useMemo(() => {
     // TEMP DISABLED bounds filter for MyHotspots debugging

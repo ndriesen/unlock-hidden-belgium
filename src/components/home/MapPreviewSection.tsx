@@ -70,8 +70,8 @@ export default function MapPreviewSection({
           {/* Top Controls */}
           <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
             <div className="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-xl rounded-2xl shadow-lg">
-              <MapPin className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-              <span className="font-semibold text-slate-800 text-sm">Nearby hotspots</span>
+              {/*<MapPin className="w-5 h-5 text-emerald-500 flex-shrink-0" />/}
+              {/* <span className="font-semibold text-slate-800 text-sm">Nearby hotspots</span>*/}
             </div>
 
             <button

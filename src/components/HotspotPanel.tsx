@@ -70,7 +70,7 @@ initial={{ opacity: 0 }}
             animate={{ x: 0 }}
             exit={{ x: 460 }}
             transition={{ duration: 0.25 }}
-className="hidden md:flex fixed right-0 top-0 z-[1000] h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-xl rounded-l-[28px] overflow-hidden"
+className="hidden md:flex fixed right-0 top-0 z-[10010] h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-xl rounded-l-[28px] overflow-hidden"
           
           >
             {/* Header */}

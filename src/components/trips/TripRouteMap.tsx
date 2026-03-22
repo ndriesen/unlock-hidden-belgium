@@ -145,20 +145,23 @@ export default function TripRouteMap({
     );
   }
 
+  useEffect(() => {
+    if (mapRef.current) {
+      setTimeout(() => {
+        mapRef.current?.invalidateSize(); // Leaflet forceert render
+      }, 100);
+    }
+  }, []);
+
   return (
-    <div className="relative rounded-xl overflow-hidden">
-      <MapContainer
-        center={[50.85, 4.35]}
-        zoom={8}
-        className="w-full"
-        style={{ height }}
-        ref={(mapInstance) => {
-          if (mapInstance) {
-            mapRef.current = mapInstance;
-          }
-        }}
-      >
-        <TileLayer url={tile.url} attribution={tile.attribution} />
+      <div className="relative rounded-xl overflow-hidden" style={{ height }}>
+        <MapContainer
+          center={[50.85, 4.35]}
+          zoom={8}
+          style={{ height: "100%", width: "100%" }}
+          ref={(mapInstance) => { mapRef.current = mapInstance; }}
+        >
+          <TileLayer url={tile.url} attribution={tile.attribution} />
         
         {/* Route line */}
         {showRoute && routeCoordinates.length > 1 && (
