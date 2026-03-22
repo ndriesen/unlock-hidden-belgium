@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import type { TripStop } from "@/types/trip";
 import { TripLocation } from "@/lib/services/tripLocationTracking";
 
+
 interface TripRouteMapProps {
   stops: TripStop[];
   locations?: TripLocation[];
@@ -109,6 +110,8 @@ export default function TripRouteMap({
       return locations.map((loc) => [loc.latitude, loc.longitude]);
     }
 
+    
+
     // Fall back to stop coordinates
     return stops
       .map((stop) => getStopCoordinates(stop))
@@ -119,7 +122,12 @@ export default function TripRouteMap({
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: "© OpenStreetMap contributors",
   }), []);
-
+  
+  
+  const [mapKey, setMapKey] = useState(0); // Force remount on open
+  
+  
+  
   // Calculate total distance
   const totalDistance = useMemo(() => {
     if (routeCoordinates.length < 2) return 0;
@@ -146,20 +154,28 @@ export default function TripRouteMap({
   }
 
   useEffect(() => {
-    if (mapRef.current) {
-      setTimeout(() => {
-        mapRef.current?.invalidateSize(); // Leaflet forceert render
-      }, 100);
-    }
+    const handleResize = () => mapRef.current?.invalidateSize();
+    window.addEventListener('resize', handleResize);
+
+    // initial
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return (
-      <div className="relative rounded-xl overflow-hidden" style={{ height }}>
+      <div className="relative rounded-xl overflow-hidden" style={{ height: height, minHeight: '300px' }}>
         <MapContainer
-          center={[50.85, 4.35]}
+          key={mapKey}
+          center={routeCoordinates[0] || [50.85, 4.35]}
           zoom={8}
           style={{ height: "100%", width: "100%" }}
-          ref={(mapInstance) => { mapRef.current = mapInstance; }}
+          ref={(mapInstance) => { 
+            if (mapInstance) {             // <-- check if not null
+              mapRef.current = mapInstance;
+              setTimeout(() => mapInstance.invalidateSize(), 100);
+    }
+        }}
         >
           <TileLayer url={tile.url} attribution={tile.attribution} />
         

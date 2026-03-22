@@ -622,7 +622,7 @@ export default function Home() {
         onTripUpdated={() => setTripsVersion((v) => v + 1)}
       />
 
-      <HotspotSheet
+      {/*<HotspotSheet
         hotspot={selected}
         onClose={() => setSelected(null)}
         onVisit={handleVisit}
@@ -643,7 +643,7 @@ export default function Home() {
         onShowTripSelector={setShowTripSelector}
         onTripUpdated={() => setTripsVersion((v) => v + 1)}
       />
-
+*/}
       {toast && <Toast message={toast} />}
 
       <BadgeCelebration

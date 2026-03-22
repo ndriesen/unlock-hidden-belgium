@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useState, useCallback, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import MapClickHandler from './MapClickHandler';
 import { MapResizeFix } from './MapResizeFix';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+
 
 import 'leaflet/dist/leaflet.css';
 
@@ -30,6 +30,8 @@ export type MapPickerPosition = {
   lng: number;
   address: string;
 };
+
+  
 
 export default function MapPickerModal({ isOpen, onClose, onConfirm }: MapPickerModalProps) {
   const [position, setPosition] = useState<LatLngTuple>([50.8503, 4.3517]); // Brussels default
@@ -76,8 +78,11 @@ export default function MapPickerModal({ isOpen, onClose, onConfirm }: MapPicker
 
   if (!isOpen) return null;
 
+
+
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[10100] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div 
         className="bg-white rounded-3xl w-full max-w-4xl max-h-[95vh] flex flex-col shadow-2xl overflow-hidden" 
         onClick={(e) => e.stopPropagation()}
@@ -98,11 +103,13 @@ export default function MapPickerModal({ isOpen, onClose, onConfirm }: MapPicker
         </div>
 
         {/* Map: Full height */}
-        <div className="flex-1 w-full relative rounded-b-3xl overflow-hidden min-h-[300px] md:min-h-[500px]">
+        <div className="w-full h-[400px] md:h-[500px] relative">
+          {isOpen && (
           <MapContainer 
+            key={mapKey}
             center={position}
             zoom={13}
-            style={{ height: '100%', width: '100%' }}
+            style={{ height: '100%', width: '100%', touchAction: 'none' }}
             preferCanvas={true}
             scrollWheelZoom={true}
           >
@@ -122,6 +129,7 @@ export default function MapPickerModal({ isOpen, onClose, onConfirm }: MapPicker
             </Marker>
             <MapResizeFix />
           </MapContainer>
+          )}
         </div>
 
         {/* Address Preview & Buttons */}

@@ -201,13 +201,19 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
       mapRef.current.flyTo(coords, zoom, { duration: 0.8 });
     },
   }));
+  
   useEffect(() => {
-  document.body.style.overflow = isFullscreen ? "hidden" : "auto";
+    const map = mapRef.current;
+    if (!map) return;
 
-  setTimeout(() => {
-    mapRef.current?.invalidateSize();
-  }, 200);
-}, [isFullscreen]);
+    const handleResize = () => map.invalidateSize();
+    window.addEventListener("resize", handleResize);
+
+    // Init
+    setTimeout(() => map.invalidateSize(), 300);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     if (selectedHotspotId === undefined) return;
@@ -329,10 +335,10 @@ useEffect(() => {
     <div
   className={`
     ${isFullscreen 
-      ? "fixed inset-0 z-[9999] bg-black w-screen h-screen"
+      ? "fixed inset-0 z-[9998] bg-black w-screen h-screen"
       : "relative w-full"
     }
-    ${!isFullscreen && (compact ? 'h-[400px]' : 'h-[100dvh] min-h-[500px]')}
+    ${!isFullscreen && (compact ? 'h-[400px]' : 'h-screen min-h-[500px]')}
     overflow-hidden
   `}
 
@@ -440,35 +446,32 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
         <FitToHotspots hotspots={hotspots} enabled={autoFit} />
       </MapContainer>
       
-      <div className="absolute inset-0 pointer-events-none z-[1000]">
+      
   
-        {/* RIGHT CONTROLS */}
-        <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto">
-          
-          {/* Locate */}
+        {/* BUTTON CONTROLS */}
+        <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto z-50">
+
+          {/* Locate / Current Location Button */}
           <button
-          onClick={() => handleGoToCurrentLocation()}
-          className="bg-white p-3 rounded-xl shadow-lg active:scale-95 transition"
+            onClick={handleGoToCurrentLocation}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg hover:bg-white transition"
+            title="Go to current location"
           >
             📍
           </button>
 
-          {/* Heatmap toggle (voorbeeld) */}
-          {/* <HeatmapToggle /> */}
-          
-        </div>
-        
-        {/* LEFT CONTROLS */}
-        <div className="absolute top-4 left-4 pointer-events-auto">
+          {/* Fullscreen Toggle */}
           <button
             onClick={() => setIsFullscreen(prev => !prev)}
-            className="bg-white p-3 rounded-xl shadow-lg active:scale-95 transition"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg hover:bg-white transition"
+            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           >
             {isFullscreen ? <Minimize size={20} /> : <Fullscreen size={20} />}
           </button>
+
         </div>
 
-      </div>
+      
 
 
       
@@ -507,10 +510,17 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
               <h3 className="text-lg font-semibold mb-4">Enable Location</h3>
               <p className="mb-6">
                 {platform === "ios" && (
-                  <>Go to Settings → Safari → Location → Allow While Using App</>
+                  <>Go to Settings 
+                  → Safari 
+                  → Location 
+                  → Allow While Using App</>
                 )}
                 {platform === "android" && (
-                  <>Go to Settings → Chrome → Site Settings → Location → Allow</>
+                  <>Go to Settings 
+                  → Chrome 
+                  → Site Settings 
+                  → Location 
+                  → Allow</>
                 )}
                 {platform === "desktop" && (
                   <>Please enable location access in your browser settings.</>

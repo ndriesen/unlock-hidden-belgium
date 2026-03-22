@@ -12,10 +12,16 @@ import type { Trip } from "@/types/trip";
 import { getTripLocations, startLocationTracking, stopLocationTracking, isLocationTracking, LocationUpdate, calculateDistance, isWithinRadius } from "@/lib/services/tripLocationTracking";
 import TripHero from "@/components/trips/TripHero";
 import TripHighlights from "@/components/trips/TripHighlights";
-import TripRouteMap from "@/components/trips/TripRouteMap";
 import TripTimeline from "@/components/trips/TripTimeline";
 import CreateMemoryModal from "@/components/trips/CreateMemoryModal";
 import { GlassButton } from "@/components/ui/glass-button";
+import dynamic from "next/dynamic";
+
+  const TripRouteMap = dynamic(
+    () => import("@/components/trips/TripRouteMap"),
+    { ssr: false }
+  );
+
 
 function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse bg-slate-200 rounded ${className}`} />;
