@@ -5,7 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import AnimatedButton from "@/components/ui/hover-button"
 import FloatingActionMenu from "@/components/ui/FloatingActionMenu"
-import { Heart } from "lucide-react"
+import { Clover, Heart, MapPinned, Save, SaveOff } from "lucide-react"
 
 export interface Hotspot {
   id: string
@@ -106,7 +106,7 @@ export default function HotspotCard({
           <FloatingActionMenu
             actions={[
               {
-                icon:hotspot.likedByMe ? "❤️" : "🤍",
+                icon:hotspot.likedByMe ? "❤️" : <Heart/>,
                 label: hotspot.likedByMe ? "Liked" : "Like",
                 onClick: () => onLike(hotspot),
                 className: hotspot.likedByMe
@@ -114,7 +114,7 @@ export default function HotspotCard({
                   : "bg-transparent text-slate-800",
               },
               {
-                icon:hotspot.savedByMe ? "⛊" : "⛉",
+                icon:hotspot.savedByMe ? <Save/> : <SaveOff/>,
                 label: hotspot.savedByMe ? "Saved" : "Save",
                 onClick: () => onSave(hotspot),
                 className: hotspot.savedByMe
@@ -122,7 +122,7 @@ export default function HotspotCard({
                   : "bg-transparent text-slate-800",
               },
               {
-                icon:hotspot.wishlist ? "🍀" : "☘︎",
+                icon:hotspot.wishlist ? "🍀" : <Clover/>,
                 label: hotspot.wishlist ? "Wishlist" : "Wishlist",
                 onClick: () => onWishlist(hotspot.id),
                 className: hotspot.wishlist
@@ -130,7 +130,7 @@ export default function HotspotCard({
                   : "bg-transparent text-slate-800",
               },
               {
-                icon:"🌍",
+                icon:<MapPinned/>,
                 label: "Map",
                 onClick: () => onMap(hotspot.id),
                 className: "bg-transparent text-slate-800",
