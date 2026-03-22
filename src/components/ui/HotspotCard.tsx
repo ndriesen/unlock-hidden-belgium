@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import AnimatedButton from "@/components/ui/hover-button"
 import FloatingActionMenu from "@/components/ui/FloatingActionMenu"
+import { Heart } from "lucide-react"
 
 export interface Hotspot {
   id: string
@@ -74,7 +75,7 @@ export default function HotspotCard({
           }`}
           aria-label={hotspot.likedByMe ? "Remove from favorites" : "Add to favorites"}
         >
-          <span aria-hidden="true" className="text-[16px] leading-none">♡</span>
+          <span aria-hidden="true" className="leading-none">{hotspot.likedByMe ? "❤️" : <Heart/>} </span>
         </button>
       </div>
 
