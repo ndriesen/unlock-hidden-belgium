@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Heart } from "lucide-react";
+import { Clover, Heart, MapPinned, Save, SaveOff, Share,Eye, Check } from "lucide-react"
 import ReviewsSection from "@/components/ReviewsSection";
 import GalleryCarousel from "@/components/GalleryCarousel";
 import TripMemoriesGallery from "@/components/TripMemoriesGallery";
@@ -138,6 +138,25 @@ export default function HotspotDetailPage() {
       const url = `https://www.google.com/maps/dir/?api=1&destination=${hotspot.latitude},${hotspot.longitude}`;
       window.open(url, "_blank");
     }, [hotspot]);
+
+  const handleShare = async (hotspot: Hotspot) => {
+    const url = `${window.location.origin}/hotspots/${hotspot.id}`
+  
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: hotspot.name,
+          text: hotspot.description || "Check this hidden gem!",
+          url,
+        })
+      } else {
+        await navigator.clipboard.writeText(url)
+        alert("Link copied to clipboard!")
+      }
+    } catch (error) {
+      console.error("Error sharing:", error)
+    }
+  }  
 
   useEffect(() => {
     if (!hotspotId || !hotspot) return;
@@ -476,36 +495,43 @@ setCommunityPhotos(organizedMedia.community);
             </p>
           </div>
           <div className="absolute bottom-2 right-2 mt-3 flex justify-end z-[94]">
+                 
           <FloatingActionMenu
             actions={[
               {
                 icon: likedByMe ? "❤️" : <Heart/>,
                 label: likedByMe ? "Liked" : "Like",
-                onClick: handleToggleLike,
+                onClick: () => handleToggleLike,
                 className: likedByMe
                   ? "bg-transparent text-slate-800"
                   : "bg-transparent text-slate-800",
               },
               {
-                icon: savedByMe ? "⛊" : "⛉",
+                icon: savedByMe ? <Save/> : <SaveOff/>,
                 label: savedByMe ? "Saved" : "Save",
-                onClick: handleToggleSave,
+                onClick: () => handleToggleSave,
                 className: savedByMe
                   ? "bg-transparent text-slate-800"
                   : "bg-transparent text-slate-800",
               },
               {
-                icon: wishlistedByMe ? "🍀" : "☘︎",
-                label: wishlistedByMe ? "Wishlisted" : "Wishlist",
-                onClick: handleToggleWishlist,
+                icon: wishlistedByMe ? "🍀" : <Clover/>,
+                label:  wishlistedByMe ? "Wishlist" : "Wishlist",
+                onClick: () => handleToggleWishlist,
                 className: wishlistedByMe
                   ? "bg-transparent text-slate-800"
                   : "bg-transparent text-slate-800",
               },
               {
-                icon:"🌍",
+                icon:<MapPinned/>,
                 label: "Map",
                 onClick: () => handleOpenMap,
+                className: "bg-transparent text-slate-800",
+              },
+              {
+                icon: <Share />,
+                label: "Share",
+                onClick: () => handleShare(hotspot),
                 className: "bg-transparent text-slate-800",
               },
             ]}
@@ -513,18 +539,26 @@ setCommunityPhotos(organizedMedia.community);
         </div>
         </div>
 
-        <section className="bg-white rounded-2xl p-6 border border-slate-100">
+        <section className="bg-white rounded-2xl p-5 border border-slate-100">
 
         
         {/* Stats */}
-        <div className="flex justify-center items-center gap-4 text-sm text-slate-500 mb-6">
-          <span>📍 {hotspot.province}</span>
+        <div className="flex justify-center items-center gap-3 text-sm text-slate-500 mb-4">
+          <span className="flex items-center gap-1">
+            <span>📍 {hotspot.province}</span>
+          </span>
           <span className="w-px h-5 bg-slate-300" />
-          <span> ✔ {hotspot.visit_count ?? 0}</span>
+          <span className="flex items-center gap-1">
+            <span> <Check size={12} className="inline-block" strokeWidth={5}/> {hotspot.visit_count ?? 0}</span>
+          </span>
           <span className="w-px h-5 bg-slate-300" />
-          <span>❤️ {hotspot.likes_count ?? 0}</span>
+          <span className="flex items-center gap-1">
+            <span><Heart fill="#111" size={10} className="inline-block"/> {hotspot.likes_count ?? 0}</span>
+          </span>
           <span className="w-px h-5 bg-slate-300" />
-          <span>👁 {hotspot.views_count ?? 0}</span>
+          <span className="flex items-center gap-1">
+            <span><Eye size={10} className="inline-block" strokeWidth={4}/> {hotspot.views_count ?? 0}</span>
+          </span>  
         </div>
 
         {/* Description */}
@@ -570,7 +604,7 @@ setCommunityPhotos(organizedMedia.community);
       </section>
 
       {/* Trip Memories Section */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm relative z-40">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 mt-2 shadow-sm relative z-40">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-slate-900">Trip Memories</h2>
 
@@ -612,7 +646,7 @@ setCommunityPhotos(organizedMedia.community);
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm space-y-2">
+      <section className="rounded-2xl border border-slate-200 bg-white p-3 mt-2 shadow-sm space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">Map</h2>
           <select
@@ -641,7 +675,7 @@ setCommunityPhotos(organizedMedia.community);
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 mt-2 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900 mb-3">Reviews</h2>
         <ReviewsSection hotspotId={hotspot.id} />
       </section>
