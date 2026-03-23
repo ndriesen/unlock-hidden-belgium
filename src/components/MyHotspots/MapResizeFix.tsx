@@ -1,9 +1,7 @@
 "use client";
 
-import { useMap, useMapEvent } from 'react-leaflet';
-import { useEffect, useRef } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useMap, useMapEvent } from "react-leaflet";
+import { useEffect, useRef } from "react";
 
 export function MapResizeFix() {
   const map = useMap();
@@ -12,12 +10,12 @@ export function MapResizeFix() {
   useEffect(() => {
     if (!map) return;
 
-    // Initial resize fix
+    // Force initial resize after render
     const timeoutId = setTimeout(() => {
       map.invalidateSize();
     }, 150);
 
-    // ResizeObserver for dynamic container
+    // Observe container size changes
     const container = map.getContainer();
     if (container) {
       resizeObserverRef.current = new ResizeObserver(() => {
@@ -34,7 +32,8 @@ export function MapResizeFix() {
     };
   }, [map]);
 
-  useMapEvent('moveend', () => {
+  // Optional: force redraw after each moveend
+  useMapEvent("moveend", () => {
     map.invalidateSize();
   });
 

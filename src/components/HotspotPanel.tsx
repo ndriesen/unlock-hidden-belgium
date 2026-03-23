@@ -1,23 +1,22 @@
 ﻿"use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, animate, useDragControls } from "framer-motion";
 import HotspotDetail from "./HotspotDetail";
 import { Hotspot } from "@/types/hotspot";
+import { useEffect, useState } from "react";
 
 interface HotspotPanelProps {
   hotspot: Hotspot | null;
   onClose: () => void;
   onVisit: (id: string) => void;
-  onLike?: (id: string, name: string) => void;
-  onSave?: (id: string, name: string) => void;
   onAddToTrip: (hotspot: Hotspot) => void;
+  onWishlist: (id: string) => void;
+  onFavorite: (id: string) => void;
   isVisited: boolean;
+  isWishlist: boolean;
+  isFavorite: boolean;
   isLiked: boolean;
   isSaved: boolean;
-  isFavorite: boolean;
-  isWishlist: boolean;
-  onFavorite: (id: string) => void;
-  onWishlist: (id: string) => void;
   canGoPrevious: boolean;
   canGoNext: boolean;
   onPrevious: (id: string) => void;
@@ -32,14 +31,12 @@ export default function HotspotPanel({
   hotspot,
   onClose,
   onVisit,
-onAddToTrip,
-  isVisited,
-  isLiked,
-  isSaved,
-  isFavorite,
-  isWishlist,
-  onFavorite,
+  onAddToTrip,
   onWishlist,
+  onFavorite,
+  isVisited,
+  isWishlist,
+  isFavorite,
   canGoPrevious,
   canGoNext,
   onPrevious,
@@ -49,190 +46,171 @@ onAddToTrip,
   onShowTripSelector,
   onTripUpdated,
 }: HotspotPanelProps) {
+
+  type SheetState = "collapsed" | "half" | "full";
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [sheetState, setSheetState] = useState<SheetState>("half");
+
+  const y = useMotionValue(0);
+  const controls = useDragControls();
+
+  // Dynamische snap-points gebaseerd op viewport height
+  const SNAP_POINTS = {
+    collapsed: viewportHeight * 0.85,
+    half: viewportHeight * 0.5,
+    full: viewportHeight * 0.05,
+  };
+
+  const backdropOpacity = useTransform(
+    y,
+    [SNAP_POINTS.collapsed, SNAP_POINTS.full],
+    [0, 0.4]
+  );
+
+  const scale = useTransform(
+    y,
+    [SNAP_POINTS.full, SNAP_POINTS.collapsed],
+    [1, 0.96]
+  );
+
+  // Update viewportHeight bij mount of hotspot change
+  useEffect(() => {
+    const height = window.innerHeight;
+    setViewportHeight(height);
+    y.set(SNAP_POINTS.half);
+    setSheetState("half");
+  }, [hotspot]);
+
+  // Animatie bij sheetState change
+  useEffect(() => {
+    if (!viewportHeight) return;
+    animate(y, SNAP_POINTS[sheetState], { type: "spring", stiffness: 650, damping: 28, mass: 0.6 });
+  }, [sheetState, viewportHeight]);
+
   if (!hotspot) return null;
 
   return (
     <AnimatePresence>
-      {hotspot && (
-        <>
-          {/* Subtle backdrop */}
-          <motion.div
-            onClick={onClose}
-initial={{ opacity: 0 }}
-            animate={{ opacity: 0.2 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[990] bg-black"
-          />
+      <>
+        {/* Backdrop */}
+        <motion.div
+          onClick={onClose}
+          style={{ opacity: backdropOpacity }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.2 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[990] bg-black"
+        />
 
-          {/* Side panel */}
-          <motion.aside
-            initial={{ x: 460 }}
-            animate={{ x: 0 }}
-            exit={{ x: 460 }}
-            transition={{ duration: 0.25 }}
-className="hidden md:flex fixed right-0 top-0 z-[10010] h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-xl rounded-l-[28px] overflow-hidden"
-          
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-
-              <div className="flex items-center gap-2">
-
-                <button
-                  onClick={() => onPrevious(hotspot.id)}
-                  disabled={!canGoPrevious}
-                  className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
-                >
-                  <span aria-hidden="true">&larr;</span>
-                </button>
-
-                <button
-                  onClick={ () => onNext(hotspot.id)}
-                  disabled={!canGoNext}
-                  className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
-                >
-                  <span aria-hidden="true">&rarr;</span>
-                </button>
-
-              </div>
-
-              <span className="text-sm text-gray-500">{positionLabel}</span>
-
-              <button
-                onClick={onClose}
-                className="p-1 rounded-md hover:bg-gray-100"
-              >
-                <span aria-hidden="true">&times;</span>
+        {/* Desktop Side Panel */}
+        <motion.aside
+          initial={{ x: 460 }}
+          animate={{ x: 0 }}
+          exit={{ x: 460 }}
+          transition={{ type: "spring", stiffness: 650, damping: 28, mass: 0.6 }}
+          className="hidden md:flex fixed right-0 top-0 z-[10010] h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-xl rounded-l-[28px] overflow-hidden"
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <button onClick={() => onPrevious(hotspot.id)} disabled={!canGoPrevious} className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30">
+                &larr;
               </button>
-
-            </div>
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-              {/* Only display hotspot info; remove action buttons from here */}
-              <HotspotDetail
-                hotspot={hotspot}
-                onVisit={onVisit}
-                onWishlist={onWishlist}
-                onFavorite={onFavorite}
-                isVisited={isVisited}
-                isWishlist={isWishlist}
-                isFavorite={isFavorite}
-                showTripSelector={showTripSelector}
-                onShowTripSelector={onShowTripSelector}
-                onTripUpdated={onTripUpdated}
-                showFavoriteInDetail={false}
-                onClose={onClose}
-              />
-            </div>
-
-            {/* Sticky Footer with primary actions 
-            <div className="border-t border-gray-200 bg-white px-4 py-3 flex flex-col gap-2"> */}
-              {/* Visit 
-              <button
-                onClick={() => onVisit(hotspot.id)}
-                className={`w-full py-2 rounded-lg text-white font-semibold ${
-                  isVisited ? "bg-gray-400 cursor-default" : "bg-blue-600 hover:bg-blue-700"
-                }`}
-                disabled={isVisited}
-              >
-                <span className="inline-flex items-center justify-center gap-2">
-                  <span aria-hidden="true" className="text-[18px] leading-none">✓</span>
-                  {isVisited ? "Visited" : "Mark as Visited"}
-                </span>
-              </button>*/}
-
-              {/* Add to Trip 
-              <button
-                onClick={() => onAddToTrip(hotspot)}
-                className="w-full py-2 rounded-lg bg-blue-100 text-blue-700 font-semibold hover:bg-blue-200"
-              >
-                Add to Trip
-              </button>*/}
-
-              {/* Favorite
-              <button
-                onClick={() => onFavorite(hotspot.id)}
-                className={`w-full py-2 rounded-lg border border-gray-200 font-medium flex justify-center items-center ${
-                  isFavorite ? "text-red-500" : "text-gray-700"
-                }`} 
-              >
-                {isFavorite ? (
-                  <>
-                    <span aria-hidden="true" className="text-[18px] leading-none">♡</span> Favorited
-                  </>
-                ) : (
-                  <>
-                    <span aria-hidden="true" className="text-[18px] leading-none">♡</span> Favorite
-                  </>
-                )}
-              </button>
-            </div>*/}
-          </motion.aside>
-          
-          {/* Mobile Bottom Sheet */}
-          <motion.div
-            drag="y"
-            dragConstraints={{ top: 0, bottom: 300 }}
-            onDragEnd={(e, info) => {
-              if (info.offset.y > 120) onClose();
-            }}
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ duration: 0.3 }}
-            className="md:hidden fixed bottom-0 left-0 right-0 z-[1000] h-[85vh] bg-white shadow-xl rounded-t-[28px] overflow-hidden flex flex-col"
-          >
-            {/* Mobile Header */}
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onPrevious(hotspot.id)}
-                  disabled={!canGoPrevious}
-                  className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
-                >
-                  <span aria-hidden="true">&larr;</span>
-                </button>
-                <button
-                  onClick={() => onNext(hotspot.id)}
-                  disabled={!canGoNext}
-                  className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30"
-                >
-                  <span aria-hidden="true">&rarr;</span>
-                </button>
-              </div>
-              <span className="text-sm text-gray-500">{positionLabel}</span>
-              <button
-                onClick={onClose}
-                className="p-1 rounded-md hover:bg-gray-100"
-              >
-                <span aria-hidden="true">&times;</span>
+              <button onClick={() => onNext(hotspot.id)} disabled={!canGoNext} className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30">
+                &rarr;
               </button>
             </div>
-            {/* Drag handle */}
-            <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2 cursor-grab active:cursor-grabbing" />
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-4">
-              <HotspotDetail
-                hotspot={hotspot}
-                onVisit={onVisit}
-                onWishlist={onWishlist}
-                onFavorite={onFavorite}
-                onAddToTrip={onAddToTrip}
-                isVisited={isVisited}
-                isWishlist={isWishlist}
-                isFavorite={isFavorite}
-                showTripSelector={showTripSelector}
-                onShowTripSelector={onShowTripSelector}
-                onTripUpdated={onTripUpdated}
-                showFavoriteInDetail={false}
-                onClose={onClose}
-              />
+            <span className="text-sm text-gray-500">{positionLabel}</span>
+            <button onClick={onClose} className="p-1 rounded-md hover:bg-gray-100">&times;</button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-4">
+            <HotspotDetail
+              hotspot={hotspot}
+              onVisit={onVisit}
+              onWishlist={onWishlist}
+              onFavorite={onFavorite}
+              onAddToTrip={onAddToTrip}
+              isVisited={isVisited}
+              isWishlist={isWishlist}
+              isFavorite={isFavorite}
+              showTripSelector={showTripSelector}
+              onShowTripSelector={onShowTripSelector}
+              onTripUpdated={onTripUpdated}
+              showFavoriteInDetail={false}
+              onClose={onClose}
+            />
+          </div>
+        </motion.aside>
+
+        {/* Mobile Bottom Sheet */}
+        <motion.div
+          style={{ y, scale }}
+          drag="y"
+          dragControls={controls}
+          dragListener={false}
+          dragMomentum={false}
+          dragConstraints={{ top: SNAP_POINTS.full, bottom: SNAP_POINTS.collapsed }}
+          onDrag={(e, info) => {
+            const clamped = Math.min(Math.max(y.get() + info.delta.y, SNAP_POINTS.full), SNAP_POINTS.collapsed);
+            y.set(clamped);
+          }}
+          onDragEnd={(e, info) => {
+            const velocity = info.velocity.y;
+            const currentY = y.get();
+
+            // Swipe down to close
+            if (currentY > SNAP_POINTS.collapsed - 50 || velocity > 600) {
+              onClose();
+              return;
+            }
+
+            // Snap logic
+            const distances = Object.entries(SNAP_POINTS).map(([key, value]) => ({
+              key,
+              distance: Math.abs(currentY - value),
+            }));
+            const closest = distances.reduce((prev, curr) => (curr.distance < prev.distance ? curr : prev));
+            setSheetState(closest.key as SheetState);
+          }}
+          initial={{ y: "100%" }}
+          animate={{ y: SNAP_POINTS[sheetState] }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", stiffness: 650, damping: 28, mass: 0.6 }}
+          className="md:hidden fixed bottom-0 left-0 right-0 z-[10010] bg-white shadow-xl rounded-t-[28px] overflow-hidden flex flex-col"
+        >
+          {/* Drag handle */}
+          <div onPointerDown={(e) => controls.start(e)} className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2 cursor-grab active:cursor-grabbing" />
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <button onClick={() => onPrevious(hotspot.id)} disabled={!canGoPrevious} className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30">&larr;</button>
+              <button onClick={() => onNext(hotspot.id)} disabled={!canGoNext} className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30">&rarr;</button>
             </div>
-          </motion.div>
-        </>
-      )}
+            <span className="text-sm text-gray-500">{positionLabel}</span>
+            <button onClick={onClose} className="p-1 rounded-md hover:bg-gray-100">&times;</button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-4">
+            <HotspotDetail
+              hotspot={hotspot}
+              onClose={onClose}
+              onVisit={onVisit}
+              onAddToTrip={onAddToTrip}
+              onWishlist={onWishlist}
+              onFavorite={onFavorite}
+              isVisited={isVisited}
+              isWishlist={isWishlist}
+              isFavorite={isFavorite}
+              showTripSelector={showTripSelector}
+              onShowTripSelector={onShowTripSelector}
+              onTripUpdated={onTripUpdated}
+              showFavoriteInDetail={false}
+            />
+          </div>
+        </motion.div>
+      </>
     </AnimatePresence>
   );
 }
-
-

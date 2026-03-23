@@ -621,7 +621,7 @@ function ZoomAwareMarkers({
     return filtered.slice(0, visibleCount);
   }, [hotspots, visibleCount]); // removed bounds dep
 
-  const size = zoom < 9 ? 16 : zoom < 12 ? 22 : zoom < 14 ? 26 : 30;
+  const size = zoom < 12 ? 16 : zoom < 15 ? 22 : zoom < 20 ? 26 : 30;
 
   return (
     <>

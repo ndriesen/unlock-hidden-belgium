@@ -5,7 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import AnimatedButton from "@/components/ui/hover-button"
 import FloatingActionMenu from "@/components/ui/FloatingActionMenu"
-import { Clover, Heart, MapPinned, Save, SaveOff } from "lucide-react"
+import { Clover, Heart, MapPinned, Save, SaveOff, Share } from "lucide-react"
 
 export interface Hotspot {
   id: string
@@ -35,6 +35,26 @@ export interface HotspotCardProps {
   onFavorite: (hotspotId: string) => void
   onMap: (hotspotId: string) => void
 }
+
+const handleShare = async (hotspot: Hotspot) => {
+  const url = `${window.location.origin}/hotspots/${hotspot.id}`
+
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: hotspot.name,
+        text: hotspot.description || "Check this hidden gem!",
+        url,
+      })
+    } else {
+      await navigator.clipboard.writeText(url)
+      alert("Link copied to clipboard!")
+    }
+  } catch (error) {
+    console.error("Error sharing:", error)
+  }
+}
+
 
 export default function HotspotCard({
   hotspot,
@@ -133,6 +153,12 @@ export default function HotspotCard({
                 icon:<MapPinned/>,
                 label: "Map",
                 onClick: () => onMap(hotspot.id),
+                className: "bg-transparent text-slate-800",
+              },
+              {
+                icon: <Share />,
+                label: "Share",
+                onClick: () => handleShare(hotspot),
                 className: "bg-transparent text-slate-800",
               },
             ]}
