@@ -12,6 +12,8 @@ interface HotspotPanelProps {
   onAddToTrip: (hotspot: Hotspot) => void;
   onWishlist: (id: string) => void;
   onFavorite: (id: string) => void;
+  onLike?: (id: string) => void;
+  onSave?: (id: string) => void;
   isVisited: boolean;
   isWishlist: boolean;
   isFavorite: boolean;
@@ -34,9 +36,13 @@ export default function HotspotPanel({
   onAddToTrip,
   onWishlist,
   onFavorite,
+  onLike,
+  onSave,
   isVisited,
   isWishlist,
   isFavorite,
+  isLiked,
+  isSaved,
   canGoPrevious,
   canGoNext,
   onPrevious,
@@ -57,7 +63,7 @@ export default function HotspotPanel({
   // Dynamische snap-points gebaseerd op viewport height
   const SNAP_POINTS = {
     collapsed: viewportHeight * 0.85,
-    half: viewportHeight * 0.5,
+    half: viewportHeight * 0.35,
     full: viewportHeight * 0.05,
   };
 
@@ -129,10 +135,14 @@ export default function HotspotPanel({
               onVisit={onVisit}
               onWishlist={onWishlist}
               onFavorite={onFavorite}
+              onLike={onLike}
+              onSave={onSave}
               onAddToTrip={onAddToTrip}
               isVisited={isVisited}
               isWishlist={isWishlist}
               isFavorite={isFavorite}
+              isLiked={isLiked}
+              isSaved={isSaved}
               showTripSelector={showTripSelector}
               onShowTripSelector={onShowTripSelector}
               onTripUpdated={onTripUpdated}
@@ -188,7 +198,17 @@ export default function HotspotPanel({
               <button onClick={() => onNext(hotspot.id)} disabled={!canGoNext} className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30">&rarr;</button>
             </div>
             <span className="text-sm text-gray-500">{positionLabel}</span>
-            <button onClick={onClose} className="p-1 rounded-md hover:bg-gray-100">&times;</button>
+              
+          {onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Close detail panel"
+              className="rounded-full bg-black/50 text-white px-3 py-1.5 text-sm"
+            >
+              Close
+            </button>
+          )}
+      
           </div>
 
           {/* Content */}
@@ -197,12 +217,16 @@ export default function HotspotPanel({
               hotspot={hotspot}
               onClose={onClose}
               onVisit={onVisit}
-              onAddToTrip={onAddToTrip}
               onWishlist={onWishlist}
               onFavorite={onFavorite}
+              onLike={onLike}
+              onSave={onSave}
+              onAddToTrip={onAddToTrip}
               isVisited={isVisited}
               isWishlist={isWishlist}
               isFavorite={isFavorite}
+              isLiked={isLiked}
+              isSaved={isSaved}
               showTripSelector={showTripSelector}
               onShowTripSelector={onShowTripSelector}
               onTripUpdated={onTripUpdated}

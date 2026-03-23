@@ -18,11 +18,15 @@ interface Props {
   onVisit?: (id: string) => void;
   onWishlist?: (id: string) => void;
   onFavorite?: (id: string) => void;
+  onLike?: (id: string) => void;
+  onSave?: (id: string) => void;
   onAddToTrip?: (hotspot: Hotspot) => void;
   onClose?: () => void;
   isVisited?: boolean;
   isWishlist?: boolean;
   isFavorite?: boolean;
+  isLiked?: boolean;
+  isSaved?: boolean;
   showTripSelector?: boolean;
   onShowTripSelector?: (show: boolean) => void;
   onTripUpdated?: () => void;
@@ -36,11 +40,15 @@ export default function HotspotDetail({
   onVisit,
   onWishlist,
   onFavorite,
+  onLike,
+  onSave,
   onAddToTrip,
   onClose,
   isVisited,
   isWishlist,
   isFavorite,
+  isLiked,
+  isSaved,
   showTripSelector,
   onShowTripSelector,
   onTripUpdated,
@@ -109,22 +117,12 @@ export default function HotspotDetail({
           showCounter={true}
           showArrows={true}
           className="rounded-t-xl"
-          onLike={() => onFavorite?.(hotspot.id)}
-          isLiked={isFavorite}
+          onLike={() => onLike?.(hotspot.id)}
+          isLiked={isLiked}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
       
-        <div className="absolute top-3 right-3">
-          {onClose && (
-            <button
-              onClick={onClose}
-              aria-label="Close detail panel"
-              className="rounded-full bg-black/50 text-white px-3 py-1.5 text-sm"
-            >
-              Close
-            </button>
-          )}
-        </div>
+
 
         <div className="absolute bottom-4 left-4 right-4">
           <h2 className="text-2xl font-bold text-white leading-tight">{hotspot.name}</h2>
@@ -134,64 +132,61 @@ export default function HotspotDetail({
         </div>
       </div>
 
-      <div className="px-6 pt-4 space-y-3">
-        {/* Social + utility actions */}
-        <div className="flex grid grid-cols-3 left-4 right-4 gap-5 items-center">
+      {/* Social + utility actions */}
+      <div className="flex grid grid-cols-3 mt-2 left-4 right-4 gap-2 items-center">
 
-          <button
-            onClick={() => onVisit?.(hotspot.id)}
-            className={`text-sm font-bold ${
-              isVisited ? "text-green-600" : "text-slate-700"
-            }`}
-          >
-            <span aria-hidden="true" className="text-[16px] font-bold leading-none">✓</span> Mark visited
-          </button>
+        <button
+          onClick={() => onVisit?.(hotspot.id)}
+          className={`text-sm font-bold rounded-lg border border-[0.5px] border-slate-300 ${
+            isVisited ? "text-green-600" : "text-slate-700"
+          }`}
+        >
+          <span aria-hidden="true" className="text-[16px] font-bold leading-none">✓</span> Mark visited
+        </button>
 
+        <button
+          onClick={() => onWishlist?.(hotspot.id)}
+          className={`text-sm font-bold rounded-lg border border-[0.5px] border-slate-300 ${
+            isWishlist ? "text-amber-600" : "text-slate-700"
+          }`}
+        >
+          <span aria-hidden="true" className="text-[16px] font-bold leading-none">⟟</span> Wishlist
+        </button>
 
-          <button
-            onClick={() => onWishlist?.(hotspot.id)}
-            className={`text-sm font-bold ${
-              isWishlist ? "text-amber-600" : "text-slate-700"
-            }`}
-          >
-            <span aria-hidden="true" className="text-[16px] font-bold leading-none">⟟</span> Wishlist
-          </button>
-
-      
-            <button
-              onClick={() => onFavorite?.(hotspot.id)}
-              className={`text-sm font-bold ${
-                isFavorite ? "text-rose-600" : "text-slate-700"
-              }`}
-            >
-              <span aria-hidden="true" className="text-[16px] font-bold leading-none">♡</span> Favorite
-            </button>
-          
-        </div>
-
-        <div className="mt-1 grid grid-cols-3 gap-2">
-          <button
-            onClick={() => window.open(routeUrl, "_blank", "noopener,noreferrer")}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-          >
-            Open route
-          </button>
-          <button
-            onClick={shareHotspot}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-          >
-            Share
-          </button>
-          <button
-            onClick={() => router.push(`/hotspots/${hotspot.id}`)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-          >
-            More info
-          </button>
-        </div>
+        <button
+          onClick={() => onLike?.(hotspot.id)}
+          className={`text-sm font-bold rounded-lg border border-[0.5px] border-slate-300 ${
+            isLiked ? "text-rose-600" : "text-slate-700"
+          }`}
+        >
+          <span aria-hidden="true" className="text-[16px] font-bold leading-none">♡</span> Favorite
+        </button>
       </div>
 
-      <div className="px-4 pt-4">
+      {/* Action buttons */}
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <button
+          onClick={() => window.open(routeUrl, "_blank", "noopener,noreferrer")}
+          className="rounded-lg border border-slate-200 px-2 text-sm"
+        >
+          Open route
+        </button>
+        <button
+          onClick={shareHotspot}
+          className="rounded-lg border border-slate-200 px-3 text-sm"
+        >
+          Share
+        </button>
+        <button
+          onClick={() => router.push(`/hotspots/${hotspot.id}`)}
+          className="rounded-lg border border-slate-200 px-3  text-sm"
+        >
+          More info
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="px-4 pt-2">
         <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
           {[
             { id: "overview", label: "Overview" },
@@ -201,7 +196,7 @@ export default function HotspotDetail({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as DetailTab)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              className={`rounded-lg px-3 py-1 text-sm font-medium transition ${
                 activeTab === tab.id
                   ? "bg-white shadow-sm text-slate-900"
                   : "text-slate-600"

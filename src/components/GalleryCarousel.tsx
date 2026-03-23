@@ -32,7 +32,7 @@ export interface GalleryCarouselProps {
   showArrows?: boolean;
   onImageClick?: (index: number) => void;
   className?: string;
-  onLike: () => void
+  onLike?: () => void
   isLiked?: boolean  
 }
 
@@ -217,7 +217,7 @@ export default function GalleryCarousel({
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                onLike()
+                onLike?.()
               }}
               className={`absolute right-2 top-2 z-[75] inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm ${
                 isLiked? "text-rose-600" : "text-slate-600"
@@ -229,9 +229,9 @@ export default function GalleryCarousel({
 
               <button
                 onClick={() => handleImageClick(index)}
-                onDoubleClick={() => onLike()}
-                className="absolute inset-0 w-full h-full cursor-zoom-in z-50"
-                aria-label={`View image ${index + 1}`}
+              onDoubleClick={() => onLike?.()}
+              className="absolute inset-0 w-full h-full cursor-zoom-in z-50"
+              aria-label={`View image ${index + 1}`}
               >
                 <Image
                   src={image}

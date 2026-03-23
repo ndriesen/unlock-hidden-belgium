@@ -579,8 +579,8 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
         hotspot={selectedHotspot}
         onClose={() => setSelectedHotspot(null)}
         onVisit={handleVisit}
-        onLike={(id, name) => toggleHotspotLikeInUi(hotspots.find(h => h.id === id) as ExploreHotspot || {id, name})}
-        onSave={(id, name) => toggleHotspotSaveInUi(hotspots.find(h => h.id === id) as ExploreHotspot || {id, name})}
+        onLike={(id) => toggleHotspotLikeInUi(hotspots.find(h => h.id === id)!)}
+        onSave={(id) => toggleHotspotSaveInUi(hotspots.find(h => h.id === id)!)}
         onWishlist={toggleWishlistInUi}
         onFavorite={toggleFavoriteInUi}
         onAddToTrip={() => setShowTripSelector(true)}
