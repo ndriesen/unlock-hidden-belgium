@@ -543,7 +543,6 @@ export default function Home() {
   // Render logged-in homepage - PREMIUM DISCOVERY-FIRST STRUCTURE
   const renderLoggedInHomepage = () => (
     <div className="flex flex-col min-h-screen">
-      {/* Using SidebarLayout header only (no duplicate) */}
       
       {/* Main Content - Discovery First */}
       <main className="flex-1 pt-0">

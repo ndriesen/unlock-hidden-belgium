@@ -157,8 +157,9 @@ export default function HotspotPanel({
           style={{ y, scale }}
           drag="y"
           dragControls={controls}
-          dragListener={false}
+          dragListener={true}
           dragMomentum={false}
+          dragPropagation={false}
           dragConstraints={{ top: SNAP_POINTS.full, bottom: SNAP_POINTS.collapsed }}
           onDrag={(e, info) => {
             const clamped = Math.min(Math.max(y.get() + info.delta.y, SNAP_POINTS.full), SNAP_POINTS.collapsed);
