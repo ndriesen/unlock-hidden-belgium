@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Clover, Heart, MapPinned, Save, SaveOff, Share,Eye, Check } from "lucide-react"
+import { Clover, Heart, MapPinned, Save, SaveOff, Share,Eye, Check, ImagePlus } from "lucide-react"
 import ReviewsSection from "@/components/ReviewsSection";
 import GalleryCarousel from "@/components/GalleryCarousel";
 import TripMemoriesGallery from "@/components/TripMemoriesGallery";
@@ -18,7 +18,7 @@ import { MediaVisibility } from "@/lib/services/media";
 import { Hotspot, getSafeDisplay } from "@/types/hotspot";
 import FloatingActionMenu from "@/components/ui/FloatingActionMenu"
 import { GlassButton } from "@/components/ui/glass-button";
-import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
+import { CreateMemoryModalHotspot } from "@/components/trips/CreateMemoryModalHotspots";
 
 const MapView = dynamic(() => import("@/components/Map/MapView"), {
   ssr: false,
@@ -113,6 +113,17 @@ export default function HotspotDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
   const [actionMessage, setActionMessage] = useState(""); // For like/save feedback
+
+
+  useEffect(() => {
+    if (!actionMessage) return;
+
+    const timer = setTimeout(() => {
+      setActionMessage(""); // verdwijnt na 3 seconden
+    }, 3000);
+
+    return () => clearTimeout(timer); // cleanup bij unmount of nieuwe message
+  }, [actionMessage]);
 
   const mediaUrls = useMemo(() => {
     if (!hotspot) return [];
@@ -494,14 +505,14 @@ setCommunityPhotos(organizedMedia.community);
               {getSafeDisplay(hotspot.category)} - {hotspot.province}
             </p>
           </div>
-          <div className="absolute bottom-2 right-2 mt-3 flex justify-end z-[94]">
+          <div className="absolute bottom-2 right-2 mt-3 flex justify-end">
                  
           <FloatingActionMenu
             actions={[
               {
                 icon: likedByMe ? "❤️" : <Heart/>,
                 label: likedByMe ? "Liked" : "Like",
-                onClick: () => handleToggleLike,
+                onClick: handleToggleLike,
                 className: likedByMe
                   ? "bg-transparent text-slate-800"
                   : "bg-transparent text-slate-800",
@@ -509,7 +520,7 @@ setCommunityPhotos(organizedMedia.community);
               {
                 icon: savedByMe ? <Save/> : <SaveOff/>,
                 label: savedByMe ? "Saved" : "Save",
-                onClick: () => handleToggleSave,
+                onClick: handleToggleSave,
                 className: savedByMe
                   ? "bg-transparent text-slate-800"
                   : "bg-transparent text-slate-800",
@@ -517,15 +528,15 @@ setCommunityPhotos(organizedMedia.community);
               {
                 icon: wishlistedByMe ? "🍀" : <Clover/>,
                 label:  wishlistedByMe ? "Wishlist" : "Wishlist",
-                onClick: () => handleToggleWishlist,
+                onClick: handleToggleWishlist,
                 className: wishlistedByMe
                   ? "bg-transparent text-slate-800"
                   : "bg-transparent text-slate-800",
               },
               {
                 icon:<MapPinned/>,
-                label: "Map",
-                onClick: () => handleOpenMap,
+                label: "Route",
+                onClick: handleOpenMap,
                 className: "bg-transparent text-slate-800",
               },
               {
@@ -611,17 +622,17 @@ setCommunityPhotos(organizedMedia.community);
           {/* GlassButton met safeguard en z-index */}
           <GlassButton
             size="sm"
-            color="secondary"
+            color="danger"
             contentClassName="text-slate-800"
-            className="relative z-50" // altijd boven overlays
+            className="relative z-50 pointer-events-auto" // altijd boven overlays
             onClick={() => {
               if (hotspot?.id) {
                 handleOpenMemoryModal(hotspot.id);
               }
             }}
-            title="Add/edit memories & photos"
+            title="Add memories & photos"
           >
-            📷
+            <ImagePlus size={20}/>
           </GlassButton>
         </div>
 
@@ -632,18 +643,28 @@ setCommunityPhotos(organizedMedia.community);
           currentUserId={user?.id}
           hotspotName={hotspot?.name ?? ""}
         />
-
-        {/* AddHotspotModal */}
-        {showMemoryModal && hotspot?.id && (
-          <AddHotspotModal
-            isOpen={showMemoryModal}
+        {/* AddHotspotModal */} 
+        {showMemoryModal && hotspot?.id && ( 
+          <CreateMemoryModalHotspot
+            hotspotId={hotspot.id}
+            hotspotName={hotspot.name}
+            userId={user?.id!}
+            
             onClose={() => setShowMemoryModal(false)}
-            onAdded={(newHotspot) => {
-              console.log("Memory added for hotspot:", newHotspot);
+            onUploaded={async () => { 
+              // refresh media
+              const organizedMedia = await fetchOrganizedHotspotMedia({
+                hotspotId: hotspot.id,
+                userId: user?.id!,
+                limit: 50,
+              });
+              setPersonalPhotos(organizedMedia.personal);
+              setCommunityPhotos(organizedMedia.community);
               setShowMemoryModal(false);
             }}
           />
         )}
+
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-3 mt-2 shadow-sm space-y-2">
@@ -682,7 +703,7 @@ setCommunityPhotos(organizedMedia.community);
 
       {actionMessage && (
         <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 max-w-sm mx-4">
-          <p className="bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg text-sm animate-fade-in">
+          <p className="bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg text-sm animate-fade-in-out">
             {actionMessage}
           </p>
         </div>
