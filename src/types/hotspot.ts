@@ -1,4 +1,4 @@
-﻿export interface Hotspot {
+﻿﻿export interface Hotspot {
   id: string;
   name: string;
   latitude: number;
@@ -20,10 +20,24 @@
   rating?: number;
   status?: "private" | "pending" | "approved";
   created_by?: string;
+  geog?: any; // PostGIS geography
 
   // optional aliases (for Leaflet compatibility)
   lat?: number;
   lng?: number;
+}
+
+// Verification status for user-hotspot relationship
+export interface UserHotspotStatus {
+  status: 'none' | 'visited' | 'verified';
+  visited: boolean;
+  verified: boolean;
+  visit_xp_awarded: boolean;
+  verification_xp_awarded: boolean;
+  verification_status: 'none' | 'pending' | 'verified' | 'failed';
+  verified_at?: string | null;
+  distance_to_hotspot?: number | null;
+  attempt_count?: number;
 }
 
 // Safe display for category or opening_hours (plain text fallback)
@@ -146,3 +160,4 @@ export interface OrganizedHotspotMedia {
   }[];
   inspiration: string[]; // Database filler images
 }
+

@@ -17,6 +17,7 @@ import {
   toggleWishlist,
   toggleFavorite,
 } from "@/lib/services/gamification";
+import { evaluateBadges } from "@/lib/services/badgeEngine";
 import { useSearch } from "@/context/SearchContext";
 import type { MapContainerProps } from "@/components/Map/MapContainer";
 import { Hotspot, getSafeDisplay } from "@/types/hotspot";
@@ -417,7 +418,7 @@ export default function Home() {
       }
 
       try {
-        const unlockedBadges = await markVisited(user.id, hotspotId);
+        await markVisited(user.id, hotspotId);
 
         setVisitedIds((prev) => [...prev, hotspotId]);
 
@@ -425,11 +426,13 @@ export default function Home() {
         setVisitStreak(stats.streak);
         setVisitedToday(stats.visitedToday);
 
-        showToast("Visited hotspot. +50 XP earned.");      
-        if (unlockedBadges && "badges" in unlockedBadges && unlockedBadges.badges?.length) {          
+        const unlockedBadges = await evaluateBadges(user.id);
+
+        showToast("Visited hotspot. +50 XP earned!");      
+        if (unlockedBadges.length > 0) {          
           setBadgeCelebration(true);
-          showToast(`Badge unlocked: ${unlockedBadges.badges[0].name}`); 
-             }
+          showToast(`Badge unlocked: ${unlockedBadges[0].name}`); 
+        }
 
         const projectedCount = visitedIds.length + 1;
 

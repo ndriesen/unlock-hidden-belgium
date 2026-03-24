@@ -400,7 +400,7 @@ export default function HotspotDetailPage() {
     try {
       const result = await markVisited(user.id, hotspot.id);
 
-      if (result && 'success' in result && result.reason === "already_visited") {
+      if (result?.alreadyVisited) {
         setActionMessage("You already visited this place today 👀");
         return;
       }

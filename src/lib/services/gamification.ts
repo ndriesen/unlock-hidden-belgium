@@ -60,6 +60,30 @@ export async function awardXP(
   const dailyCap = dailyCapRule.data?.rule_value || 100;
   // Note: Full daily sum requires RPC, skip for v1
 
+  // Anti-abuse for verification XP: flag + 1min cooldown
+  if (actionKey === 'verify_hotspot_xp' && context.hotspotId) {
+    const recentAttempt = await supabase
+      .from('verification_attempts')
+      .select('created_at')
+      .eq('user_id', userId)
+      .eq('hotspot_id', context.hotspotId)
+      .gte('created_at', new Date(Date.now() - 60*1000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    const { data: status } = await supabase
+      .from('user_hotspots')
+      .select('verification_xp_awarded')
+      .eq('user_id', userId)
+      .eq('hotspot_id', context.hotspotId)
+      .single();
+    
+    if (status?.verification_xp_awarded || recentAttempt.data) {
+      return { success: false, reason: status?.verification_xp_awarded ? "already_verified" : "cooldown_active" };
+    }
+  }
+
   // 2. Get XP amount
   const { data: rule } = await supabase
     .from('app_rules')
@@ -99,23 +123,10 @@ export async function awardXP(
   };
 }
 
+import { markAsVisited } from "./visitVerification";
 export async function markVisited(userId: string, hotspotId: string) {
-  // Update flag first
-  const { error } = await supabase.from("user_hotspots").upsert(
-    {
-      user_id: userId,
-      hotspot_id: hotspotId,
-      visited: true,
-      visited_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,hotspot_id" }
-  );
-  if (error) throw error;
-
-  const result = await awardXP(userId, 'visit_hotspot_xp', { hotspotId });
-  if ('success' in result && result.success === false) {
-    return result;
-  }
+  const result = await markAsVisited(userId, hotspotId);
+  await evaluateBadges(userId);
   return result;
 }
 

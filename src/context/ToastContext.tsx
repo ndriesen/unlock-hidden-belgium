@@ -4,7 +4,7 @@ import { createContext, useContext, useState } from "react";
 import Toast from "@/components/Toast";
 
 interface ToastContextType {
-  addToast: (message: string, type?: "success" | "error") => void;
+  addToast: (message: string, type?: "success" | "error" | "info") => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
