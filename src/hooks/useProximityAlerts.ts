@@ -1,9 +1,9 @@
-"use client";
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useGeolocation } from './useGeolocation';
 import { getProximityAlerts } from '@/lib/services/proximity';
 import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/Supabase/browser-client';
 
 export interface ProximityAlert {
   id: string;
@@ -12,23 +12,35 @@ export interface ProximityAlert {
   category: string;
 }
 
-export function useProximityAlerts() {
+interface UseProximityAlertsOptions {
+  enabled?: boolean;
+}
+
+export function useProximityAlerts(options: UseProximityAlertsOptions = {}) {
+  const { enabled = true } = options;
+  const { user } = useAuth();
   const { position } = useGeolocation();
   const addToast = useToast();
   const [nearby, setNearby] = useState<ProximityAlert[]>([]);
-  const alertedHotspots = useRef<Map<string, number>>(new Map()); // timestamped: '1km-id' -> timestamp
-  const lastPositionRef = useRef<{lat: number, lng: number} | null>(null);
+  const alertedHotspots = useRef<Map<string, number>>(new Map());
+  const lastPositionRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  const persistAlerts = useCallback(() => {
+    localStorage.setItem(
+      'proximity_alerts',
+      JSON.stringify(Array.from(alertedHotspots.current.entries()))
+    );
+  }, []);
 
   const checkProximity = useCallback(async () => {
-    if (!position) return;
+    if (!enabled || !user?.id || !position) return;
 
-    // Movement threshold check
     if (lastPositionRef.current) {
       const delta = Math.sqrt(
         Math.pow(position.coords.latitude - lastPositionRef.current.lat, 2) +
-        Math.pow(position.coords.longitude - lastPositionRef.current.lng, 2)
-      ) * 111000; // approx meters
-      if (delta < 50) return; // Less than 50m movement
+          Math.pow(position.coords.longitude - lastPositionRef.current.lng, 2)
+      ) * 111000;
+      if (delta < 50) return;
     }
     lastPositionRef.current = { lat: position.coords.latitude, lng: position.coords.longitude };
 
@@ -38,57 +50,80 @@ export function useProximityAlerts() {
         position.coords.longitude
       );
 
-      const now = Date.now();
+      const nearbyIds = alerts.within_1km.map((h) => h.id);
+      let visitedSet = new Set<string>();
 
-      // 1km alert (first time or >24h)
-      const new1km = alerts.within_1km.filter(h => {
+      if (nearbyIds.length > 0) {
+        const { data, error } = await supabase
+          .from('user_hotspots')
+          .select('hotspot_id, visited')
+          .eq('user_id', user.id)
+          .in('hotspot_id', nearbyIds)
+          .eq('visited', true);
+
+        if (!error && data) {
+          visitedSet = new Set((data as Array<{ hotspot_id: string }>).map((row) => row.hotspot_id));
+        }
+      }
+
+      const nonVisitedWithin1km = alerts.within_1km.filter((h) => !visitedSet.has(h.id));
+      const nonVisitedWithin500m = nonVisitedWithin1km.filter((h) => h.distance_meters <= 500);
+
+      const now = Date.now();
+      let hasNewAlert = false;
+
+      const new1km = nonVisitedWithin1km.filter((h) => {
         const key = `1km-${h.id}`;
         const ts = alertedHotspots.current.get(key);
-        return !ts || now - ts > 24*60*60*1000;
+        return !ts || now - ts > 24 * 60 * 60 * 1000;
       });
-      new1km.forEach(h => {
+      new1km.forEach((h) => {
         addToast(`${h.name} is 1km away!`, 'info');
         alertedHotspots.current.set(`1km-${h.id}`, now);
+        hasNewAlert = true;
       });
 
-      // 500m special alert (first time or >24h)
-      const new500m = alerts.within_500m.filter(h => {
+      const new500m = nonVisitedWithin500m.filter((h) => {
         const key = `500m-${h.id}`;
         const ts = alertedHotspots.current.get(key);
-        return !ts || now - ts > 24*60*60*1000;
+        return !ts || now - ts > 24 * 60 * 60 * 1000;
       });
-      new500m.forEach(h => {
-        addToast(`🚨 Close! ${h.name} is ${(h.distance_meters).toFixed(0)}m away`, 'success');
+      new500m.forEach((h) => {
+        addToast(`Nearby hotspot: ${h.name} is ${h.distance_meters.toFixed(0)}m away`, 'success');
         alertedHotspots.current.set(`500m-${h.id}`, now);
+        hasNewAlert = true;
       });
 
-      setNearby([...alerts.within_1km, ...alerts.within_500m]);
+      if (hasNewAlert) {
+        persistAlerts();
+      }
+
+      setNearby(nonVisitedWithin1km);
     } catch (error) {
       console.warn('Proximity check failed:', error);
     }
-  }, [position, addToast]);
+  }, [enabled, user?.id, position, addToast, persistAlerts]);
 
-  // Check every 30 seconds when moving
   useEffect(() => {
-    if (!position) return;
+    if (!enabled || !user?.id || !position) return;
 
-    checkProximity();
+    void checkProximity();
 
-    const interval = setInterval(checkProximity, 30000); // 30s
+    const interval = setInterval(() => {
+      void checkProximity();
+    }, 30000);
+
     return () => clearInterval(interval);
-  }, [position, checkProximity]);
+  }, [enabled, user?.id, position, checkProximity]);
 
-  // Persist alerts across sessions (localStorage)
   useEffect(() => {
+    if (!enabled) return;
+
     const saved = localStorage.getItem('proximity_alerts');
     if (saved) {
       alertedHotspots.current = new Map(JSON.parse(saved));
     }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('proximity_alerts', JSON.stringify(Array.from(alertedHotspots.current.entries())));
-  }, [alertedHotspots.current.size]);
+  }, [enabled]);
 
   return {
     nearby,
@@ -100,4 +135,3 @@ export function useProximityAlerts() {
     }
   };
 }
-

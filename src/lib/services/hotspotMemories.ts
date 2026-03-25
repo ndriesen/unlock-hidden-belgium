@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/Supabase/browser-client";
+﻿import { supabase } from "@/lib/Supabase/browser-client";
 import { MediaVisibility, validateImageFile } from "@/lib/services/media";
 
 const HOTSPOT_MEDIA_BUCKET = "spotly-media";
@@ -21,10 +21,12 @@ export interface UploadHotspotPhotosParams {
 
 function sanitizeFileName(fileName: string): string {
   const cleaned = fileName
+    .toLowerCase()
     .replace(/[\\/]/g, "_")
     .replace(/\s+/g, "-")
-    .replace(/[^a-zA-Z0-9._-]/g, "")
-    .slice(0, 120);
+    .replace(/[^a-z0-9._-]/g, "")
+    .replace(/\.jfif$/, ".jpg") 
+    .slice(0, 120) || "upload.jpg";
 
   return cleaned || "upload.jpg";
 }
@@ -36,7 +38,9 @@ function buildHotspotStoragePath(params: {
   index: number;
 }): string {
   const safeFileName = sanitizeFileName(params.fileName);
-  const uniquePrefix = `${Date.now()}-${params.index}-${Math.random().toString(36).slice(2, 8)}`;
+  const uniquePrefix = `${Date.now()}-${params.index}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 
   // Must match RLS path convention: ${userId}/hotspots/${hotspotId}/filename
   return `${params.userId}/hotspots/${params.hotspotId}/${uniquePrefix}-${safeFileName}`;
@@ -62,6 +66,15 @@ export async function uploadHotspotPhotos(
 
   const expiresIn = params.signedUrlExpiresInSeconds ?? SIGNED_URL_EXPIRY_SECONDS;
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User not authenticated");
+  }
+
+
   return Promise.all(
     params.files.map(async (file, index): Promise<HotspotPhotoUploadResult> => {
       const fileName = file?.name ?? `file-${index + 1}`;
@@ -76,36 +89,46 @@ export async function uploadHotspotPhotos(
       }
 
       const storagePath = buildHotspotStoragePath({
-        userId: params.userId,
+        userId: user.id,
         hotspotId: params.hotspotId,
         fileName,
         index,
       });
+       
+      console.log("Uploading to:", storagePath);
 
       try {
-        const { error: uploadError } = await supabase.storage
+        // 1. Upload
+        const { data, error: uploadError } = await supabase.storage
           .from(HOTSPOT_MEDIA_BUCKET)
           .upload(storagePath, file, {
             upsert: false,
             cacheControl: "3600",
             contentType: file.type || undefined,
-            metadata: {
+          /**   metadata: {
               owner: params.userId,
-            },
+            },*/
           });
 
-        if (uploadError) {
+        if (uploadError || !data?.path) {
           return {
             fileName,
             success: false,
-            error: uploadError.message,
+            error: uploadError?.message ?? "Upload failed",
           };
         }
 
-        if (params.visibility === "public") {
-          const { data } = supabase.storage.from(HOTSPOT_MEDIA_BUCKET).getPublicUrl(storagePath);
+        await new Promise((res) => setTimeout(res, 200));
 
-          if (!data?.publicUrl) {
+        let url: string;
+
+        // 2. URL generatie
+        if (params.visibility === "public") {
+          const { data: publicData } = supabase.storage
+            .from(HOTSPOT_MEDIA_BUCKET)
+            .getPublicUrl(storagePath);
+
+          if (!publicData?.publicUrl) {
             return {
               fileName,
               success: false,
@@ -113,31 +136,33 @@ export async function uploadHotspotPhotos(
             };
           }
 
-          return {
-            fileName,
-            success: true,
-            url: data.publicUrl,
-          };
-        }
+          url = publicData.publicUrl;
+        } else {
+          const { data: signedData, error: signedError } =
+            await supabase.storage
+              .from(HOTSPOT_MEDIA_BUCKET)
+              .createSignedUrl(storagePath, expiresIn);
 
-        const { data: signedData, error: signedError } = await supabase.storage
-          .from(HOTSPOT_MEDIA_BUCKET)
-          .createSignedUrl(storagePath, expiresIn);
+          if (signedError || !signedData?.signedUrl) {
+            return {
+              fileName,
+              success: false,
+              error:
+                signedError?.message ?? "Signed URL could not be created.",
+            };
+          }
 
-        if (signedError || !signedData?.signedUrl) {
-          return {
-            fileName,
-            success: false,
-            error: signedError?.message ?? "Signed URL could not be created.",
-          };
+          url = signedData.signedUrl;
         }
 
         return {
           fileName,
           success: true,
-          url: signedData.signedUrl,
+          url,
         };
       } catch (error) {
+        console.error("Upload error:", error);
+
         return {
           fileName,
           success: false,

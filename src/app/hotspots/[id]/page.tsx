@@ -1,4 +1,4 @@
-﻿﻿"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -12,10 +12,11 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/Supabase/browser-client";
 import OpeningHoursDisplay from "@/components/ui/OpeningHoursDisplay";
 import { fetchHotspotMedia, fetchOrganizedHotspotMedia, uploadHotspotPhoto } from "@/lib/services/hotspotMedia";
-import { toggleWishlist, markVisited } from "@/lib/services/gamification";
+import { toggleWishlist } from "@/lib/services/gamification";
 import { toggleHotspotLike, toggleHotspotSave, recordHotspotView } from "@/lib/services/hotspotSocial";
 import { MediaVisibility } from "@/lib/services/media";
 import { Hotspot, getSafeDisplay } from "@/types/hotspot";
+import { verifyVisitWithCurrentLocation } from "@/lib/services/visitVerification";
 import FloatingActionMenu from "@/components/ui/FloatingActionMenu"
 import { GlassButton } from "@/components/ui/glass-button";
 import { CreateMemoryModalHotspot } from "@/components/trips/CreateMemoryModalHotspots";
@@ -398,10 +399,25 @@ export default function HotspotDetailPage() {
     }
 
     try {
-      const result = await markVisited(user.id, hotspot.id);
+      const verification = await verifyVisitWithCurrentLocation(user.id, hotspot.id);
 
-      if (result?.alreadyVisited) {
-        setActionMessage("You already visited this place today 👀");
+      if (verification.reason === 'location_unavailable') {
+        setActionMessage("Enable location services to verify GPS");
+        return;
+      }
+
+      if (verification.reason === 'poor_accuracy') {
+        setActionMessage("Poor GPS accuracy. Wait for better signal (<=50m)");
+        return;
+      }
+
+      if (!verification.success) {
+        setActionMessage("Could not verify visit.");
+        return;
+      }
+
+      if (verification.status === 'failed') {
+        setActionMessage(`Too far: ${verification.distance_meters.toFixed(0)}m (need <=100m)`);
         return;
       }
 
@@ -413,13 +429,12 @@ export default function HotspotDetailPage() {
             }
           : prev
       );
-      setActionMessage("Marked as visited + XP earned!");
+      setActionMessage(`Visit verified at ${verification.distance_meters.toFixed(0)}m. XP granted.`);
     } catch (error) {
       console.error("Visit mark failed:", error);
       setActionMessage("Could not mark visited.");
     }
   }, [user, hotspot]);
-
   const handleUpload = async () => {
     if (!user || !hotspot) {
       setUploadMessage("Login required.");
@@ -510,7 +525,7 @@ setCommunityPhotos(organizedMedia.community);
           <FloatingActionMenu
             actions={[
               {
-                icon: likedByMe ? "❤️" : <Heart/>,
+                icon: likedByMe ? "??" : <Heart/>,
                 label: likedByMe ? "Liked" : "Like",
                 onClick: handleToggleLike,
                 className: likedByMe
@@ -526,7 +541,7 @@ setCommunityPhotos(organizedMedia.community);
                   : "bg-transparent text-slate-800",
               },
               {
-                icon: wishlistedByMe ? "🍀" : <Clover/>,
+                icon: wishlistedByMe ? "??" : <Clover/>,
                 label:  wishlistedByMe ? "Wishlist" : "Wishlist",
                 onClick: handleToggleWishlist,
                 className: wishlistedByMe
@@ -556,7 +571,7 @@ setCommunityPhotos(organizedMedia.community);
         {/* Stats */}
         <div className="flex justify-center items-center gap-3 text-sm text-slate-500 mb-4">
           <span className="flex items-center gap-1">
-            <span>📍 {hotspot.province}</span>
+            <span>?? {hotspot.province}</span>
           </span>
           <span className="w-px h-5 bg-slate-300" />
           <span className="flex items-center gap-1">
@@ -583,7 +598,7 @@ setCommunityPhotos(organizedMedia.community);
               className="mt-4 text-emerald-600 font-semibold hover:text-emerald-700 transition-colors text-sm flex items-center gap-1"
             >
               {showFullDesc ? 'Read less' : 'Read more'} 
-              <span className={`w-4 h-4 transition-transform ${showFullDesc ? 'rotate-180' : ''}`}>▼</span>
+              <span className={`w-4 h-4 transition-transform ${showFullDesc ? 'rotate-180' : ''}`}>?</span>
             </button>
           )}
         </div>
@@ -607,7 +622,7 @@ setCommunityPhotos(organizedMedia.community);
                 : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" 
             }`}
           >
-            ✓ Mark as visited (+XP)
+            ? Mark as visited (+XP)
           </button>
 
           
@@ -712,3 +727,5 @@ setCommunityPhotos(organizedMedia.community);
     </div>
   );
 }
+
+

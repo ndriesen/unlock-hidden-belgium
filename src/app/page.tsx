@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import { fetchHotspots } from "@/lib/services/hotspots";
@@ -12,12 +12,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import HotspotPanel from "@/components/HotspotPanel";
 import HotspotSheet from "@/components/HotspotSheet";
 import Toast from "@/components/Toast";
-import {
-  markVisited,
-  toggleWishlist,
-  toggleFavorite,
-} from "@/lib/services/gamification";
+import { toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
 import { evaluateBadges } from "@/lib/services/badgeEngine";
+import { verifyVisitWithCurrentLocation } from "@/lib/services/visitVerification";
 import { useSearch } from "@/context/SearchContext";
 import type { MapContainerProps } from "@/components/Map/MapContainer";
 import { Hotspot, getSafeDisplay } from "@/types/hotspot";
@@ -38,6 +35,7 @@ import FeaturedHotspots from "@/components/home/FeaturedHotspots";
 // New logged-in components - Premium Redesign
 import StickyHeader from "@/components/home/StickyHeader";
 import TrendingHotspots from "@/components/home/TrendingHotspots";
+import AdventuresNearYou from "@/components/home/AdventuresNearYou";
 
 const MapContainer = dynamic(
   () =>
@@ -418,9 +416,29 @@ export default function Home() {
       }
 
       try {
-        await markVisited(user.id, hotspotId);
+        const verification = await verifyVisitWithCurrentLocation(user.id, hotspotId);
 
-        setVisitedIds((prev) => [...prev, hotspotId]);
+        if (verification.reason === 'location_unavailable') {
+          showToast("Enable location services to verify GPS");
+          return;
+        }
+
+        if (verification.reason === 'poor_accuracy') {
+          showToast("Poor GPS accuracy. Wait for better signal (<=50m)");
+          return;
+        }
+
+        if (!verification.success) {
+          showToast("Could not verify visit.");
+          return;
+        }
+
+        if (verification.status === 'failed') {
+          showToast(`Too far: ${verification.distance_meters.toFixed(0)}m (need <=100m)`);
+          return;
+        }
+
+        setVisitedIds((prev) => (prev.includes(hotspotId) ? prev : [...prev, hotspotId]));
 
         const stats = await fetchVisitStatsForUser(user.id);
         setVisitStreak(stats.streak);
@@ -428,10 +446,10 @@ export default function Home() {
 
         const unlockedBadges = await evaluateBadges(user.id);
 
-        showToast("Visited hotspot. +50 XP earned!");      
-        if (unlockedBadges.length > 0) {          
+        showToast(`Visit verified at ${verification.distance_meters.toFixed(0)}m. XP granted.`);
+        if (unlockedBadges.length > 0) {
           setBadgeCelebration(true);
-          showToast(`Badge unlocked: ${unlockedBadges[0].name}`); 
+          showToast(`Badge unlocked: ${unlockedBadges[0].name}`);
         }
 
         const projectedCount = visitedIds.length + 1;
@@ -444,13 +462,12 @@ export default function Home() {
           showToast("Achievement unlocked: Adventurer.");
         }
       } catch (error) {
-        console.error("Failed to mark visit:", error);
+        console.error("Failed to verify visit:", error);
         showToast("Could not save visit.");
       }
     },
     [showToast, user, visitedIds]
   );
-
   const handleOpenQuest = useCallback(
     (hotspotId: string) => {
       const found = questCandidates.find((hotspot) => hotspot.id === hotspotId);
@@ -563,6 +580,15 @@ export default function Home() {
           onWishlistToggle={handleWishlist}
           loading={!userDataLoaded}
           selectedCategory={selectedCategory}
+        />
+
+        <AdventuresNearYou
+          hotspots={questCandidates.filter((h) => !selectedCategory || h.category === selectedCategory)}
+          userPosition={userPosition}
+          wishlistIds={wishlistIds}
+          visitedIds={visitedIds}
+          onWishlistToggle={handleWishlist}
+          loading={questLoading}
         />
         {/* Main Content - Discovery First 
         <div className="max-w-4xl mx-auto px-4 py-8">
@@ -701,6 +727,11 @@ export default function Home() {
 
   return renderLoggedInHomepage();
 }
+
+
+
+
+
 
 
 
