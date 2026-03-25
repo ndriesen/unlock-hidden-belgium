@@ -1,16 +1,15 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { supabase } from "@/lib/Supabase/browser-client";
 import { GlassButton } from "@/components/ui/glass-button";
-
-export type MediaVisibility = "public" | "friends" | "private";
+import { uploadHotspotPhotos } from "@/lib/services/hotspotMedia";
+import type { MediaVisibility } from "@/lib/services/media";
 
 interface Props {
   hotspotId: string;
   hotspotName: string;
   userId: string;
-  onUploaded: () => void;
+  onUploaded: () => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -28,29 +27,6 @@ export const CreateMemoryModalHotspot: React.FC<Props> = ({
   const [message, setMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Upload functie
-  const uploadHotspotPhoto = async (file: File) => {
-    try {
-      const bucket = "spotly-media";
-      const path = `${userId}/hotspots/${hotspotId}/${Date.now()}_${file.name}`;
-
-      // Upload naar Supabase Storage
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file);
-      if (uploadError) throw uploadError;
-
-      // Signed URL ophalen (1 uur geldig)
-      const { data: signedData, error: signedError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(path, 60 * 60);
-      if (signedError) throw signedError;
-
-      return { success: true, url: signedData.signedUrl };
-    } catch (err) {
-      console.error(err);
-      return { success: false, message: (err as Error).message };
-    }
-  };
-
   const handleUpload = async () => {
     if (!files.length) {
       setMessage("Select at least one file first.");
@@ -61,18 +37,33 @@ export const CreateMemoryModalHotspot: React.FC<Props> = ({
     setMessage("");
 
     try {
-      // Alle foto's parallel uploaden
-      const results = await Promise.all(files.map(uploadHotspotPhoto));
+      const results = await uploadHotspotPhotos({
+        userId,
+        hotspotId,
+        hotspotName,
+        files,
+        caption,
+        visibility,
+      });
 
-      const failed = results.filter((r) => !r.success);
+      const failed = results.filter((result) => !result.success);
+      const successCount = results.length - failed.length;
+
       if (failed.length > 0) {
-        setMessage(`Error uploading ${failed.length} file(s).`);
-      } else {
-        setMessage("All photos uploaded successfully!");
-        setFiles([]);
-        setCaption("");
-        onUploaded();
+        const summary = failed
+          .slice(0, 2)
+          .map((result) => `${result.fileName}: ${result.error ?? "Upload failed."}`)
+          .join(" ");
+
+        setMessage(`Uploaded ${successCount}/${results.length}. ${summary}${failed.length > 2 ? " ..." : ""}`);
+
+        return;
       }
+
+      setMessage("All photos uploaded successfully!");
+      setFiles([]);
+      setCaption("");
+      await onUploaded();
     } catch (err) {
       console.error(err);
       setMessage("Upload failed. Please try again.");
@@ -118,7 +109,7 @@ export const CreateMemoryModalHotspot: React.FC<Props> = ({
 
           {/* File Upload */}
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">📸 Photos</label>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Photos</label>
             <input
               ref={fileInputRef}
               type="file"
@@ -141,14 +132,14 @@ export const CreateMemoryModalHotspot: React.FC<Props> = ({
                       onClick={() => setFiles(files.filter((_, idx) => idx !== i))}
                       className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100"
                     >
-                      ×
+                      x
                     </button>
                   </div>
                 ))}
               </div>
             )}
             {files.length > 0 && (
-              <p className="text-xs text-slate-500 mt-1">{files.length} photo{files.length !== 1 ? 's' : ''} selected</p>
+              <p className="text-xs text-slate-500 mt-1">{files.length} photo{files.length !== 1 ? "s" : ""} selected</p>
             )}
           </div>
 
