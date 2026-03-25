@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Compass, Loader2, MapPinned, Sparkles } from "lucide-react";
+import { Compass, Loader2, MapPinned, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CreateMemoryModal from "@/components/trips/CreateMemoryModal";
 import JourneyTimeline, { type JourneyGroup, type JourneyStopItem } from "@/components/trips/detail/JourneyTimeline";
@@ -12,15 +13,23 @@ import TripProgressIndicator from "@/components/trips/detail/TripProgressIndicat
 import TripStoryHero from "@/components/trips/detail/TripStoryHero";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 import { useAuth } from "@/context/AuthContext";
+import { fetchHotspots } from "@/lib/services/hotspots";
 import { createSignedMediaUrl } from "@/lib/services/media";
 import {
+  addHotspotToTrip,
   buildTripShareText,
   fetchTrips,
+  removeStopFromTrip,
+  setTripCoverImage,
   toggleTripLike,
+  toggleTripMediaHighlight,
   toggleTripSave,
+  updateStopNote,
+  updateStopVisitedAt,
   type Trip,
   type TripStop,
 } from "@/lib/services/tripBuilder";
+import type { Hotspot } from "@/types/hotspot";
 import { getCategoryDisplay } from "@/types/hotspot";
 
 const TripRouteMap = dynamic(() => import("@/components/trips/TripRouteMap"), {
@@ -34,6 +43,16 @@ const TripRouteMap = dynamic(() => import("@/components/trips/TripRouteMap"), {
 });
 
 const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
+
+type StopCarouselState = {
+  stopId: string;
+  index: number;
+};
+
+function getLeadMediaIndex(stop: TripStop): number {
+  const highlightedIndex = stop.media.findIndex((media) => media.isHighlight);
+  return highlightedIndex >= 0 ? highlightedIndex : 0;
+}
 
 function formatDateLabel(dateValue: string | null | undefined): string {
   if (!dateValue) return "Planned stop";
@@ -72,7 +91,6 @@ function isValidCoordinate(value: number): boolean {
 function haversineDistanceKm(fromLat: number, fromLng: number, toLat: number, toLng: number): number {
   const toRadians = (value: number) => (value * Math.PI) / 180;
   const earthRadiusKm = 6371;
-
   const dLat = toRadians(toLat - fromLat);
   const dLng = toRadians(toLng - fromLng);
 
@@ -86,7 +104,8 @@ function haversineDistanceKm(fromLat: number, fromLng: number, toLat: number, to
 }
 
 function stopImage(stop: TripStop): string {
-  return stop.media[0]?.signedUrl || stop.photoUrl || DEFAULT_IMAGE;
+  const leadIndex = getLeadMediaIndex(stop);
+  return stop.media[leadIndex]?.signedUrl || stop.photoUrl || DEFAULT_IMAGE;
 }
 
 function buildJourneyStops(stops: TripStop[]): JourneyStopItem[] {
@@ -150,11 +169,7 @@ function buildJourneyGroups(stops: JourneyStopItem[]): JourneyGroup[] {
       const date = new Date(stop.visitedAt);
 
       key = `day-${dayKey}`;
-      title = date.toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "short",
-        day: "numeric",
-      });
+      title = date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
       subtitle = "Journey chapter by day";
     } else {
       const province = stop.province || "Across Belgium";
@@ -164,12 +179,7 @@ function buildJourneyGroups(stops: JourneyStopItem[]): JourneyGroup[] {
     }
 
     if (!groups.has(key)) {
-      groups.set(key, {
-        key,
-        title,
-        subtitle,
-        stops: [],
-      });
+      groups.set(key, { key, title, subtitle, stops: [] });
     }
 
     groups.get(key)?.stops.push(stop);
@@ -180,46 +190,24 @@ function buildJourneyGroups(stops: JourneyStopItem[]): JourneyGroup[] {
 
 function locationSummary(stops: TripStop[]): string {
   const provinces = Array.from(new Set(stops.map((stop) => stop.province).filter(Boolean)));
-
-  if (!provinces.length) {
-    return "Belgium";
-  }
-
-  if (provinces.length === 1) {
-    return provinces[0];
-  }
-
-  if (provinces.length === 2) {
-    return `${provinces[0]} & ${provinces[1]}`;
-  }
-
+  if (!provinces.length) return "Belgium";
+  if (provinces.length === 1) return provinces[0];
+  if (provinces.length === 2) return `${provinces[0]} & ${provinces[1]}`;
   return `${provinces[0]}, ${provinces[1]} +${provinces.length - 2} regions`;
 }
 
 function buildGoogleMapsUrl(stops: TripStop[]): string | null {
   const validStops = stops.filter((stop) => isValidCoordinate(stop.lat) && isValidCoordinate(stop.lng));
-
-  if (!validStops.length) {
-    return null;
-  }
+  if (!validStops.length) return null;
 
   const origin = `${validStops[0].lat},${validStops[0].lng}`;
   const destinationStop = validStops[validStops.length - 1];
   const destination = `${destinationStop.lat},${destinationStop.lng}`;
   const waypointStops = validStops.slice(1, -1);
 
-  const params = new URLSearchParams({
-    api: "1",
-    origin,
-    destination,
-    travelmode: "driving",
-  });
-
+  const params = new URLSearchParams({ api: "1", origin, destination, travelmode: "driving" });
   if (waypointStops.length) {
-    params.set(
-      "waypoints",
-      waypointStops.map((stop) => `${stop.lat},${stop.lng}`).join("|")
-    );
+    params.set("waypoints", waypointStops.map((stop) => `${stop.lat},${stop.lng}`).join("|"));
   }
 
   return `https://www.google.com/maps/dir/?${params.toString()}`;
@@ -228,11 +216,7 @@ function buildGoogleMapsUrl(stops: TripStop[]): string | null {
 async function fetchTripsWithRetry(userId: string): Promise<Trip[]> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const trips = await fetchTrips(userId);
-
-    if (trips.length > 0 || attempt === 2) {
-      return trips;
-    }
-
+    if (trips.length > 0 || attempt === 2) return trips;
     await new Promise((resolve) => window.setTimeout(resolve, 180 * (attempt + 1)));
   }
 
@@ -254,10 +238,17 @@ export default function TripDetailPage() {
   const [shareFeedback, setShareFeedback] = useState("");
   const [updatingReactions, setUpdatingReactions] = useState(false);
   const [selectedStop, setSelectedStop] = useState<JourneyStopItem | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<Hotspot[]>([]);
+  const [searchingHotspots, setSearchingHotspots] = useState(false);
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [visitedDrafts, setVisitedDrafts] = useState<Record<string, string>>({});
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [carousel, setCarousel] = useState<StopCarouselState | null>(null);
 
   const inFlightRef = useRef<Promise<void> | null>(null);
   const requestVersionRef = useRef(0);
-
+  const hotspotsCacheRef = useRef<Hotspot[] | null>(null);
   const loadTrip = useCallback(
     async ({ showLoader, preserveCurrent }: { showLoader: boolean; preserveCurrent: boolean }) => {
       if (!user?.id || !tripId) {
@@ -273,9 +264,7 @@ export default function TripDetailPage() {
       requestVersionRef.current = version;
 
       const operation = (async () => {
-        if (showLoader) {
-          setLoading(true);
-        }
+        if (showLoader) setLoading(true);
 
         try {
           const trips = await fetchTripsWithRetry(user.id);
@@ -286,10 +275,7 @@ export default function TripDetailPage() {
           }
 
           setTrip((current) => {
-            if (foundTrip) {
-              return foundTrip;
-            }
-
+            if (foundTrip) return foundTrip;
             return preserveCurrent ? current : null;
           });
         } finally {
@@ -365,6 +351,21 @@ export default function TripDetailPage() {
   const journeyGroups = useMemo(() => buildJourneyGroups(journeyStops), [journeyStops]);
 
   useEffect(() => {
+    if (!trip) return;
+
+    const nextNoteDrafts: Record<string, string> = {};
+    const nextVisitedDrafts: Record<string, string> = {};
+
+    trip.stops.forEach((stop) => {
+      nextNoteDrafts[stop.id] = stop.note || "";
+      nextVisitedDrafts[stop.id] = stop.visitedAt ? stop.visitedAt.slice(0, 10) : "";
+    });
+
+    setNoteDrafts(nextNoteDrafts);
+    setVisitedDrafts(nextVisitedDrafts);
+  }, [trip]);
+
+  useEffect(() => {
     if (!journeyStops.length) {
       setActiveStopId(null);
       return;
@@ -375,6 +376,67 @@ export default function TripDetailPage() {
       setActiveStopId(journeyStops[0].id);
     }
   }, [journeyStops, activeStopId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const runSearch = async () => {
+      const term = searchTerm.trim();
+
+      if (!term || term.length < 2 || !trip) {
+        setSearchResults([]);
+        setSearchingHotspots(false);
+        return;
+      }
+
+      setSearchingHotspots(true);
+
+      try {
+        let hotspots = hotspotsCacheRef.current;
+
+        if (!hotspots) {
+          hotspots = ((await fetchHotspots()) as Hotspot[] | null) ?? [];
+          hotspotsCacheRef.current = hotspots;
+        }
+
+        const normalizedTerm = term.toLowerCase();
+        const existingHotspotIds = new Set(trip.stops.map((stop) => stop.hotspotId));
+
+        const filtered = hotspots
+          .filter((hotspot) => {
+            if (!hotspot.id || existingHotspotIds.has(hotspot.id)) {
+              return false;
+            }
+
+            const target = `${hotspot.name ?? ""} ${hotspot.province ?? ""} ${String(hotspot.category ?? "")}`;
+            return target.toLowerCase().includes(normalizedTerm);
+          })
+          .slice(0, 8);
+
+        if (!cancelled) {
+          setSearchResults(filtered);
+        }
+      } catch (error) {
+        console.error("Hotspot search failed", error);
+        if (!cancelled) {
+          setSearchResults([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSearchingHotspots(false);
+        }
+      }
+    };
+
+    const timeout = window.setTimeout(() => {
+      void runSearch();
+    }, 220);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [searchTerm, trip]);
 
   const activeStopIndex = useMemo(() => {
     if (!journeyStops.length || !activeStopId) {
@@ -409,12 +471,9 @@ export default function TripDetailPage() {
   }, [loadTrip]);
 
   const handleLike = useCallback(async () => {
-    if (!trip || !user?.id || updatingReactions) {
-      return;
-    }
+    if (!trip || !user?.id || updatingReactions) return;
 
     setUpdatingReactions(true);
-
     try {
       await toggleTripLike({ tripId: trip.id, userId: user.id, tripTitle: trip.title });
       await refreshTrip();
@@ -424,12 +483,9 @@ export default function TripDetailPage() {
   }, [refreshTrip, trip, updatingReactions, user?.id]);
 
   const handleSave = useCallback(async () => {
-    if (!trip || !user?.id || updatingReactions) {
-      return;
-    }
+    if (!trip || !user?.id || updatingReactions) return;
 
     setUpdatingReactions(true);
-
     try {
       await toggleTripSave({ tripId: trip.id, userId: user.id, tripTitle: trip.title });
       await refreshTrip();
@@ -439,20 +495,14 @@ export default function TripDetailPage() {
   }, [refreshTrip, trip, updatingReactions, user?.id]);
 
   const handleShare = useCallback(async () => {
-    if (!trip) {
-      return;
-    }
+    if (!trip) return;
 
     const url = typeof window !== "undefined" ? window.location.href : "";
     const text = buildTripShareText(trip);
 
     try {
       if (navigator.share) {
-        await navigator.share({
-          title: trip.title,
-          text,
-          url,
-        });
+        await navigator.share({ title: trip.title, text, url });
         setShareFeedback("Trip shared");
         return;
       }
@@ -470,15 +520,6 @@ export default function TripDetailPage() {
     setShareFeedback("Sharing unavailable on this device");
   }, [trip]);
 
-  useEffect(() => {
-    if (!shareFeedback) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setShareFeedback(""), 2400);
-    return () => window.clearTimeout(timeout);
-  }, [shareFeedback]);
-
   const handleOpenMaps = useCallback(() => {
     if (!mapsUrl) {
       setShareFeedback("No route coordinates yet");
@@ -487,6 +528,177 @@ export default function TripDetailPage() {
 
     window.open(mapsUrl, "_blank", "noopener,noreferrer");
   }, [mapsUrl]);
+
+  const handleAddStop = useCallback(
+    async (hotspot: Hotspot) => {
+      if (!trip || !user?.id) return;
+
+      setBusyAction("add-stop");
+      try {
+        await addHotspotToTrip({ tripId: trip.id, hotspot });
+        setSearchTerm("");
+        setSearchResults([]);
+        await refreshTrip();
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [refreshTrip, trip, user?.id]
+  );
+
+  const handleAddCustomStop = useCallback(async () => {
+    if (!trip || !user?.id || !searchTerm.trim()) return;
+
+    setBusyAction("add-custom-stop");
+    try {
+      await addHotspotToTrip({
+        tripId: trip.id,
+        hotspot: {
+          id: `custom-${Date.now()}`,
+          name: searchTerm.trim(),
+          category: "custom",
+          province: "",
+          images: [],
+          latitude: 0,
+          longitude: 0,
+        } as Hotspot,
+      });
+
+      setSearchTerm("");
+      setSearchResults([]);
+      await refreshTrip();
+    } finally {
+      setBusyAction(null);
+    }
+  }, [refreshTrip, searchTerm, trip, user?.id]);
+
+  const handleRemoveStop = useCallback(
+    async (stopId: string) => {
+      if (!trip) return;
+
+      setBusyAction(`remove-${stopId}`);
+      try {
+        await removeStopFromTrip(trip.id, stopId);
+        await refreshTrip();
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [refreshTrip, trip]
+  );
+
+  const handleSaveStopNote = useCallback(
+    async (stopId: string) => {
+      if (!trip) return;
+
+      setBusyAction(`note-${stopId}`);
+      try {
+        await updateStopNote(trip.id, stopId, noteDrafts[stopId] || "");
+        await refreshTrip();
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [noteDrafts, refreshTrip, trip]
+  );
+
+  const handleSaveStopVisitedDate = useCallback(
+    async (stopId: string) => {
+      if (!trip) return;
+
+      setBusyAction(`visited-${stopId}`);
+      try {
+        await updateStopVisitedAt(trip.id, stopId, visitedDrafts[stopId] || null);
+        await refreshTrip();
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [refreshTrip, trip, visitedDrafts]
+  );
+
+  const handleSetLeadImage = useCallback(
+    async (stop: TripStop, mediaId: string) => {
+      if (!trip || !user?.id) return;
+
+      setBusyAction(`lead-${stop.id}`);
+      try {
+        const highlightedElsewhere = stop.media.filter((media) => media.isHighlight && media.id !== mediaId);
+        if (highlightedElsewhere.length) {
+          await Promise.all(
+            highlightedElsewhere.map((media) =>
+              toggleTripMediaHighlight({ mediaId: media.id, userId: user.id, isHighlight: false })
+            )
+          );
+        }
+
+        const selected = stop.media.find((media) => media.id === mediaId);
+        if (selected && !selected.isHighlight) {
+          await toggleTripMediaHighlight({ mediaId: selected.id, userId: user.id, isHighlight: true });
+        }
+
+        await refreshTrip();
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [refreshTrip, trip, user?.id]
+  );
+
+  const handleSetTripCoverFromMedia = useCallback(
+    async (storagePath: string, stopId: string) => {
+      if (!trip || !user?.id) return;
+
+      setBusyAction(`cover-${stopId}`);
+      try {
+        await setTripCoverImage({ tripId: trip.id, userId: user.id, storagePath });
+        await refreshTrip();
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [refreshTrip, trip, user?.id]
+  );
+
+  const openCarousel = useCallback((stopId: string, index: number) => {
+    setCarousel({ stopId, index });
+  }, []);
+
+  const handleTimelineImageClick = useCallback(
+    (stop: JourneyStopItem) => {
+      if (!trip) return;
+
+      const fullStop = trip.stops.find((item) => item.id === stop.id);
+      if (!fullStop || !fullStop.media.length) return;
+
+      openCarousel(fullStop.id, getLeadMediaIndex(fullStop));
+    },
+    [openCarousel, trip]
+  );
+
+  const carouselPhotos = useMemo(() => {
+    if (!trip || !carousel) return [];
+
+    const stop = trip.stops.find((item) => item.id === carousel.stopId);
+    return stop?.media ?? [];
+  }, [carousel, trip]);
+
+  const nextCarouselPhoto = useCallback(() => {
+    if (!carousel || !carouselPhotos.length) return;
+    setCarousel({ stopId: carousel.stopId, index: (carousel.index + 1) % carouselPhotos.length });
+  }, [carousel, carouselPhotos.length]);
+
+  const prevCarouselPhoto = useCallback(() => {
+    if (!carousel || !carouselPhotos.length) return;
+    setCarousel({ stopId: carousel.stopId, index: (carousel.index - 1 + carouselPhotos.length) % carouselPhotos.length });
+  }, [carousel, carouselPhotos.length]);
+
+  useEffect(() => {
+    if (!shareFeedback) return;
+
+    const timeout = window.setTimeout(() => setShareFeedback(""), 2400);
+    return () => window.clearTimeout(timeout);
+  }, [shareFeedback]);
 
   const relatedStops = useMemo(() => journeyStops.slice(0, 8), [journeyStops]);
 
@@ -506,10 +718,7 @@ export default function TripDetailPage() {
         <div className="space-y-4">
           <h1 className="text-2xl font-semibold text-slate-900">Trip not found</h1>
           <p className="text-sm text-slate-600">This trip may have been removed or you no longer have access.</p>
-          <Link
-            href="/trips"
-            className="inline-flex rounded-xl bg-[#0f766e] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0d5f5a]"
-          >
+          <Link href="/trips" className="inline-flex rounded-xl bg-[#0f766e] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0d5f5a]">
             Back to trips
           </Link>
         </div>
@@ -549,7 +758,7 @@ export default function TripDetailPage() {
               <h2 className="mt-2 text-2xl font-semibold text-slate-900">Follow the story stop by stop</h2>
             </div>
             <p className="max-w-[260px] text-sm text-slate-600">
-              Scroll to move through each chapter. Progress updates as hotspots enter focus.
+              Scroll to move through each chapter. Tap images to open the stop carousel.
             </p>
           </header>
 
@@ -558,7 +767,225 @@ export default function TripDetailPage() {
             activeStopId={activeStopId}
             onActiveStopChange={setActiveStopId}
             onAddMemory={setSelectedStop}
+            onImageClick={handleTimelineImageClick}
           />
+        </section>
+
+        <section className="space-y-5 rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-[0_22px_40px_-34px_rgba(10,18,36,0.95)] backdrop-blur-xl sm:p-6">
+          <header className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-900">Trip studio</h2>
+              <p className="text-sm text-slate-600">Edit stop count, details, and media directly from one place.</p>
+            </div>
+          </header>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <label className="mb-2 block text-sm font-medium text-slate-700">Add a stop</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search hotspots by name, category, or province"
+                  className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!searchTerm.trim()) return;
+                  void handleAddCustomStop();
+                }}
+                disabled={!searchTerm.trim() || busyAction === "add-custom-stop"}
+                className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                Add custom
+              </button>
+            </div>
+
+            {searchingHotspots ? <p className="mt-2 text-xs text-slate-500">Searching hotspots...</p> : null}
+
+            {searchResults.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {searchResults.map((hotspot) => (
+                  <button
+                    key={hotspot.id}
+                    type="button"
+                    onClick={() => {
+                      void handleAddStop(hotspot);
+                    }}
+                    disabled={busyAction === "add-stop"}
+                    className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-2 text-left transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <div className="relative h-10 w-10 overflow-hidden rounded-lg bg-slate-100">
+                      <OptimizedImage
+                        src={hotspot.images?.[0] || DEFAULT_IMAGE}
+                        alt={hotspot.name}
+                        fill
+                        showSkeleton
+                        enableRetry
+                        className="object-cover"
+                        sizes="40px"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">{hotspot.name}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {getCategoryDisplay(hotspot.category)} {hotspot.province ? `• ${hotspot.province}` : ""}
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold text-emerald-700">Add</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="space-y-4">
+            {trip.stops.map((stop, index) => {
+              const leadIndex = getLeadMediaIndex(stop);
+              const leadMedia = stop.media[leadIndex] ?? null;
+              const thumbs = stop.media.slice(0, 6);
+
+              return (
+                <article key={stop.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Stop {index + 1}</p>
+                      <h3 className="text-lg font-semibold text-slate-900">{stop.name}</h3>
+                      <p className="text-xs text-slate-500">{getCategoryDisplay(stop.category)} {stop.province ? `• ${stop.province}` : ""}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { void handleRemoveStop(stop.id); }}
+                      disabled={busyAction === `remove-${stop.id}`}
+                      className="inline-flex items-center gap-1 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Remove stop
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {stop.media.length > 0 && leadMedia ? (
+                      <div className="grid gap-2 lg:grid-cols-[1.8fr,1fr]">
+                        <button
+                          type="button"
+                          onClick={() => openCarousel(stop.id, leadIndex)}
+                          className="relative block aspect-[16/10] overflow-hidden rounded-2xl border border-slate-200"
+                        >
+                          <OptimizedImage src={leadMedia.signedUrl} alt={leadMedia.caption || stop.name} fill showSkeleton enableRetry className="object-cover" sizes="(max-width: 1024px) 100vw, 700px" />
+                          <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-1 text-[11px] font-semibold text-white">Lead photo</span>
+                        </button>
+
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-2">
+                          {thumbs.map((media, mediaIndex) => {
+                            const isLead = mediaIndex === leadIndex;
+
+                            return (
+                              <div key={media.id} className="space-y-1">
+                                <button type="button" onClick={() => openCarousel(stop.id, mediaIndex)} className="relative block aspect-square overflow-hidden rounded-xl border border-slate-200">
+                                  <OptimizedImage src={media.signedUrl} alt={media.caption || stop.name} fill showSkeleton enableRetry className="object-cover" sizes="120px" />
+                                  {isLead ? <span className="absolute left-1 top-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">Lead</span> : null}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { void handleSetLeadImage(stop, media.id); }}
+                                  disabled={isLead || busyAction === `lead-${stop.id}`}
+                                  className="w-full rounded-md border border-slate-200 px-1 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                  {isLead ? "Current lead" : "Set lead"}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No photos yet for this stop.</div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedStop({
+                            id: stop.id,
+                            hotspotId: stop.hotspotId,
+                            order: index + 1,
+                            name: stop.name,
+                            categoryLabel: getCategoryDisplay(stop.category),
+                            province: stop.province,
+                            note: stop.note,
+                            imageUrl: stopImage(stop),
+                            visitedLabel: formatDateLabel(stop.visitedAt),
+                            visitedAt: stop.visitedAt,
+                            mediaCount: stop.media.length,
+                            distanceFromPreviousKm: null,
+                          })
+                        }
+                        className="rounded-xl bg-[#0f766e] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#0d5f5a]"
+                      >
+                        Upload / manage photos
+                      </button>
+
+                      {leadMedia ? (
+                        <button
+                          type="button"
+                          onClick={() => { void handleSetTripCoverFromMedia(leadMedia.storagePath, stop.id); }}
+                          disabled={busyAction === `cover-${stop.id}`}
+                          className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Use lead as trip cover
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">Stop note</label>
+                        <textarea
+                          value={noteDrafts[stop.id] || ""}
+                          onChange={(event) => setNoteDrafts((current) => ({ ...current, [stop.id]: event.target.value }))}
+                          rows={3}
+                          className="w-full rounded-xl border border-slate-200 p-2 text-sm focus:border-emerald-500 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { void handleSaveStopNote(stop.id); }}
+                          disabled={busyAction === `note-${stop.id}`}
+                          className="mt-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Save note
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">Visited date</label>
+                        <input
+                          type="date"
+                          value={visitedDrafts[stop.id] || ""}
+                          onChange={(event) => setVisitedDrafts((current) => ({ ...current, [stop.id]: event.target.value }))}
+                          className="w-full rounded-xl border border-slate-200 p-2 text-sm focus:border-emerald-500 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { void handleSaveStopVisitedDate(stop.id); }}
+                          disabled={busyAction === `visited-${stop.id}`}
+                          className="mt-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Save date
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </section>
 
         <section className="space-y-4 rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-[0_22px_40px_-34px_rgba(10,18,36,0.95)] backdrop-blur-xl sm:p-6">
@@ -567,11 +994,7 @@ export default function TripDetailPage() {
               <h2 className="text-2xl font-semibold text-slate-900">Route map</h2>
               <p className="text-sm text-slate-600">Visualize all stops and the trip path in one glance.</p>
             </div>
-            <button
-              type="button"
-              onClick={handleOpenMaps}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            >
+            <button type="button" onClick={handleOpenMaps} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
               <MapPinned className="h-4 w-4" />
               Open in Maps
             </button>
@@ -594,32 +1017,17 @@ export default function TripDetailPage() {
             <div className="flex snap-x gap-3 overflow-x-auto pb-2">
               {relatedStops.map((stop) => {
                 const hasHotspotLink = Boolean(stop.hotspotId && !stop.hotspotId.startsWith("custom"));
-
                 return (
-                  <div
-                    key={stop.id}
-                    className="min-w-[220px] max-w-[240px] snap-start overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-                  >
+                  <div key={stop.id} className="min-w-[220px] max-w-[240px] snap-start overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="relative h-28">
-                      <OptimizedImage
-                        src={stop.imageUrl}
-                        alt={stop.name}
-                        fill
-                        showSkeleton
-                        enableRetry
-                        className="object-cover"
-                        sizes="220px"
-                      />
+                      <OptimizedImage src={stop.imageUrl} alt={stop.name} fill showSkeleton enableRetry className="object-cover" sizes="220px" />
                     </div>
                     <div className="space-y-2 p-3">
                       <p className="line-clamp-1 text-sm font-semibold text-slate-900">{stop.name}</p>
                       <p className="text-xs text-slate-500">{stop.province || "Belgium"}</p>
 
                       {hasHotspotLink ? (
-                        <Link
-                          href={`/hotspots/${stop.hotspotId}`}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#0f766e]"
-                        >
+                        <Link href={`/hotspots/${stop.hotspotId}`} className="inline-flex items-center gap-1 text-xs font-semibold text-[#0f766e]">
                           Open hotspot
                           <Compass className="h-3.5 w-3.5" />
                         </Link>
@@ -632,19 +1040,12 @@ export default function TripDetailPage() {
               })}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-              Add stops to start building this journey.
-            </div>
+            <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">Add stops to start building this journey.</div>
           )}
 
           <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-cyan-50 p-4">
-            <p className="text-sm text-slate-700">
-              Inspired by this trip? Create your own version and share your hidden gems with the community.
-            </p>
-            <Link
-              href="/trips"
-              className="mt-3 inline-flex rounded-xl bg-[#0f766e] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0d5f5a]"
-            >
+            <p className="text-sm text-slate-700">Inspired by this trip? Create your own version and share your hidden gems with the community.</p>
+            <Link href="/trips" className="mt-3 inline-flex rounded-xl bg-[#0f766e] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0d5f5a]">
               Create a new trip
             </Link>
           </div>
@@ -681,7 +1082,64 @@ export default function TripDetailPage() {
         userId={user?.id ?? ""}
         hotspotId={selectedStop && !selectedStop.hotspotId.startsWith("custom") ? selectedStop.hotspotId : ""}
       />
+
+      {carousel && carouselPhotos.length > 0 ? (
+        <div
+          className="fixed inset-0 z-[100] bg-black/95"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setCarousel(null);
+            }
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setCarousel(null)}
+            className="absolute right-4 top-4 z-10 rounded-full border border-white/35 bg-black/35 p-2 text-white"
+            aria-label="Close carousel"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              prevCarouselPhoto();
+            }}
+            className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/35 bg-black/35 px-3 py-2 text-2xl text-white"
+            aria-label="Previous photo"
+          >
+            ‹
+          </button>
+
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              nextCarouselPhoto();
+            }}
+            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/35 bg-black/35 px-3 py-2 text-2xl text-white"
+            aria-label="Next photo"
+          >
+            ›
+          </button>
+
+          <div className="relative mx-auto h-full w-full max-w-6xl">
+            <Image
+              src={carouselPhotos[carousel.index].signedUrl}
+              alt={carouselPhotos[carousel.index].caption || "Trip memory"}
+              fill
+              className="object-contain"
+              sizes="100vw"
+              priority
+            />
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-4 py-2 text-sm font-medium text-white">
+              {carousel.index + 1} / {carouselPhotos.length}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
-
