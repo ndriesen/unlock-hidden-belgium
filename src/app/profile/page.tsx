@@ -1,5 +1,4 @@
-﻿﻿
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -433,14 +432,22 @@ export default function ProfilePage() {
       return;
     }
 
-    const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
-    const publicUrl = data.publicUrl;
+    const { data: signedData, error: signedError } = await supabase.storage
+      .from("avatars")
+      .createSignedUrl(filePath, 24 * 60 * 60);
+
+    if (signedError || !signedData?.signedUrl) {
+      console.error("Avatar signed URL error:", signedError);
+      return;
+    }
+
+    const signedUrl = signedData.signedUrl;
 
     await supabase.auth.updateUser({
-      data: { avatar_url: publicUrl },
+      data: { avatar_url: signedUrl, avatar_path: filePath },
     });
 
-    setAvatarUrl(publicUrl);
+    setAvatarUrl(signedUrl);
   };
 
   const handleSaveBuddyPreferences = async () => {
@@ -488,9 +495,9 @@ export default function ProfilePage() {
 
   // Profile tabs
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'preferences' as const, label: 'Buddies', icon: '👥' },
-    { id: 'badges' as const, label: 'Badges', icon: '🏆' },
+    { id: 'overview', label: 'Overview', icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â ' },
+    { id: 'preferences' as const, label: 'Buddies', icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¥' },
+    { id: 'badges' as const, label: 'Badges', icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ' },
   ];
 
   return (
@@ -512,12 +519,12 @@ export default function ProfilePage() {
             )}
           </div>
           <label className="absolute -bottom-2 -right-2 bg-white p-2 rounded-full shadow-lg cursor-pointer">
-            ✏️
+            ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
             <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
           </label>
           {/* TODO: Follow button for public profiles only (see TODO.md)
           <label className="absolute -bottom-2 -left-2 bg-white p-2 rounded-full shadow-lg cursor-pointer" onClick={handleToggleFollow}>
-            {isFollowing ? '✓' : '+'}
+            {isFollowing ? 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ' : '+'}
           </label> */}
         </div>
         <div className="space-y-2">
@@ -661,7 +668,7 @@ export default function ProfilePage() {
                   {visited.slice(0, 4).map((hotspot) => (
                     <div key={hotspot.id} className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
                       <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-                        📍
+                        ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â
                       </div>
                       <div>
                         <p className="font-semibold">{hotspot.name}</p>
@@ -856,7 +863,7 @@ export default function ProfilePage() {
               </div>
               {earnedBadges.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
-                  <span className="text-4xl mb-4 block">🏆</span>
+                  <span className="text-4xl mb-4 block">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â </span>
                   <h3 className="text-xl font-bold mb-2">No badges yet</h3>
                   <p className="text-slate-600 mb-6">Keep exploring to unlock achievements</p>
                 </div>
