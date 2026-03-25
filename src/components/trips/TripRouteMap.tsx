@@ -103,6 +103,17 @@ export default function TripRouteMap({
 }: TripRouteMapProps) {
   const mapRef = useRef<L.Map | null>(null);
 
+
+    // Sort stops
+  const sortedStops = useMemo(() => {
+    return [...stops].sort((a, b) => {
+      const dateA = a.visitedAt || a.addedAt || 0;
+      const dateB = b.visitedAt || b.addedAt || 0;
+
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    });
+  }, [stops]);
+
   // Get route coordinates (either from tracked locations or stops)
   const routeCoordinates = useMemo<[number, number][]>(() => {
     if (locations.length > 0) {
@@ -113,7 +124,7 @@ export default function TripRouteMap({
     
 
     // Fall back to stop coordinates
-    return stops
+    return sortedStops
       .map((stop) => getStopCoordinates(stop))
       .filter((coords): coords is [number, number] => coords !== null);
   }, [stops, locations]);
@@ -126,6 +137,8 @@ export default function TripRouteMap({
   
   const [mapKey, setMapKey] = useState(0); // Force remount on open
   
+
+
   
   
   // Calculate total distance
@@ -193,7 +206,7 @@ export default function TripRouteMap({
         )}
         
         {/* Stop markers */}
-        {stops.map((stop, index) => {
+        {sortedStops.map((stop, index) => {
           const coords = getStopCoordinates(stop);
           if (!coords) return null;
 
@@ -201,12 +214,12 @@ export default function TripRouteMap({
             <Marker
               key={stop.id}
               position={coords}
-              icon={createStopIcon(index, stops.length)}
+              icon={createStopIcon(index, sortedStops.length)}
             />
           );
         })}
         
-        <FitToRoute stops={stops} locations={locations} />
+        <FitToRoute stops={sortedStops} locations={locations} />
       </MapContainer>
       
       {/* Distance indicator */}

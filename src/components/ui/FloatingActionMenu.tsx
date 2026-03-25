@@ -13,12 +13,23 @@ interface Action {
 
 interface FloatingActionMenuProps {
   actions: Action[]
+  state?:boolean
 }
 
-export default function FloatingActionMenu({ actions }: FloatingActionMenuProps) {
-  const [open, setOpen] = React.useState(false)
+export default function FloatingActionMenu({ actions, state }: FloatingActionMenuProps) {
+
+  const [open, setOpen] = React.useState(state ?? false)
+
+  React.useEffect(() => {
+    if (state !== undefined) {
+      setOpen(state)
+    }
+  }, [state])
 
   const toggle = () => setOpen((prev) => !prev)
+  
+
+
 
   return (
     <div className="relative flex items-center">

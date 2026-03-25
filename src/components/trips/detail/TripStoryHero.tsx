@@ -98,7 +98,7 @@ export default function TripStoryHero({
       >
         <ArrowLeft className="h-5 w-5" />
       </button>
-
+          
       <div ref={parallaxLayerRef} className="absolute inset-0 will-change-transform">
         <OptimizedImage
           src={imageUrl}

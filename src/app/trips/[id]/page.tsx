@@ -1,10 +1,11 @@
 "use client";
 
+// IMPORTS
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Compass, Edit3, Loader2, MapPinned, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Compass, Edit3, Loader2, MapPinned, Plus, Search, Sparkles, Trash2, X, Heart, Save, SaveOff, Share } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CreateMemoryModal from "@/components/trips/CreateMemoryModal";
 import StopImagesGrid from "@/components/trips/StopImagesGrid";
@@ -31,6 +32,7 @@ import {
 } from "@/lib/services/tripBuilder";
 import type { Hotspot } from "@/types/hotspot";
 import { getCategoryDisplay } from "@/types/hotspot";
+import FloatingActionMenu from "@/components/ui/FloatingActionMenu";
 
 const TripRouteMap = dynamic(() => import("@/components/trips/TripRouteMap"), {
   ssr: false,
@@ -290,6 +292,10 @@ export default function TripDetailPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [carousel, setCarousel] = useState<StopCarouselState | null>(null);
   const [showTripStudio, setShowTripStudio] = useState(false);
+
+  const [wishlistedByMe, setWishlistedByMe] = useState(false);
+  const [likedByMe, setLikedByMe] = useState(false);
+  const [savedByMe, setSavedByMe] = useState(false);
 
   const inFlightRef = useRef<Promise<void> | null>(null);
   const requestVersionRef = useRef(0);
@@ -773,18 +779,7 @@ export default function TripDetailPage() {
           onBack={() => router.push("/trips")}
         />
 
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setShowTripStudio((current) => !current)}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            aria-expanded={showTripStudio}
-            aria-controls="trip-studio"
-          >
-            <Edit3 className="h-4 w-4" />
-            {showTripStudio ? "Close studio" : "Edit trip"}
-          </button>
-        </div>
+
 
         <section className="space-y-4 rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-[0_22px_40px_-34px_rgba(10,18,36,0.95)] backdrop-blur-xl sm:p-6">
           <header className="flex flex-wrap items-end justify-between gap-3">
@@ -794,6 +789,18 @@ export default function TripDetailPage() {
                 Journey timeline
               </p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-900">Follow the story stop by stop</h2>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowTripStudio((current) => !current)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                aria-expanded={showTripStudio}
+                aria-controls="trip-studio"
+              >
+                <Edit3 className="h-4 w-4" />
+                {showTripStudio ? "Close studio" : "Edit trip"}
+              </button>
             </div>
             <p className="max-w-[260px] text-sm text-slate-600">
               Scroll to move through each chapter. Tap images to open the stop carousel.
@@ -1065,7 +1072,44 @@ export default function TripDetailPage() {
         </section>
       </div>
 
-
+      <div className="fixed inset-x-0 bottom-25 z-40 flex px-4 md:bottom-8 md:justify-center">
+                       
+        <FloatingActionMenu
+          state = {true}
+          actions={[
+            {
+              icon: likedByMe ? "❤️" : <Heart/>,
+              label: likedByMe ? "Liked" : "Like",
+              onClick: handleLike,
+              className: likedByMe
+                ? "bg-transparent text-slate-800"
+                : "bg-transparent text-slate-800",
+            },
+            {
+              icon: savedByMe ? <Save/> : <SaveOff/>,
+              label: savedByMe ? "Saved" : "Save",
+              onClick: handleSave,
+              className: savedByMe
+                ? "bg-transparent text-slate-800"
+                : "bg-transparent text-slate-800",
+            },
+            {
+              icon:<MapPinned/>,
+              label: "Route",
+              onClick: handleOpenMaps,
+              className: "bg-transparent text-slate-800",
+            },
+            {
+              icon: <Share />,
+              label: "Share",
+              onClick: () => handleShare(),
+              className: "bg-transparent text-slate-800",
+            },
+          ]}
+        />
+      </div>
+      
+      {/*
       <TripFloatingActions
         likesCount={trip.likesCount}
         savesCount={trip.savesCount}
@@ -1076,8 +1120,8 @@ export default function TripDetailPage() {
         onShare={handleShare}
         onOpenMaps={handleOpenMaps}
         disabled={updatingReactions}
-      />
-
+      /> */}
+      
       {shareFeedback ? (
         <div className="pointer-events-none fixed left-1/2 top-24 z-50 -translate-x-1/2 rounded-full bg-slate-900/90 px-4 py-2 text-sm font-medium text-white shadow-lg">
           {shareFeedback}
@@ -1097,6 +1141,8 @@ export default function TripDetailPage() {
         hotspotId={selectedStop && !selectedStop.hotspotId.startsWith("custom") ? selectedStop.hotspotId : ""}
       />
 
+
+      {/* IMAGE CARROUSEL */}
       {carousel && carouselPhotos.length > 0 ? (
         <div
           className="fixed inset-0 z-[100] bg-black/95"

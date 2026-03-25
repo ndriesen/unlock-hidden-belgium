@@ -191,7 +191,7 @@ export default function JourneyTimeline({
                       onClick={() => onImageClick?.(stop, leadPreviewUrl)}
                       className={cn(
                         "group relative col-span-2 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 text-left",
-                        "aspect-[16/10] md:row-span-2 md:aspect-auto",
+                        "aspect-[16/10] md:h-full md:row-span-2 md:aspect-4/3",
                         onImageClick ? "cursor-pointer" : "cursor-default"
                       )}
                       disabled={!onImageClick}
