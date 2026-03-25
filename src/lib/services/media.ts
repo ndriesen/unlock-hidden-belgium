@@ -1,4 +1,4 @@
-﻿import { supabase } from "@/lib/Supabase/browser-client";
+import { supabase } from "@/lib/Supabase/browser-client";
 
 export type MediaVisibility = "private" | "friends" | "public";
 
@@ -42,8 +42,9 @@ export function buildMediaStoragePath(params: {
 
   const safeRef = sanitizeSegment(params.refId) || "item";
   const safeName = sanitizeSegment(params.fileName.replace(/\.[^.]+$/, "")) || "upload";
+  const uniquePrefix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  return `${params.userId}/${params.scope}/${safeRef}/${Date.now()}_${safeName}.${extension}`;
+  return `${params.userId}/${params.scope}/${safeRef}/${uniquePrefix}_${safeName}.${extension}`;
 }
 
 export async function uploadImageToMediaBucket(params: {
@@ -63,6 +64,8 @@ export async function uploadImageToMediaBucket(params: {
     refId: params.refId,
     fileName: params.file.name,
   });
+
+  console.log("Uploading to:", storagePath);
 
   const { error } = await supabase.storage
     .from("spotly-media")
@@ -93,4 +96,3 @@ export async function createSignedMediaUrl(storagePath: string, expiresInSeconds
 
   return data.signedUrl;
 }
-

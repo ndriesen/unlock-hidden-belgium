@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/Supabase/browser-client";
 import { getLevelFromXp } from "./gamificationLevels";
+import { createSignedMediaUrl } from "./media";
 import type { Badge } from "./badgeEngine";
 
 export interface PublicProfileData {
@@ -65,6 +66,8 @@ export interface PublicProfileData {
     createdAt: string;
   }>;
 }
+
+const PUBLIC_PROFILE_MEDIA_EXPIRY_SECONDS = 24 * 60 * 60;
 
 export async function getPublicProfileData(userId: string): Promise<PublicProfileData> {
   // Parallel fetches
@@ -184,19 +187,27 @@ export async function getPublicProfileData(userId: string): Promise<PublicProfil
     ...(hotspotMediaRes.data || [])
   ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 20);
   
-  const photos = allPhotos.map((p: any) => ({
-    id: p.id,
-    storage_path: p.storage_path,
-    public_url: p.storage_path ? supabase.storage.from("trip-media").getPublicUrl(p.storage_path).data.publicUrl : '/images/placeholder-image.png',
-    created_at: p.created_at,
-  })) || [
-{ id: 'demo-p1', storage_path: '', public_url: '/images/placeholder-image.png', created_at: '2024-03-20' },
-{ id: 'demo-p2', storage_path: '', public_url: '/images/placeholder-image.png', created_at: '2024-03-19' }
-  ];
+  const photoRows = await Promise.all(
+    allPhotos.map(async (p: any) => ({
+      id: p.id,
+      storage_path: p.storage_path,
+      public_url: p.storage_path
+        ? (await createSignedMediaUrl(p.storage_path, PUBLIC_PROFILE_MEDIA_EXPIRY_SECONDS)) ?? "/images/placeholder-image.png"
+        : "/images/placeholder-image.png",
+      created_at: p.created_at,
+    }))
+  );
+
+  const photos = photoRows.length > 0
+    ? photoRows
+    : [
+        { id: "demo-p1", storage_path: "", public_url: "/images/placeholder-image.png", created_at: "2024-03-20" },
+        { id: "demo-p2", storage_path: "", public_url: "/images/placeholder-image.png", created_at: "2024-03-19" },
+      ];
   const badgesList = (badgesRes.data || []).map((b: any) => ({
     id: b.badges?.id || `demo-${Math.random()}`,
     name: b.badges?.name || 'Explorer Badge',
-    icon: b.badges?.icon || '🏆',
+    icon: b.badges?.icon || 'Ã°Å¸Ââ€ ',
     description: b.badges?.description || 'Achievement unlocked',
     awarded_at: b.awarded_at || new Date().toISOString(),
   })).filter(b => b.id !== 'demo-${Math.random()}'); // Safe access, prioritize real data

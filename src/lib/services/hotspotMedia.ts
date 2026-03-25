@@ -1,12 +1,19 @@
 import { supabase } from "@/lib/Supabase/browser-client";
 import {
+  buildMediaStoragePath,
   createSignedMediaUrl,
   MediaVisibility,
   normalizeCaption,
-  uploadImageToMediaBucket,
+  validateImageFile,
 } from "@/lib/services/media";
 import { recordActivity } from "@/lib/services/activity";
 import { OrganizedHotspotMedia } from "@/types/hotspot";
+
+const MEDIA_BUCKET = "spotly-media";
+const PUBLIC_URL_EXPIRY_SECONDS = 24 * 60 * 60;
+const RESTRICTED_URL_EXPIRY_SECONDS = 60 * 60;
+
+type Visibility = "public" | "friends" | "private";
 
 interface HotspotMediaRow {
   id: string;
@@ -18,6 +25,113 @@ interface HotspotMediaRow {
   caption: string;
   visibility: MediaVisibility;
   is_primary: boolean;
+  created_at: string;
+}
+
+interface CachedSignedUrl {
+  url: string;
+  expiresAt: number;
+}
+
+interface HotspotAssetPaths {
+  basePath: string;
+  originalPath: string;
+  thumbnailPath: string;
+}
+
+interface UploadFileInternalResult extends HotspotPhotoUploadResult {
+  metadataId?: string;
+}
+
+const hotspotSignedUrlCache = new Map<string, CachedSignedUrl>();
+
+function buildSignedUrlCacheKey(storagePath: string, expiresInSeconds: number, viewerScope: string): string {
+  return `${viewerScope}:${expiresInSeconds}:${storagePath}`;
+}
+
+function getCachedSignedUrl(cacheKey: string): string | null {
+  const cached = hotspotSignedUrlCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (cached.expiresAt > Date.now()) {
+    return cached.url;
+  }
+
+  hotspotSignedUrlCache.delete(cacheKey);
+  return null;
+}
+
+function setCachedSignedUrl(cacheKey: string, url: string, expiresInSeconds: number): void {
+  hotspotSignedUrlCache.set(cacheKey, {
+    url,
+    expiresAt: Date.now() + expiresInSeconds * 1000,
+  });
+}
+
+function getFileExtension(fileName: string): string {
+  const rawExt = fileName.includes(".")
+    ? fileName.split(".").pop()?.toLowerCase() ?? "jpg"
+    : "jpg";
+
+  return rawExt.replace(/[^a-z0-9]+/g, "") || "jpg";
+}
+
+function buildHotspotAssetPaths(params: {
+  userId: string;
+  hotspotId: string;
+  fileName: string;
+}): HotspotAssetPaths {
+  const seedPath = buildMediaStoragePath({
+    userId: params.userId,
+    scope: "hotspots",
+    refId: params.hotspotId,
+    fileName: params.fileName,
+  });
+
+  const extension = getFileExtension(params.fileName);
+  const basePath = seedPath.replace(/\.[^.]+$/, "");
+
+  return {
+    basePath,
+    originalPath: `${basePath}/original.${extension}`,
+    thumbnailPath: `${basePath}/thumb.${extension}`,
+  };
+}
+
+async function isFine(currentUserId: string, ownerUserId: string): Promise<boolean> {
+  if (!currentUserId || !ownerUserId) return false;
+  if (currentUserId === ownerUserId) return true;
+
+  const [viewerFollowsOwner, ownerFollowsViewer] = await Promise.all([
+    supabase
+      .from("user_follows")
+      .select("follower_id")
+      .eq("follower_id", currentUserId)
+      .eq("followed_id", ownerUserId)
+      .eq("status", "accepted")
+      .maybeSingle(),
+    supabase
+      .from("user_follows")
+      .select("follower_id")
+      .eq("follower_id", ownerUserId)
+      .eq("followed_id", currentUserId)
+      .eq("status", "accepted")
+      .maybeSingle(),
+  ]);
+
+  if (viewerFollowsOwner.error || ownerFollowsViewer.error) {
+    return false;
+  }
+
+  return Boolean(viewerFollowsOwner.data && ownerFollowsViewer.data);
+}
+
+export interface HotspotPhotoRecord {
+  id: string;
+  user_id: string;
+  hotspot_id: string;
+  storage_path: string;
+  visibility: Visibility;
   created_at: string;
 }
 
@@ -39,15 +153,52 @@ export interface HotspotPhotoUploadResult {
   success: boolean;
   url?: string;
   error?: string;
+  storagePath?: string;
+  thumbnailPath?: string;
 }
 
-async function resolveMediaUrl(storagePath: string, visibility: MediaVisibility, expiresInSeconds = 3600): Promise<string | null> {
-  if (visibility === "public") {
-    const { data } = supabase.storage.from("spotly-media").getPublicUrl(storagePath);
-    return data?.publicUrl ?? null;
+export async function getHotspotPhotoUrl(
+  photo: HotspotPhotoRecord,
+  currentUserId?: string | null
+): Promise<string | null> {
+  const viewerId = currentUserId ?? null;
+  const ownerId = photo.user_id;
+
+  let allowed = false;
+  let expiresInSeconds = RESTRICTED_URL_EXPIRY_SECONDS;
+  let viewerScope = "anon";
+
+  if (photo.visibility === "public") {
+    allowed = true;
+    expiresInSeconds = PUBLIC_URL_EXPIRY_SECONDS;
+    viewerScope = "public";
+  } else if (photo.visibility === "friends") {
+    if (!viewerId) return null;
+    allowed = await isFine(viewerId, ownerId);
+    viewerScope = `friends:${viewerId}`;
+  } else {
+    if (!viewerId) return null;
+    allowed = viewerId === ownerId;
+    viewerScope = `private:${viewerId}`;
   }
 
-  return createSignedMediaUrl(storagePath, expiresInSeconds);
+  if (!allowed) {
+    return null;
+  }
+
+  const cacheKey = buildSignedUrlCacheKey(photo.storage_path, expiresInSeconds, viewerScope);
+  const cachedUrl = getCachedSignedUrl(cacheKey);
+  if (cachedUrl) {
+    return cachedUrl;
+  }
+
+  const signedUrl = await createSignedMediaUrl(photo.storage_path, expiresInSeconds);
+  if (!signedUrl) {
+    return null;
+  }
+
+  setCachedSignedUrl(cacheKey, signedUrl, expiresInSeconds);
+  return signedUrl;
 }
 
 export async function fetchHotspotMedia(params: {
@@ -68,29 +219,38 @@ export async function fetchHotspotMedia(params: {
 
   const rows = data as HotspotMediaRow[];
 
-  const signedUrls = await Promise.all(
-    rows.map((row) => createSignedMediaUrl(row.storage_path))
-  );
+  const mapped = (
+    await Promise.all(
+      rows.map(async (row) => {
+        const signedUrl = await getHotspotPhotoUrl(
+          {
+            id: row.id,
+            user_id: row.uploaded_by,
+            hotspot_id: row.hotspot_id,
+            storage_path: row.storage_path,
+            visibility: row.visibility,
+            created_at: row.created_at,
+          },
+          params.userId
+        );
 
-  const mapped = rows
-    .map((row, index) => {
-      const signedUrl = signedUrls[index];
-      if (!signedUrl) return null;
+        if (!signedUrl) return null;
 
-      return {
-        id: row.id,
-        hotspotId: row.hotspot_id,
-        tripId: row.trip_id,
-        tripStopId: row.trip_stop_id,
-        uploadedBy: row.uploaded_by,
-        signedUrl,
-        caption: row.caption,
-        visibility: row.visibility,
-        isPrimary: row.is_primary,
-        createdAt: row.created_at,
-      };
-    })
-    .filter((item): item is HotspotMediaItem => item !== null);
+        return {
+          id: row.id,
+          hotspotId: row.hotspot_id,
+          tripId: row.trip_id,
+          tripStopId: row.trip_stop_id,
+          uploadedBy: row.uploaded_by,
+          signedUrl,
+          caption: row.caption,
+          visibility: row.visibility,
+          isPrimary: row.is_primary,
+          createdAt: row.created_at,
+        };
+      })
+    )
+  ).filter((item): item is HotspotMediaItem => item !== null);
 
   const currentUserId = params.userId ?? "";
 
@@ -118,7 +278,10 @@ export async function uploadHotspotPhotos(params: {
   }
 
   const cleanCaption = normalizeCaption(params.caption);
-  const expiresInSeconds = params.signedUrlExpiresInSeconds ?? 3600;
+  const visibilityExpirySeconds =
+    params.visibility === "public"
+      ? PUBLIC_URL_EXPIRY_SECONDS
+      : params.signedUrlExpiresInSeconds ?? RESTRICTED_URL_EXPIRY_SECONDS;
 
   const { count } = await supabase
     .from("hotspot_media")
@@ -126,69 +289,107 @@ export async function uploadHotspotPhotos(params: {
     .eq("hotspot_id", params.hotspotId)
     .eq("uploaded_by", params.userId);
 
-  let userAlreadyHasPrimary = (count ?? 0) > 0;
-  let successCount = 0;
-  const results: HotspotPhotoUploadResult[] = [];
+  const userAlreadyHasPrimary = (count ?? 0) > 0;
 
-  for (const file of params.files) {
-    const upload = await uploadImageToMediaBucket({
-      userId: params.userId,
-      scope: "hotspots",
-      refId: params.hotspotId,
-      file,
-    });
+  const perFileResults = await Promise.all(
+    params.files.map(async (file): Promise<UploadFileInternalResult> => {
+      const validationError = validateImageFile(file);
+      if (validationError) {
+        return {
+          fileName: file.name,
+          success: false,
+          error: validationError,
+        };
+      }
 
-    if (upload.error || !upload.storagePath) {
-      results.push({
+      const assetPaths = buildHotspotAssetPaths({
+        userId: params.userId,
+        hotspotId: params.hotspotId,
         fileName: file.name,
-        success: false,
-        error: upload.error ?? "Upload failed.",
       });
-      continue;
-    }
 
-    const isPrimary = !userAlreadyHasPrimary;
+      console.log("Uploading to:", assetPaths.originalPath);
 
-    const { error: metadataError } = await supabase.from("hotspot_media").insert({
-      hotspot_id: params.hotspotId,
-      uploaded_by: params.userId,
-      storage_path: upload.storagePath,
-      caption: cleanCaption,
-      visibility: params.visibility,
-      is_primary: isPrimary,
-    });
+      const { error: uploadError } = await supabase.storage
+        .from(MEDIA_BUCKET)
+        .upload(assetPaths.originalPath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type,
+          metadata: {
+            owner: params.userId,
+            thumbnail_path: assetPaths.thumbnailPath,
+          },
+        });
 
-    if (metadataError) {
-      results.push({
+      if (uploadError) {
+        return {
+          fileName: file.name,
+          success: false,
+          error: uploadError.message,
+          storagePath: assetPaths.originalPath,
+          thumbnailPath: assetPaths.thumbnailPath,
+        };
+      }
+
+      const { data: insertData, error: metadataError } = await supabase
+        .from("hotspot_media")
+        .insert({
+          hotspot_id: params.hotspotId,
+          uploaded_by: params.userId,
+          storage_path: assetPaths.originalPath,
+          caption: cleanCaption,
+          visibility: params.visibility,
+          is_primary: false,
+        })
+        .select("id")
+        .single();
+
+      if (metadataError || !insertData?.id) {
+        await supabase.storage.from(MEDIA_BUCKET).remove([assetPaths.originalPath]);
+        return {
+          fileName: file.name,
+          success: false,
+          error: "Photo metadata could not be saved.",
+          storagePath: assetPaths.originalPath,
+          thumbnailPath: assetPaths.thumbnailPath,
+        };
+      }
+
+      const signedUrl = await createSignedMediaUrl(assetPaths.originalPath, visibilityExpirySeconds);
+      if (!signedUrl) {
+        return {
+          fileName: file.name,
+          success: false,
+          error: "Signed URL could not be created.",
+          storagePath: assetPaths.originalPath,
+          thumbnailPath: assetPaths.thumbnailPath,
+          metadataId: insertData.id,
+        };
+      }
+
+      return {
         fileName: file.name,
-        success: false,
-        error: "Photo metadata could not be saved.",
-      });
-      continue;
+        success: true,
+        url: signedUrl,
+        storagePath: assetPaths.originalPath,
+        thumbnailPath: assetPaths.thumbnailPath,
+        metadataId: insertData.id,
+      };
+    })
+  );
+
+  if (!userAlreadyHasPrimary) {
+    const firstSuccessful = perFileResults.find((result) => result.success && result.metadataId);
+    if (firstSuccessful?.metadataId) {
+      await supabase
+        .from("hotspot_media")
+        .update({ is_primary: true })
+        .eq("id", firstSuccessful.metadataId);
     }
-
-    if (isPrimary) {
-      userAlreadyHasPrimary = true;
-    }
-
-    const url = await resolveMediaUrl(upload.storagePath, params.visibility, expiresInSeconds);
-
-    if (!url) {
-      results.push({
-        fileName: file.name,
-        success: false,
-        error: "Photo uploaded but URL could not be generated.",
-      });
-      continue;
-    }
-
-    successCount += 1;
-    results.push({
-      fileName: file.name,
-      success: true,
-      url,
-    });
   }
+
+  const successCount = perFileResults.filter((result) => result.success).length;
 
   if (successCount > 0) {
     await recordActivity({
@@ -202,7 +403,11 @@ export async function uploadHotspotPhotos(params: {
     });
   }
 
-  return results;
+  return perFileResults.map((result) => {
+    const { metadataId, ...publicResult } = result;
+    void metadataId;
+    return publicResult;
+  });
 }
 
 export async function uploadHotspotPhoto(params: {
@@ -231,7 +436,7 @@ export async function uploadHotspotPhoto(params: {
 
 /**
  * Fetch hotspot media organized by priority for Polarsteps-like display
- * Priority: Personal â†’ Community â†’ Inspiration (database filler images)
+ * Priority: Personal -> Community -> Inspiration (database filler images)
  */
 export async function fetchOrganizedHotspotMedia(params: {
   hotspotId: string;
@@ -240,7 +445,6 @@ export async function fetchOrganizedHotspotMedia(params: {
 }): Promise<OrganizedHotspotMedia> {
   const currentUserId = params.userId ?? "";
 
-  // Fetch user-uploaded media from hotspot_media table
   const { data: mediaData, error } = await supabase
     .from("hotspot_media")
     .select("id,hotspot_id,uploaded_by,storage_path,caption,visibility,created_at")
@@ -249,56 +453,51 @@ export async function fetchOrganizedHotspotMedia(params: {
     .limit(params.limit ?? 50);
 
   if (error || !mediaData) {
-    // Return empty organized structure on error
     return { personal: [], community: [], inspiration: [] };
   }
 
-  // Get signed URLs for all media
-  const signedUrls = await Promise.all(
-    mediaData.map((row) => createSignedMediaUrl(row.storage_path))
-  );
+  const allMedia = (
+    await Promise.all(
+      mediaData.map(async (row) => {
+        const signedUrl = await getHotspotPhotoUrl(
+          {
+            id: row.id,
+            user_id: row.uploaded_by,
+            hotspot_id: row.hotspot_id,
+            storage_path: row.storage_path,
+            visibility: row.visibility,
+            created_at: row.created_at,
+          },
+          currentUserId
+        );
 
-  // Map to media items
-  const allMedia = mediaData
-    .map((row, index) => {
-      const signedUrl = signedUrls[index];
-      if (!signedUrl) return null;
+        if (!signedUrl) return null;
 
-      return {
-        id: row.id,
-        signedUrl,
-        caption: row.caption,
-        visibility: row.visibility,
-        createdAt: row.created_at,
-        uploadedBy: row.uploaded_by,
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
+        return {
+          id: row.id,
+          signedUrl,
+          caption: row.caption,
+          visibility: row.visibility,
+          createdAt: row.created_at,
+          uploadedBy: row.uploaded_by,
+        };
+      })
+    )
+  ).filter((item): item is NonNullable<typeof item> => item !== null);
 
-  // Separate into personal (current user's) and community (others' public)
   const personal: OrganizedHotspotMedia["personal"] = [];
   const community: OrganizedHotspotMedia["community"] = [];
 
   for (const item of allMedia) {
     if (item.uploadedBy === currentUserId) {
-      // User's own photos (regardless of visibility)
       personal.push(item);
-    } else if (item.visibility === "public") {
-      // Other users' public photos
+    } else {
       community.push(item);
     }
-    // Private photos from others are not included
   }
 
-  // Sort personal by newest first
   personal.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  // Sort community by newest first
   community.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  // Inspiration (filler images) will be handled by the hotspot.images field
-  // which contains database URLs (Wikimedia, etc.)
-  // These will be passed separately from the hotspot data
 
   return { personal, community, inspiration: [] };
 }
