@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const { error: delErr } = await supabase
         .from("trip_likes")
         .delete()
-        .eq("id", existing.id);
+.eq("trip_id", existing.trip_id).eq("user_id", existing.user_id);
       if (delErr) throw delErr;
     } else {
       // Add like

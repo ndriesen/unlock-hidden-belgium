@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Compass, Edit3, Loader2, MapPinned, Sparkles, X } from "lucide-react";
+import { Compass, Edit3, Loader2, MapPinned, Sparkles, X, Heart, Save, SaveOff, Share } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import JourneyTimeline, { type JourneyGroup, type JourneyStopItem } from "@/components/trips/detail/JourneyTimeline";
 import TripFloatingActions from "@/components/trips/detail/TripFloatingActions";
@@ -17,6 +17,7 @@ import { fetchPublicTrip } from "@/lib/services/publicTrip";
 import { buildTripShareText } from "@/lib/services/tripBuilder";
 import type { Trip, TripStop } from "@/types/trip";
 import { getCategoryDisplay } from "@/types/hotspot";
+import FloatingActionMenu from "@/components/ui/FloatingActionMenu";
 
 const TripRouteMap = dynamic(() => import("@/components/trips/TripRouteMap"), {
   ssr: false,
@@ -292,6 +293,11 @@ export default function PublicTripPage() {
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   const [showTripStudio, setShowTripStudio] = useState(false);
   const studioSectionRef = useRef<HTMLElement | null>(null);
+  const [localLikedByMe, setLocalLikedByMe] = useState(false);
+  const [localSavedByMe, setLocalSavedByMe] = useState(false);
+  const [localLikesCount, setLocalLikesCount] = useState(0);
+  const [localSavesCount, setLocalSavesCount] = useState(0);
+
 
   const allTripPhotos = useMemo(() => (trip ? trip.stops.flatMap((stop) => stop.media) : []), [trip]);
   const canEditTrip = Boolean(user?.id && trip?.creator?.id && user.id === trip.creator.id);
@@ -328,6 +334,17 @@ export default function PublicTripPage() {
   useEffect(() => {
     void loadTrip();
   }, [loadTrip, user?.id]);
+
+  useEffect(() => {
+    if (!trip) return;
+
+    // Sync local reaction state
+    setLocalLikedByMe(trip.likedByMe || false);
+    setLocalSavedByMe(trip.savedByMe || false);
+    setLocalLikesCount(trip.likesCount || 0);
+    setLocalSavesCount(trip.savesCount || 0);
+  }, [trip]);
+
 
   useEffect(() => {
     const tripLoadedId = trip?.id;
@@ -470,12 +487,10 @@ export default function PublicTripPage() {
   }, [allTripPhotos.length, lightbox]);
 
   const handleLike = useCallback(async () => {
-    if (!trip || !tripId) {
-      return;
-    }
-
-    if (!user?.id) {
-      setShareFeedback("Log in to like this trip");
+    if (!trip || !tripId || !user?.id) {
+      if (!user?.id) {
+        setShareFeedback("Log in to like this trip");
+      }
       return;
     }
 
@@ -483,6 +498,13 @@ export default function PublicTripPage() {
       return;
     }
 
+    // Optimistic update
+    const wasLiked = localLikedByMe;
+    const newLikedState = !localLikedByMe;
+    const newLikesCount = localLikesCount + (newLikedState ? 1 : -1);
+    
+    setLocalLikedByMe(newLikedState);
+    setLocalLikesCount(newLikesCount);
     setUpdatingLike(true);
 
     try {
@@ -498,6 +520,7 @@ export default function PublicTripPage() {
 
       const payload = (await response.json()) as { liked: boolean; likesCount: number };
 
+      // Server result takes precedence
       setTrip((current) =>
         current
           ? {
@@ -509,19 +532,21 @@ export default function PublicTripPage() {
       );
     } catch (likeError) {
       console.error("Like failed", likeError);
+      // Rollback
+      setLocalLikedByMe(wasLiked);
+      setLocalLikesCount(wasLiked ? newLikesCount - 1 : newLikesCount + 1);
       setShareFeedback("Could not update like");
     } finally {
       setUpdatingLike(false);
     }
-  }, [trip, tripId, updatingLike, user?.id]);
+  }, [trip, tripId, updatingLike, user?.id, localLikedByMe, localLikesCount]);
+
 
   const handleSave = useCallback(async () => {
-    if (!trip || !tripId) {
-      return;
-    }
-
-    if (!user?.id) {
-      setShareFeedback("Log in to save this trip");
+    if (!trip || !tripId || !user?.id) {
+      if (!user?.id) {
+        setShareFeedback("Log in to save this trip");
+      }
       return;
     }
 
@@ -529,6 +554,13 @@ export default function PublicTripPage() {
       return;
     }
 
+    // Optimistic update
+    const wasSaved = localSavedByMe;
+    const newSavedState = !localSavedByMe;
+    const newSavesCount = localSavesCount + (newSavedState ? 1 : -1);
+    
+    setLocalSavedByMe(newSavedState);
+    setLocalSavesCount(newSavesCount);
     setUpdatingSave(true);
 
     try {
@@ -544,6 +576,7 @@ export default function PublicTripPage() {
 
       const payload = (await response.json()) as { saved: boolean; savesCount: number };
 
+      // Server result takes precedence
       setTrip((current) =>
         current
           ? {
@@ -555,11 +588,15 @@ export default function PublicTripPage() {
       );
     } catch (saveError) {
       console.error("Save failed", saveError);
+      // Rollback
+      setLocalSavedByMe(wasSaved);
+      setLocalSavesCount(wasSaved ? newSavesCount - 1 : newSavesCount + 1);
       setShareFeedback("Could not update save");
     } finally {
       setUpdatingSave(false);
     }
-  }, [trip, tripId, updatingSave, user?.id]);
+  }, [trip, tripId, updatingSave, user?.id, localSavedByMe, localSavesCount]);
+
 
   const handleShare = useCallback(async () => {
     if (!trip) {
@@ -869,7 +906,47 @@ export default function PublicTripPage() {
           </section>
         </div>
 
-        <TripFloatingActions
+<div className="fixed inset-x-0 bottom-25 z-40 flex px-4 md:bottom-8 md:justify-center">
+                       
+            <FloatingActionMenu
+              state = {true}
+              actions={[
+                {
+                  icon: localLikedByMe ? "❤️" : <Heart/>,
+                  label: localLikedByMe ? "Liked" : "Like",
+                  onClick: handleLike,
+                  className: localLikedByMe
+                    ? "bg-transparent text-slate-800"
+                    : "bg-transparent text-slate-800",
+                },
+
+                {
+                  icon: localSavedByMe ? <Save/> : <SaveOff/>,
+                  label: localSavedByMe ? "Saved" : "Save",
+                  onClick: handleSave,
+                  className: localSavedByMe
+                    ? "bg-transparent text-slate-800"
+                    : "bg-transparent text-slate-800",
+                },
+
+                {
+                  icon:<MapPinned/>,
+                  label: "Route",
+                  onClick: handleOpenMaps,
+                  className: "bg-transparent text-slate-800",
+                },
+                {
+                  icon: <Share />,
+                  label: "Share",
+                  onClick: () => handleShare(),
+                  className: "bg-transparent text-slate-800",
+                },
+              ]}
+            />
+          </div>
+          
+          {/*
+          <TripFloatingActions
           likesCount={trip.likesCount}
           savesCount={trip.savesCount}
           likedByMe={trip.likedByMe}
@@ -879,7 +956,7 @@ export default function PublicTripPage() {
           onShare={handleShare}
           onOpenMaps={handleOpenMaps}
           disabled={updatingLike || updatingSave}
-        />
+        />*/}
 
         {shareFeedback ? (
           <div className="pointer-events-none fixed left-1/2 top-24 z-50 -translate-x-1/2 rounded-full bg-slate-900/90 px-4 py-2 text-sm font-medium text-white shadow-lg">

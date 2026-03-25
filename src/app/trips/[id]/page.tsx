@@ -292,12 +292,13 @@ export default function TripDetailPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [carousel, setCarousel] = useState<StopCarouselState | null>(null);
   const [showTripStudio, setShowTripStudio] = useState(false);
-
-  const [wishlistedByMe, setWishlistedByMe] = useState(false);
-  const [likedByMe, setLikedByMe] = useState(false);
-  const [savedByMe, setSavedByMe] = useState(false);
+  const [localLikedByMe, setLocalLikedByMe] = useState(false);
+  const [localSavedByMe, setLocalSavedByMe] = useState(false);
+  const [localLikesCount, setLocalLikesCount] = useState(0);
+  const [localSavesCount, setLocalSavesCount] = useState(0);
 
   const inFlightRef = useRef<Promise<void> | null>(null);
+
   const requestVersionRef = useRef(0);
   const hotspotsCacheRef = useRef<Hotspot[] | null>(null);
   const studioSectionRef = useRef<HTMLElement | null>(null);
@@ -416,7 +417,14 @@ export default function TripDetailPage() {
 
     setNoteDrafts(nextNoteDrafts);
     setVisitedDrafts(nextVisitedDrafts);
+    
+    // Sync local reaction state
+    setLocalLikedByMe(trip.likedByMe);
+    setLocalSavedByMe(trip.savedByMe);
+    setLocalLikesCount(trip.likesCount || 0);
+    setLocalSavesCount(trip.savesCount || 0);
   }, [trip]);
+
 
   useEffect(() => {
     if (!journeyStops.length) {
@@ -532,26 +540,56 @@ export default function TripDetailPage() {
   const handleLike = useCallback(async () => {
     if (!trip || !user?.id || updatingReactions) return;
 
-    setUpdatingReactions(true);
+    // Optimistic update
+    const wasLiked = localLikedByMe;
+    const newLikedState = !localLikedByMe;
+    const newLikesCount = localLikesCount + (newLikedState ? 1 : -1);
+    
+    setLocalLikedByMe(newLikedState);
+    setLocalLikesCount(newLikesCount);
+
     try {
-      await toggleTripLike({ tripId: trip.id, userId: user.id, tripTitle: trip.title });
-      await refreshTrip();
-    } finally {
-      setUpdatingReactions(false);
+      const result = await toggleTripLike({ tripId: trip.id, userId: user.id, tripTitle: trip.title });
+      
+      // Server result takes precedence
+      if (!result) {
+        setLocalLikedByMe(wasLiked);
+        setLocalLikesCount(wasLiked ? newLikesCount - 1 : newLikesCount + 1);
+      }
+    } catch (error) {
+      console.error('Like toggle failed:', error);
+      // Rollback
+      setLocalLikedByMe(wasLiked);
+      setLocalLikesCount(wasLiked ? newLikesCount - 1 : newLikesCount + 1);
     }
-  }, [refreshTrip, trip, updatingReactions, user?.id]);
+  }, [trip, user?.id, updatingReactions, localLikedByMe, localLikesCount, toggleTripLike]);
+
 
   const handleSave = useCallback(async () => {
     if (!trip || !user?.id || updatingReactions) return;
 
-    setUpdatingReactions(true);
+    // Optimistic update
+    const wasSaved = localSavedByMe;
+    const newSavedState = !localSavedByMe;
+    const newSavesCount = localSavesCount + (newSavedState ? 1 : -1);
+    
+    setLocalSavedByMe(newSavedState);
+    setLocalSavesCount(newSavesCount);
+
     try {
-      await toggleTripSave({ tripId: trip.id, userId: user.id, tripTitle: trip.title });
-      await refreshTrip();
-    } finally {
-      setUpdatingReactions(false);
+      const result = await toggleTripSave({ tripId: trip.id, userId: user.id, tripTitle: trip.title });
+      
+      if (!result) {
+        setLocalSavedByMe(wasSaved);
+        setLocalSavesCount(wasSaved ? newSavesCount - 1 : newSavesCount + 1);
+      }
+    } catch (error) {
+      console.error('Save toggle failed:', error);
+      setLocalSavedByMe(wasSaved);
+      setLocalSavesCount(wasSaved ? newSavesCount - 1 : newSavesCount + 1);
     }
-  }, [refreshTrip, trip, updatingReactions, user?.id]);
+  }, [trip, user?.id, localSavedByMe, localSavesCount]);
+
 
   const handleShare = useCallback(async () => {
     if (!trip) return;
@@ -1078,21 +1116,23 @@ export default function TripDetailPage() {
           state = {true}
           actions={[
             {
-              icon: likedByMe ? "❤️" : <Heart/>,
-              label: likedByMe ? "Liked" : "Like",
+              icon: localLikedByMe ? "❤️" : <Heart/>,
+              label: localLikedByMe ? "Liked" : "Like",
               onClick: handleLike,
-              className: likedByMe
+              className: localLikedByMe
                 ? "bg-transparent text-slate-800"
                 : "bg-transparent text-slate-800",
             },
+
             {
-              icon: savedByMe ? <Save/> : <SaveOff/>,
-              label: savedByMe ? "Saved" : "Save",
+              icon: localSavedByMe ? <Save/> : <SaveOff/>,
+              label: localSavedByMe ? "Saved" : "Save",
               onClick: handleSave,
-              className: savedByMe
+              className: localSavedByMe
                 ? "bg-transparent text-slate-800"
                 : "bg-transparent text-slate-800",
             },
+
             {
               icon:<MapPinned/>,
               label: "Route",

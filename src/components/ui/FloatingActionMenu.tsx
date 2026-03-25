@@ -63,7 +63,7 @@ export default function FloatingActionMenu({ actions, state }: FloatingActionMen
               onClick={(e) => {
                 e?.stopPropagation()
                 action.onClick()
-                setOpen(false)
+                // Don't auto-close on action buttons
               }}
               className={`
                 bg-transparent shadow-none hover:bg-white/30
