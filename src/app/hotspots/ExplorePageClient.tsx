@@ -28,7 +28,7 @@ import { queryKeys } from '@/lib/react-query/queryKeys';
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { createSignedMediaUrl } from "@/lib/services/media";
-import { markVisited, toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
+import { toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
 import HotspotPanel from "@/components/HotspotPanel";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
@@ -38,6 +38,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import HotspotCard from "@/components/ui/HotspotCard";
 import toast from "@/components/Toast"
 import { useToast } from "@/context/ToastContext";
+import { verifyVisitWithCurrentLocation } from "@/lib/services/visitVerification";
 
 const MapContainer = dynamic(
   () => import("@/components/Map/MapContainer"),
@@ -381,8 +382,29 @@ export default function ExplorePage() {
 
       queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
       try {
-        await markVisited(user.id, hotspotId);
-        addToast("Visited hotspot. +50 XP earned.");
+        const verification = await verifyVisitWithCurrentLocation(user.id, hotspotId);
+
+        if (verification.reason === 'location_unavailable') {
+          addToast("Enable location services to verify GPS");
+          return;
+        }
+
+        if (verification.reason === 'poor_accuracy') {
+          addToast("Poor GPS accuracy. Wait for better signal (<=50m)");
+          return;
+        }
+
+        if (!verification.success) {
+          addToast("Could not verify visit.");
+          return;
+        }
+
+        if (verification.status === 'failed') {
+          addToast(`Too far: ${verification.distance_meters.toFixed(0)}m (need <=100m)`);
+          return;
+        }
+
+        addToast(`Visit verified at ${verification.distance_meters.toFixed(0)}m.`);
       } catch (error) {
         console.error("Visit update failed:", error);
         addToast("Could not mark visited.");
@@ -390,7 +412,6 @@ export default function ExplorePage() {
     },
     [hotspots, user?.id, queryClient]
   );
-
 const toggleTripLikeInUi = useCallback(async (item: PopularTrip) => {
   if (!user?.id) {
     addToast("Login required");
@@ -868,6 +889,8 @@ src={tripCoverUrls[trip.id] || trip.coverImage || "https://images.unsplash.com/p
     </div>
   );
 }
+
+
 
 
 

@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import Sidebar from "./Sidebar";
 import LegalFooter from "@/components/LegalFooter";
 import { useSearch } from "@/context/SearchContext";
+import { useProximityAlerts } from "@/hooks/useProximityAlerts";
 import {
   NotificationItem,
   fetchNotifications,
@@ -47,6 +48,7 @@ export default function SidebarLayout({
   const pathname = usePathname();
 
   const isAuthPage = pathname === "/auth";
+  useProximityAlerts({ enabled: !isAuthPage });
 
   const formatRelativeDate = useCallback((value: string): string => {
     const date = new Date(value);
@@ -557,6 +559,7 @@ export default function SidebarLayout({
     </div>
   );
 }
+
 
 
 

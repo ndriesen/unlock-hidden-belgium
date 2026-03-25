@@ -1,4 +1,4 @@
-﻿import { supabase } from "@/lib/Supabase/browser-client";
+import { supabase } from "@/lib/Supabase/browser-client";
 import {
   createSignedMediaUrl,
   MediaVisibility,
@@ -32,6 +32,22 @@ export interface HotspotMediaItem {
   visibility: MediaVisibility;
   isPrimary: boolean;
   createdAt: string;
+}
+
+export interface HotspotPhotoUploadResult {
+  fileName: string;
+  success: boolean;
+  url?: string;
+  error?: string;
+}
+
+async function resolveMediaUrl(storagePath: string, visibility: MediaVisibility, expiresInSeconds = 3600): Promise<string | null> {
+  if (visibility === "public") {
+    const { data } = supabase.storage.from("spotly-media").getPublicUrl(storagePath);
+    return data?.publicUrl ?? null;
+  }
+
+  return createSignedMediaUrl(storagePath, expiresInSeconds);
 }
 
 export async function fetchHotspotMedia(params: {
@@ -88,6 +104,107 @@ export async function fetchHotspotMedia(params: {
   });
 }
 
+export async function uploadHotspotPhotos(params: {
+  userId: string;
+  hotspotId: string;
+  hotspotName: string;
+  files: File[];
+  caption: string;
+  visibility: MediaVisibility;
+  signedUrlExpiresInSeconds?: number;
+}): Promise<HotspotPhotoUploadResult[]> {
+  if (!params.files.length) {
+    return [];
+  }
+
+  const cleanCaption = normalizeCaption(params.caption);
+  const expiresInSeconds = params.signedUrlExpiresInSeconds ?? 3600;
+
+  const { count } = await supabase
+    .from("hotspot_media")
+    .select("id", { count: "exact", head: true })
+    .eq("hotspot_id", params.hotspotId)
+    .eq("uploaded_by", params.userId);
+
+  let userAlreadyHasPrimary = (count ?? 0) > 0;
+  let successCount = 0;
+  const results: HotspotPhotoUploadResult[] = [];
+
+  for (const file of params.files) {
+    const upload = await uploadImageToMediaBucket({
+      userId: params.userId,
+      scope: "hotspots",
+      refId: params.hotspotId,
+      file,
+    });
+
+    if (upload.error || !upload.storagePath) {
+      results.push({
+        fileName: file.name,
+        success: false,
+        error: upload.error ?? "Upload failed.",
+      });
+      continue;
+    }
+
+    const isPrimary = !userAlreadyHasPrimary;
+
+    const { error: metadataError } = await supabase.from("hotspot_media").insert({
+      hotspot_id: params.hotspotId,
+      uploaded_by: params.userId,
+      storage_path: upload.storagePath,
+      caption: cleanCaption,
+      visibility: params.visibility,
+      is_primary: isPrimary,
+    });
+
+    if (metadataError) {
+      results.push({
+        fileName: file.name,
+        success: false,
+        error: "Photo metadata could not be saved.",
+      });
+      continue;
+    }
+
+    if (isPrimary) {
+      userAlreadyHasPrimary = true;
+    }
+
+    const url = await resolveMediaUrl(upload.storagePath, params.visibility, expiresInSeconds);
+
+    if (!url) {
+      results.push({
+        fileName: file.name,
+        success: false,
+        error: "Photo uploaded but URL could not be generated.",
+      });
+      continue;
+    }
+
+    successCount += 1;
+    results.push({
+      fileName: file.name,
+      success: true,
+      url,
+    });
+  }
+
+  if (successCount > 0) {
+    await recordActivity({
+      actorId: params.userId,
+      activityType: "hotspot_photo_added",
+      entityType: "hotspot",
+      entityId: params.hotspotId,
+      message: `added ${successCount} photo${successCount === 1 ? "" : "s"} to ${params.hotspotName}`,
+      metadata: { hotspotName: params.hotspotName, count: successCount },
+      visibility: params.visibility === "private" ? "private" : "friends",
+    });
+  }
+
+  return results;
+}
+
 export async function uploadHotspotPhoto(params: {
   userId: string;
   hotspotId: string;
@@ -96,54 +213,25 @@ export async function uploadHotspotPhoto(params: {
   caption: string;
   visibility: MediaVisibility;
 }): Promise<{ success: boolean; message: string }> {
-  const upload = await uploadImageToMediaBucket({
+  const [result] = await uploadHotspotPhotos({
     userId: params.userId,
-    scope: "hotspots",
-    refId: params.hotspotId,
-    file: params.file,
-  });
-
-  if (upload.error || !upload.storagePath) {
-    return { success: false, message: upload.error ?? "Upload failed." };
-  }
-
-  const { count } = await supabase
-    .from("hotspot_media")
-    .select("id", { count: "exact", head: true })
-    .eq("hotspot_id", params.hotspotId)
-    .eq("uploaded_by", params.userId);
-
-  const cleanCaption = normalizeCaption(params.caption);
-
-  const { error } = await supabase.from("hotspot_media").insert({
-    hotspot_id: params.hotspotId,
-    uploaded_by: params.userId,
-    storage_path: upload.storagePath,
-    caption: cleanCaption,
+    hotspotId: params.hotspotId,
+    hotspotName: params.hotspotName,
+    files: [params.file],
+    caption: params.caption,
     visibility: params.visibility,
-    is_primary: (count ?? 0) === 0,
   });
 
-  if (error) {
-    return { success: false, message: "Photo metadata could not be saved." };
+  if (!result?.success) {
+    return { success: false, message: result?.error ?? "Upload failed." };
   }
-
-  await recordActivity({
-    actorId: params.userId,
-    activityType: "hotspot_photo_added",
-    entityType: "hotspot",
-    entityId: params.hotspotId,
-    message: `added a photo to ${params.hotspotName}`,
-    metadata: { hotspotName: params.hotspotName },
-    visibility: params.visibility === "private" ? "private" : "friends",
-  });
 
   return { success: true, message: "Photo uploaded." };
 }
 
 /**
  * Fetch hotspot media organized by priority for Polarsteps-like display
- * Priority: Personal → Community → Inspiration (database filler images)
+ * Priority: Personal â†’ Community â†’ Inspiration (database filler images)
  */
 export async function fetchOrganizedHotspotMedia(params: {
   hotspotId: string;
@@ -214,4 +302,3 @@ export async function fetchOrganizedHotspotMedia(params: {
 
   return { personal, community, inspiration: [] };
 }
-
