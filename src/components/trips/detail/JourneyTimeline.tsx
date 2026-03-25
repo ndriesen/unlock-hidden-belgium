@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { ArrowUpRight, Camera, Clock3, MapPin } from "lucide-react";
@@ -15,6 +15,7 @@ export interface JourneyStopItem {
   province: string;
   note: string;
   imageUrl: string;
+  mediaPreviewUrls?: string[];
   visitedLabel: string;
   visitedAt: string | null;
   mediaCount: number;
@@ -33,7 +34,22 @@ interface JourneyTimelineProps {
   activeStopId: string | null;
   onActiveStopChange?: (stopId: string) => void;
   onAddMemory?: (stop: JourneyStopItem) => void;
-  onImageClick?: (stop: JourneyStopItem) => void;
+  onImageClick?: (stop: JourneyStopItem, imageUrl?: string) => void;
+}
+
+function buildPreviewUrls(stop: JourneyStopItem): string[] {
+  const ordered = [stop.imageUrl, ...(stop.mediaPreviewUrls ?? [])].filter(Boolean);
+  const uniqueUrls: string[] = [];
+  const seen = new Set<string>();
+
+  for (const url of ordered) {
+    if (!seen.has(url)) {
+      seen.add(url);
+      uniqueUrls.push(url);
+    }
+  }
+
+  return uniqueUrls;
 }
 
 export default function JourneyTimeline({
@@ -152,6 +168,10 @@ export default function JourneyTimeline({
               const isActive = stop.id === activeStopId;
               const hasHotspotLink = Boolean(stop.hotspotId && !stop.hotspotId.startsWith("custom"));
               const isVisible = revealedStopSet.has(stop.id);
+              const previewUrls = buildPreviewUrls(stop);
+              const leadPreviewUrl = previewUrls[0] ?? stop.imageUrl;
+              const smallPreviewUrls = previewUrls.slice(1, 5);
+              const overflowCount = Math.max(stop.mediaCount - (1 + smallPreviewUrls.length), 0);
 
               return (
                 <article
@@ -165,34 +185,68 @@ export default function JourneyTimeline({
                     isActive ? "border-emerald-300/70 ring-1 ring-emerald-200/70" : "border-slate-200/75"
                   )}
                 >
-                  <button
-                    type="button"
-                    onClick={() => onImageClick?.(stop)}
-                    className={cn(
-                      "relative block w-full overflow-hidden text-left",
-                      onImageClick ? "cursor-pointer" : "cursor-default"
-                    )}
-                    disabled={!onImageClick}
-                  >
-                    <div className="relative aspect-[16/10] overflow-hidden">
+                  <div className="grid grid-cols-2 gap-2 p-2 md:grid-cols-4 md:grid-rows-2 md:gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => onImageClick?.(stop, leadPreviewUrl)}
+                      className={cn(
+                        "group relative col-span-2 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 text-left",
+                        "aspect-[16/10] md:row-span-2 md:aspect-auto",
+                        onImageClick ? "cursor-pointer" : "cursor-default"
+                      )}
+                      disabled={!onImageClick}
+                    >
                       <OptimizedImage
-                        src={stop.imageUrl}
+                        src={leadPreviewUrl}
                         alt={stop.name}
                         fill
                         enableRetry
                         showSkeleton
-                        className="object-cover"
-                        sizes="(max-width: 768px) 100vw, 720px"
+                        className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        sizes="(max-width: 768px) 100vw, 620px"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent" />
-                      <span className="absolute left-3 top-3 rounded-full border border-white/60 bg-white/75 px-2.5 py-1 text-xs font-semibold text-slate-800 backdrop-blur-sm">
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/65 via-slate-900/10 to-transparent" />
+                      <span className="absolute left-3 top-3 rounded-full border border-white/55 bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-800 backdrop-blur-sm">
                         Stop {stop.order}
                       </span>
-                      <span className="absolute bottom-3 left-3 rounded-full border border-white/20 bg-black/40 px-2.5 py-1 text-xs font-medium text-slate-100 backdrop-blur-sm">
+                      <span className="absolute bottom-3 left-3 rounded-full border border-white/30 bg-black/45 px-2.5 py-1 text-xs font-medium text-slate-100 backdrop-blur-sm">
                         {stop.categoryLabel}
                       </span>
-                    </div>
-                  </button>
+                    </button>
+
+                    {smallPreviewUrls.map((imageUrl, index) => {
+                      const showOverflow = overflowCount > 0 && index === smallPreviewUrls.length - 1;
+
+                      return (
+                        <button
+                          key={`${stop.id}-${imageUrl}-${index}`}
+                          type="button"
+                          onClick={() => onImageClick?.(stop, imageUrl)}
+                          className={cn(
+                            "group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-left",
+                            onImageClick ? "cursor-pointer" : "cursor-default"
+                          )}
+                          disabled={!onImageClick}
+                        >
+                          <OptimizedImage
+                            src={imageUrl}
+                            alt={`${stop.name} photo ${index + 2}`}
+                            fill
+                            enableRetry
+                            showSkeleton
+                            className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                            sizes="(max-width: 768px) 48vw, 190px"
+                          />
+                          {showOverflow ? (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/58 text-white">
+                              <span className="text-xl font-semibold">+{overflowCount}</span>
+                              <span className="text-[11px] uppercase tracking-[0.08em] text-white/85">more</span>
+                            </div>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
 
                   <div className="space-y-4 p-4 sm:p-5">
                     <div className="space-y-2">

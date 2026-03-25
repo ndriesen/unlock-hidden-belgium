@@ -4,12 +4,13 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Compass, Loader2, MapPinned, Sparkles, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Compass, Edit3, Loader2, MapPinned, Sparkles, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import JourneyTimeline, { type JourneyGroup, type JourneyStopItem } from "@/components/trips/detail/JourneyTimeline";
 import TripFloatingActions from "@/components/trips/detail/TripFloatingActions";
 import TripProgressIndicator from "@/components/trips/detail/TripProgressIndicator";
 import TripStoryHero from "@/components/trips/detail/TripStoryHero";
+import StopImagesGrid from "@/components/trips/StopImagesGrid";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 import { useAuth } from "@/context/AuthContext";
 import { fetchPublicTrip } from "@/lib/services/publicTrip";
@@ -83,8 +84,55 @@ function haversineDistanceKm(fromLat: number, fromLng: number, toLat: number, to
   return earthRadiusKm * c;
 }
 
+function getLeadMediaIndex(stop: TripStop): number {
+  const highlightedIndex = stop.media.findIndex((media) => media.isHighlight);
+  return highlightedIndex >= 0 ? highlightedIndex : 0;
+}
+
+function getStopPreviewUrls(stop: TripStop): string[] {
+  const leadIndex = getLeadMediaIndex(stop);
+  const orderedMedia = stop.media.length
+    ? [stop.media[leadIndex], ...stop.media.filter((_, index) => index !== leadIndex)]
+    : [];
+
+  const uniqueUrls: string[] = [];
+  const seen = new Set<string>();
+
+  orderedMedia.forEach((item) => {
+    if (!item?.signedUrl || seen.has(item.signedUrl)) {
+      return;
+    }
+
+    seen.add(item.signedUrl);
+    uniqueUrls.push(item.signedUrl);
+  });
+
+  return uniqueUrls;
+}
+
 function stopImage(stop: TripStop): string {
-  return stop.media[0]?.signedUrl || stop.photoUrl || DEFAULT_IMAGE;
+  const previewUrls = getStopPreviewUrls(stop);
+  return previewUrls[0] || stop.photoUrl || DEFAULT_IMAGE;
+}
+
+function stopSortTime(stop: TripStop): number {
+  if (!stop.visitedAt) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const timestamp = Date.parse(stop.visitedAt);
+  return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp;
+}
+
+function sortStopsChronologically(stops: TripStop[]): TripStop[] {
+  return [...stops].sort((a, b) => {
+    const byVisitedAt = stopSortTime(a) - stopSortTime(b);
+    if (byVisitedAt !== 0) {
+      return byVisitedAt;
+    }
+
+    return a.addedAt.localeCompare(b.addedAt);
+  });
 }
 
 function buildJourneyStops(stops: TripStop[]): JourneyStopItem[] {
@@ -112,6 +160,8 @@ function buildJourneyStops(stops: TripStop[]): JourneyStopItem[] {
       previousWithCoordinates = stop;
     }
 
+    const previewUrls = getStopPreviewUrls(stop);
+
     return {
       id: stop.id,
       hotspotId: stop.hotspotId,
@@ -120,7 +170,8 @@ function buildJourneyStops(stops: TripStop[]): JourneyStopItem[] {
       categoryLabel: getCategoryDisplay(stop.category),
       province: stop.province,
       note: stop.note,
-      imageUrl: stopImage(stop),
+      imageUrl: previewUrls[0] || stop.photoUrl || DEFAULT_IMAGE,
+      mediaPreviewUrls: previewUrls,
       visitedLabel: formatDateLabel(stop.visitedAt),
       visitedAt: stop.visitedAt,
       mediaCount: stop.media.length,
@@ -239,8 +290,11 @@ export default function PublicTripPage() {
   const [updatingLike, setUpdatingLike] = useState(false);
   const [updatingSave, setUpdatingSave] = useState(false);
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
+  const [showTripStudio, setShowTripStudio] = useState(false);
+  const studioSectionRef = useRef<HTMLElement | null>(null);
 
   const allTripPhotos = useMemo(() => (trip ? trip.stops.flatMap((stop) => stop.media) : []), [trip]);
+  const canEditTrip = Boolean(user?.id && trip?.creator?.id && user.id === trip.creator.id);
 
   const loadTrip = useCallback(async () => {
     if (!tripId) {
@@ -310,7 +364,8 @@ export default function PublicTripPage() {
     void trackView();
   }, [tripId, trip?.id]);
 
-  const journeyStops = useMemo(() => (trip ? buildJourneyStops(trip.stops) : []), [trip]);
+  const timelineSortedStops = useMemo(() => (trip ? sortStopsChronologically(trip.stops) : []), [trip]);
+  const journeyStops = useMemo(() => buildJourneyStops(timelineSortedStops), [timelineSortedStops]);
   const journeyGroups = useMemo(() => buildJourneyGroups(journeyStops), [journeyStops]);
 
   useEffect(() => {
@@ -324,6 +379,18 @@ export default function PublicTripPage() {
       setActiveStopId(journeyStops[0].id);
     }
   }, [journeyStops, activeStopId]);
+
+  useEffect(() => {
+    if (!showTripStudio) return;
+
+    studioSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [showTripStudio]);
+
+  useEffect(() => {
+    if (!canEditTrip && showTripStudio) {
+      setShowTripStudio(false);
+    }
+  }, [canEditTrip, showTripStudio]);
 
   const activeStopIndex = useMemo(() => {
     if (!journeyStops.length || !activeStopId) {
@@ -380,8 +447,8 @@ export default function PublicTripPage() {
   );
 
   const openLightboxFromTimeline = useCallback(
-    (stop: JourneyStopItem) => {
-      openLightboxByUrl(stop.imageUrl);
+    (stop: JourneyStopItem, imageUrl?: string) => {
+      openLightboxByUrl(imageUrl || stop.imageUrl);
     },
     [openLightboxByUrl]
   );
@@ -596,6 +663,64 @@ export default function PublicTripPage() {
             onBack={() => router.push("/")}
           />
 
+          {canEditTrip ? (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowTripStudio((current) => !current)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                aria-expanded={showTripStudio}
+                aria-controls="trip-studio"
+              >
+                <Edit3 className="h-4 w-4" />
+                {showTripStudio ? "Close studio" : "Edit trip"}
+              </button>
+            </div>
+          ) : null}
+
+          {canEditTrip && showTripStudio ? (
+            <section
+              id="trip-studio"
+              ref={studioSectionRef}
+              className="space-y-5 rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-[0_22px_40px_-34px_rgba(10,18,36,0.95)] backdrop-blur-xl sm:p-6"
+            >
+              <header className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-2xl font-semibold text-slate-900">Trip studio</h2>
+                  <p className="text-sm text-slate-600">Owner view with per-stop media and quick access to the full editor.</p>
+                </div>
+                <Link
+                  href={`/trips/${trip.id}`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Open full editor
+                </Link>
+              </header>
+
+              <div className="space-y-4">
+                {trip.stops.map((stop, index) => (
+                  <article key={stop.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Stop {index + 1}</p>
+                        <h3 className="text-lg font-semibold text-slate-900">{stop.name}</h3>
+                        <p className="text-xs text-slate-500">{getCategoryDisplay(stop.category)} {stop.province ? `- ${stop.province}` : ""}</p>
+                      </div>
+                      <p className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                        {formatDateLabel(stop.visitedAt)}
+                      </p>
+                    </div>
+
+                    <StopImagesGrid media={stop.media} stopName={stop.name} />
+
+                    {stop.note ? <p className="mt-3 text-sm text-slate-700">{stop.note}</p> : null}
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+
           <section className="space-y-4 rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-[0_22px_40px_-34px_rgba(10,18,36,0.95)] backdrop-blur-xl sm:p-6">
             <header className="flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -790,7 +915,7 @@ export default function PublicTripPage() {
             className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/35 bg-black/35 px-3 py-2 text-2xl text-white"
             aria-label="Previous photo"
           >
-            â€¹
+            &lt;
           </button>
 
           <button
@@ -802,7 +927,7 @@ export default function PublicTripPage() {
             className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/35 bg-black/35 px-3 py-2 text-2xl text-white"
             aria-label="Next photo"
           >
-            â€º
+            &gt;
           </button>
 
           <div className="relative mx-auto h-full w-full max-w-6xl">

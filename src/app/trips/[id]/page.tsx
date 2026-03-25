@@ -4,9 +4,10 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Compass, Loader2, MapPinned, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Compass, Edit3, Loader2, MapPinned, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CreateMemoryModal from "@/components/trips/CreateMemoryModal";
+import StopImagesGrid from "@/components/trips/StopImagesGrid";
 import JourneyTimeline, { type JourneyGroup, type JourneyStopItem } from "@/components/trips/detail/JourneyTimeline";
 import TripFloatingActions from "@/components/trips/detail/TripFloatingActions";
 import TripProgressIndicator from "@/components/trips/detail/TripProgressIndicator";
@@ -22,7 +23,6 @@ import {
   removeStopFromTrip,
   setTripCoverImage,
   toggleTripLike,
-  toggleTripMediaHighlight,
   toggleTripSave,
   updateStopNote,
   updateStopVisitedAt,
@@ -103,9 +103,50 @@ function haversineDistanceKm(fromLat: number, fromLng: number, toLat: number, to
   return earthRadiusKm * c;
 }
 
-function stopImage(stop: TripStop): string {
+function getStopPreviewUrls(stop: TripStop): string[] {
   const leadIndex = getLeadMediaIndex(stop);
-  return stop.media[leadIndex]?.signedUrl || stop.photoUrl || DEFAULT_IMAGE;
+  const orderedMedia = stop.media.length
+    ? [stop.media[leadIndex], ...stop.media.filter((_, index) => index !== leadIndex)]
+    : [];
+
+  const uniqueUrls: string[] = [];
+  const seen = new Set<string>();
+
+  orderedMedia.forEach((item) => {
+    if (!item?.signedUrl || seen.has(item.signedUrl)) {
+      return;
+    }
+
+    seen.add(item.signedUrl);
+    uniqueUrls.push(item.signedUrl);
+  });
+
+  return uniqueUrls;
+}
+
+function stopImage(stop: TripStop): string {
+  const previewUrls = getStopPreviewUrls(stop);
+  return previewUrls[0] || stop.photoUrl || DEFAULT_IMAGE;
+}
+
+function stopSortTime(stop: TripStop): number {
+  if (!stop.visitedAt) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const timestamp = Date.parse(stop.visitedAt);
+  return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp;
+}
+
+function sortStopsChronologically(stops: TripStop[]): TripStop[] {
+  return [...stops].sort((a, b) => {
+    const byVisitedAt = stopSortTime(a) - stopSortTime(b);
+    if (byVisitedAt !== 0) {
+      return byVisitedAt;
+    }
+
+    return a.addedAt.localeCompare(b.addedAt);
+  });
 }
 
 function buildJourneyStops(stops: TripStop[]): JourneyStopItem[] {
@@ -133,6 +174,8 @@ function buildJourneyStops(stops: TripStop[]): JourneyStopItem[] {
       previousWithCoordinates = stop;
     }
 
+    const previewUrls = getStopPreviewUrls(stop);
+
     return {
       id: stop.id,
       hotspotId: stop.hotspotId,
@@ -141,7 +184,8 @@ function buildJourneyStops(stops: TripStop[]): JourneyStopItem[] {
       categoryLabel: getCategoryDisplay(stop.category),
       province: stop.province,
       note: stop.note,
-      imageUrl: stopImage(stop),
+      imageUrl: previewUrls[0] || stop.photoUrl || DEFAULT_IMAGE,
+      mediaPreviewUrls: previewUrls,
       visitedLabel: formatDateLabel(stop.visitedAt),
       visitedAt: stop.visitedAt,
       mediaCount: stop.media.length,
@@ -245,10 +289,12 @@ export default function TripDetailPage() {
   const [visitedDrafts, setVisitedDrafts] = useState<Record<string, string>>({});
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [carousel, setCarousel] = useState<StopCarouselState | null>(null);
+  const [showTripStudio, setShowTripStudio] = useState(false);
 
   const inFlightRef = useRef<Promise<void> | null>(null);
   const requestVersionRef = useRef(0);
   const hotspotsCacheRef = useRef<Hotspot[] | null>(null);
+  const studioSectionRef = useRef<HTMLElement | null>(null);
   const loadTrip = useCallback(
     async ({ showLoader, preserveCurrent }: { showLoader: boolean; preserveCurrent: boolean }) => {
       if (!user?.id || !tripId) {
@@ -347,7 +393,8 @@ export default function TripDetailPage() {
     };
   }, [trip]);
 
-  const journeyStops = useMemo(() => (trip ? buildJourneyStops(trip.stops) : []), [trip]);
+  const timelineSortedStops = useMemo(() => (trip ? sortStopsChronologically(trip.stops) : []), [trip]);
+  const journeyStops = useMemo(() => buildJourneyStops(timelineSortedStops), [timelineSortedStops]);
   const journeyGroups = useMemo(() => buildJourneyGroups(journeyStops), [journeyStops]);
 
   useEffect(() => {
@@ -376,6 +423,12 @@ export default function TripDetailPage() {
       setActiveStopId(journeyStops[0].id);
     }
   }, [journeyStops, activeStopId]);
+
+  useEffect(() => {
+    if (!showTripStudio) return;
+
+    studioSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [showTripStudio]);
 
   useEffect(() => {
     let cancelled = false;
@@ -617,34 +670,6 @@ export default function TripDetailPage() {
     [refreshTrip, trip, visitedDrafts]
   );
 
-  const handleSetLeadImage = useCallback(
-    async (stop: TripStop, mediaId: string) => {
-      if (!trip || !user?.id) return;
-
-      setBusyAction(`lead-${stop.id}`);
-      try {
-        const highlightedElsewhere = stop.media.filter((media) => media.isHighlight && media.id !== mediaId);
-        if (highlightedElsewhere.length) {
-          await Promise.all(
-            highlightedElsewhere.map((media) =>
-              toggleTripMediaHighlight({ mediaId: media.id, userId: user.id, isHighlight: false })
-            )
-          );
-        }
-
-        const selected = stop.media.find((media) => media.id === mediaId);
-        if (selected && !selected.isHighlight) {
-          await toggleTripMediaHighlight({ mediaId: selected.id, userId: user.id, isHighlight: true });
-        }
-
-        await refreshTrip();
-      } finally {
-        setBusyAction(null);
-      }
-    },
-    [refreshTrip, trip, user?.id]
-  );
-
   const handleSetTripCoverFromMedia = useCallback(
     async (storagePath: string, stopId: string) => {
       if (!trip || !user?.id) return;
@@ -748,6 +773,19 @@ export default function TripDetailPage() {
           onBack={() => router.push("/trips")}
         />
 
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowTripStudio((current) => !current)}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            aria-expanded={showTripStudio}
+            aria-controls="trip-studio"
+          >
+            <Edit3 className="h-4 w-4" />
+            {showTripStudio ? "Close studio" : "Edit trip"}
+          </button>
+        </div>
+
         <section className="space-y-4 rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-[0_22px_40px_-34px_rgba(10,18,36,0.95)] backdrop-blur-xl sm:p-6">
           <header className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -771,13 +809,24 @@ export default function TripDetailPage() {
           />
         </section>
 
-        <section className="space-y-5 rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-[0_22px_40px_-34px_rgba(10,18,36,0.95)] backdrop-blur-xl sm:p-6">
-          <header className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold text-slate-900">Trip studio</h2>
-              <p className="text-sm text-slate-600">Edit stop count, details, and media directly from one place.</p>
-            </div>
-          </header>
+        {showTripStudio ? (
+          <section
+            id="trip-studio"
+            ref={studioSectionRef}
+            className="space-y-5 rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-[0_22px_40px_-34px_rgba(10,18,36,0.95)] backdrop-blur-xl sm:p-6"
+          >
+            <header className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900">Trip studio</h2>
+                <p className="text-sm text-slate-600">Edit stop count, details, and media directly from one place.</p>
+              </div>
+              <button
+                onClick={() => setShowTripStudio(false)}
+                className="inline-flex items-center gap-1 rounded-xl bg-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-300 transition-colors"
+              >
+                Done editing
+              </button>
+            </header>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
             <label className="mb-2 block text-sm font-medium text-slate-700">Add a stop</label>
@@ -834,7 +883,7 @@ export default function TripDetailPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-slate-900">{hotspot.name}</p>
                       <p className="truncate text-xs text-slate-500">
-                        {getCategoryDisplay(hotspot.category)} {hotspot.province ? `• ${hotspot.province}` : ""}
+                        {getCategoryDisplay(hotspot.category)} {hotspot.province ? `- ${hotspot.province}` : ""}
                       </p>
                     </div>
                     <span className="text-xs font-semibold text-emerald-700">Add</span>
@@ -848,7 +897,6 @@ export default function TripDetailPage() {
             {trip.stops.map((stop, index) => {
               const leadIndex = getLeadMediaIndex(stop);
               const leadMedia = stop.media[leadIndex] ?? null;
-              const thumbs = stop.media.slice(0, 6);
 
               return (
                 <article key={stop.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -856,7 +904,7 @@ export default function TripDetailPage() {
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Stop {index + 1}</p>
                       <h3 className="text-lg font-semibold text-slate-900">{stop.name}</h3>
-                      <p className="text-xs text-slate-500">{getCategoryDisplay(stop.category)} {stop.province ? `• ${stop.province}` : ""}</p>
+                      <p className="text-xs text-slate-500">{getCategoryDisplay(stop.category)} {stop.province ? `- ${stop.province}` : ""}</p>
                     </div>
                     <button
                       type="button"
@@ -870,43 +918,7 @@ export default function TripDetailPage() {
                   </div>
 
                   <div className="mt-4 space-y-3">
-                    {stop.media.length > 0 && leadMedia ? (
-                      <div className="grid gap-2 lg:grid-cols-[1.8fr,1fr]">
-                        <button
-                          type="button"
-                          onClick={() => openCarousel(stop.id, leadIndex)}
-                          className="relative block aspect-[16/10] overflow-hidden rounded-2xl border border-slate-200"
-                        >
-                          <OptimizedImage src={leadMedia.signedUrl} alt={leadMedia.caption || stop.name} fill showSkeleton enableRetry className="object-cover" sizes="(max-width: 1024px) 100vw, 700px" />
-                          <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-1 text-[11px] font-semibold text-white">Lead photo</span>
-                        </button>
-
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-2">
-                          {thumbs.map((media, mediaIndex) => {
-                            const isLead = mediaIndex === leadIndex;
-
-                            return (
-                              <div key={media.id} className="space-y-1">
-                                <button type="button" onClick={() => openCarousel(stop.id, mediaIndex)} className="relative block aspect-square overflow-hidden rounded-xl border border-slate-200">
-                                  <OptimizedImage src={media.signedUrl} alt={media.caption || stop.name} fill showSkeleton enableRetry className="object-cover" sizes="120px" />
-                                  {isLead ? <span className="absolute left-1 top-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">Lead</span> : null}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => { void handleSetLeadImage(stop, media.id); }}
-                                  disabled={isLead || busyAction === `lead-${stop.id}`}
-                                  className="w-full rounded-md border border-slate-200 px-1 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-                                >
-                                  {isLead ? "Current lead" : "Set lead"}
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No photos yet for this stop.</div>
-                    )}
+                    <StopImagesGrid media={stop.media} stopName={stop.name} />
 
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -986,7 +998,8 @@ export default function TripDetailPage() {
               );
             })}
           </div>
-        </section>
+          </section>
+        ) : null}
 
         <section className="space-y-4 rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-[0_22px_40px_-34px_rgba(10,18,36,0.95)] backdrop-blur-xl sm:p-6">
           <header className="flex flex-wrap items-center justify-between gap-3">
@@ -1052,6 +1065,7 @@ export default function TripDetailPage() {
         </section>
       </div>
 
+
       <TripFloatingActions
         likesCount={trip.likesCount}
         savesCount={trip.savesCount}
@@ -1110,7 +1124,7 @@ export default function TripDetailPage() {
             className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/35 bg-black/35 px-3 py-2 text-2xl text-white"
             aria-label="Previous photo"
           >
-            ‹
+            &lt;
           </button>
 
           <button
@@ -1122,7 +1136,7 @@ export default function TripDetailPage() {
             className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/35 bg-black/35 px-3 py-2 text-2xl text-white"
             aria-label="Next photo"
           >
-            ›
+            &gt;
           </button>
 
           <div className="relative mx-auto h-full w-full max-w-6xl">
