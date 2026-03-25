@@ -403,7 +403,11 @@ export async function uploadHotspotPhotos(params: {
     });
   }
 
-  return perFileResults.map(({ metadataId: _metadataId, ...result }) => result);
+  return perFileResults.map((result) => {
+    const { metadataId, ...publicResult } = result;
+    void metadataId;
+    return publicResult;
+  });
 }
 
 export async function uploadHotspotPhoto(params: {

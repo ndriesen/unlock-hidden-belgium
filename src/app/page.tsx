@@ -546,14 +546,39 @@ export default function Home() {
     }
   }, [user]);
 
+  const preLoginFeaturedHotspots = useMemo(() => {
+    if (rankedHotspots.length > 0) {
+      return rankedHotspots;
+    }
+
+    return questCandidates.slice(0, 10);
+  }, [questCandidates, rankedHotspots]);
+
+  const trendingHotspots = useMemo(() => questCandidates.slice(0, 8), [questCandidates]);
+
+  const categoryMatchedHotspots = useMemo(
+    () => questCandidates.filter((h) => !selectedCategory || h.category === selectedCategory),
+    [questCandidates, selectedCategory]
+  );
+
+  const featuredCategoryHotspots = useMemo(
+    () =>
+      questCandidates
+        .slice(8, 16)
+        .filter((h) => !selectedCategory || h.category === getSafeDisplay(selectedCategory)),
+    [questCandidates, selectedCategory]
+  );
+
+  const emptyWishlistIds = useMemo<string[]>(() => [], []);
+
   // Render pre-login homepage
   const renderPreLoginHomepage = () => (
     <div className="flex flex-col min-h-screen">
       <PreLoginHero hotspotCount={questCandidates.length} explorerCount={12000} />
       <HowItWorks />
       <FeaturedHotspots 
-        hotspots={rankedHotspots.length > 0 ? rankedHotspots : questCandidates.slice(0, 10)} 
-        wishlistIds={[]}
+        hotspots={preLoginFeaturedHotspots} 
+        wishlistIds={emptyWishlistIds}
       />
       <PreLoginFooter />
 
@@ -574,7 +599,7 @@ export default function Home() {
         />
         
         <TrendingHotspots
-          hotspots={questCandidates.slice(0, 8)}
+          hotspots={trendingHotspots}
           wishlistIds={wishlistIds}
           visitedIds={visitedIds}
           onWishlistToggle={handleWishlist}
@@ -583,7 +608,7 @@ export default function Home() {
         />
 
         <AdventuresNearYou
-          hotspots={questCandidates.filter((h) => !selectedCategory || h.category === selectedCategory)}
+          hotspots={categoryMatchedHotspots}
           userPosition={userPosition}
           wishlistIds={wishlistIds}
           visitedIds={visitedIds}
@@ -600,14 +625,14 @@ export default function Home() {
         </div>*/}
 
         <FeaturedHotspots 
-          hotspots={questCandidates.slice(8, 16).filter(h => !selectedCategory || h.category === getSafeDisplay(selectedCategory))}
+          hotspots={featuredCategoryHotspots}
           wishlistIds={wishlistIds}
           onWishlistToggle={handleWishlist}
           selectedCategory={selectedCategory}
         /> 
 
         <MapPreviewSection
-          hotspots={questCandidates.filter(h => !selectedCategory || h.category === selectedCategory)}
+          hotspots={categoryMatchedHotspots}
           visitedIds={visitedIds}
           wishlistIds={wishlistIds}
           favoriteIds={favoriteIds}

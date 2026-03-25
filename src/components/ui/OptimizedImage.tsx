@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image, { ImageProps } from "next/image";
 import { getCachedImageRequest } from "@/lib/cache/imageRequestCache";
 import { limitImageRequests } from "@/lib/network/concurrencyLimiter";
@@ -8,8 +8,8 @@ import { limitImageRequests } from "@/lib/network/concurrencyLimiter";
 /**
  * Retry configuration
  */
-const RETRY_DELAYS = [500, 1000, 2000]; // Exponential backoff: 500ms, 1s, 2s
-const MAX_RETRIES = 3;
+const RETRY_DELAYS = [500, 1000, 2000];
+const MAX_RETRIES = RETRY_DELAYS.length;
 
 /**
  * Default fallback image
@@ -17,65 +17,37 @@ const MAX_RETRIES = 3;
 const DEFAULT_FALLBACK = "/images/placeholder-image.png";
 
 export interface OptimizedImageProps extends Omit<ImageProps, "onError" | "onLoad"> {
-  /**
-   * Fallback image URL to use when the main image fails to load
-   * Defaults to a placeholder image
-   */
   fallbackUrl?: string;
-  
-  /**
-   * Enable retry on failure (default: true)
-   */
   enableRetry?: boolean;
-  
-  /**
-   * Show skeleton placeholder while loading (default: true)
-   */
   showSkeleton?: boolean;
-  
-  /**
-   * Custom skeleton className
-   */
   skeletonClassName?: string;
-
-  /**
-   * Callback when image loads successfully
-   */
   onLoadCallback?: () => void;
 }
 
-/**
- * Check if a URL is from a known image CDN that supports blur
- * These services generate blurDataURL automatically
- */
 function supportsAutoBlur(src: string): boolean {
-  const autoBlurDomains = [
-    'images.unsplash.com',
-    'res.cloudinary.com',
-    'imgix.net',
-    'cdn.imgix.com',
-  ];
+  const autoBlurDomains = ["images.unsplash.com", "res.cloudinary.com", "imgix.net", "cdn.imgix.com"];
+
   try {
     const url = new URL(src);
-    return autoBlurDomains.some(domain => url.hostname.includes(domain));
+    return autoBlurDomains.some((domain) => url.hostname.includes(domain));
   } catch {
     return false;
   }
 }
 
-/**
- * OptimizedImage Component
- * 
- * A wrapper around Next.js Image component that provides:
- * - Retry logic with exponential backoff for 429 errors
- * - Request deduplication to prevent duplicate fetches
- * - Fallback image on error
- * - Skeleton loading state
- * 
- * This component helps prevent HTTP 429 (Too Many Requests) errors
- * when loading many images simultaneously.
- */
-export default function OptimizedImage({
+function normalizeSrc(src: ImageProps["src"]): string {
+  if (typeof src === "string") {
+    return src;
+  }
+
+  if (src && typeof src === "object" && "src" in src && typeof src.src === "string") {
+    return src.src;
+  }
+
+  return "";
+}
+
+function OptimizedImageComponent({
   src,
   alt,
   fallbackUrl = DEFAULT_FALLBACK,
@@ -89,133 +61,142 @@ export default function OptimizedImage({
   onLoadCallback,
   ...rest
 }: OptimizedImageProps) {
-  const [currentSrc, setCurrentSrc] = useState<string>(src as string);
+  const normalizedSrc = useMemo(() => normalizeSrc(src), [src]);
+  const [currentSrc, setCurrentSrc] = useState<string>(normalizedSrc);
   const [isLoading, setIsLoading] = useState(!priority);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const isMountedRef = useRef(false);
+  const retryInFlightRef = useRef(false);
 
-  // Determine effective loading strategy
-  // Priority images should not use lazy loading
-  const effectiveLoading = priority ? undefined : (loading || "lazy");
-  
-  // Determine effective placeholder
-  // Blur placeholder requires blurDataURL for external images
-  // Skip blur for external URLs unless they support auto-blur
-  const effectivePlaceholder = (() => {
-    if (placeholder !== "blur") return placeholder;
-    // For blur, check if it's a supported CDN
-    const srcStr = typeof src === 'string' ? src : '';
-    if (supportsAutoBlur(srcStr)) return "blur";
-    // Otherwise, skip blur (use skeleton instead)
-    return undefined;
-  })();
-
-  // Reset state when src changes
   useEffect(() => {
-    setCurrentSrc(src as string);
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      retryInFlightRef.current = false;
+    };
+  }, []);
+
+  // Reset local state only when source/priority actually changes.
+  useEffect(() => {
+    retryInFlightRef.current = false;
+    setCurrentSrc(normalizedSrc);
     setHasError(false);
     setRetryCount(0);
     setIsLoading(!priority);
-  }, [src, priority]);
+  }, [normalizedSrc, priority]);
 
-  /**
-   * Attempt to load image with retry logic
-   */
-  const loadImageWithRetry = useCallback(
-    async (imageSrc: string, attempt: number): Promise<void> => {
-      if (attempt >= MAX_RETRIES) {
-        throw new Error("Max retries reached");
-      }
+  const effectiveLoading = useMemo(() => {
+    return priority ? undefined : (loading ?? "lazy");
+  }, [loading, priority]);
 
-      // Wait for the delay before retrying (skip delay for first attempt)
-      if (attempt > 0) {
-        const delay = RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
+  const effectivePlaceholder = useMemo(() => {
+    if (placeholder !== "blur") {
+      return placeholder;
+    }
 
-      // Use the concurrency limiter to prevent request spikes
-      return limitImageRequests(async () => {
-        return getCachedImageRequest(imageSrc, async () => {
-          // Attempt to load the image
-          return new Promise<void>((resolve, reject) => {
-            const img = new window.Image();
-            
-            img.onload = () => resolve();
-            img.onerror = (error) => {
-              // Check if it's a 429 error
-              // Since we can't directly access status, we'll treat all errors as potential retries
-              reject(new Error("Image load failed"));
-            };
-            
-            img.src = imageSrc;
-          });
+    return supportsAutoBlur(normalizedSrc) ? "blur" : undefined;
+  }, [normalizedSrc, placeholder]);
+
+  const loadImageWithRetry = useCallback(async (imageSrc: string, attempt: number): Promise<void> => {
+    if (attempt > MAX_RETRIES) {
+      throw new Error("Max retries reached");
+    }
+
+    if (attempt > 1) {
+      const delayIndex = Math.min(attempt - 2, RETRY_DELAYS.length - 1);
+      const delay = RETRY_DELAYS[delayIndex];
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+
+    return limitImageRequests(async () => {
+      return getCachedImageRequest(imageSrc, async () => {
+        return new Promise<void>((resolve, reject) => {
+          const img = new window.Image();
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Image load failed"));
+          img.src = imageSrc;
         });
       });
-    },
-    []
-  );
+    });
+  }, []);
 
-  /**
-   * Handle image error with retry logic
-   */
   const handleError = useCallback(async () => {
-    // If retries are disabled or we've reached max retries, show fallback
-    if (!enableRetry || retryCount >= MAX_RETRIES) {
+    if (retryInFlightRef.current || hasError) {
+      return;
+    }
+
+    if (!enableRetry || !normalizedSrc) {
       setHasError(true);
       setIsLoading(false);
       return;
     }
 
-    try {
-      // Increment retry count
-      setRetryCount((prev) => prev + 1);
-      
-      // Attempt to load with retry
-      await loadImageWithRetry(src as string, retryCount + 1);
-      
-      // If successful, update the source
-      setCurrentSrc(src as string);
-      setHasError(false);
-    } catch {
-      // Retry failed, try again or show fallback
-      if (retryCount + 1 >= MAX_RETRIES) {
-        setHasError(true);
-      } else {
-        // Continue retrying
-        handleError();
-      }
-    }
-  }, [enableRetry, retryCount, src, loadImageWithRetry]);
+    retryInFlightRef.current = true;
 
-  /**
-   * Handle successful image load
-   */
+    let succeeded = false;
+    let lastAttempt = retryCount;
+
+    try {
+      for (let attempt = retryCount + 1; attempt <= MAX_RETRIES; attempt += 1) {
+        lastAttempt = attempt;
+        if (isMountedRef.current) {
+          setRetryCount(attempt);
+        }
+
+        try {
+          await loadImageWithRetry(normalizedSrc, attempt);
+          succeeded = true;
+          break;
+        } catch {
+          // Continue with the next attempt.
+        }
+      }
+    } finally {
+      retryInFlightRef.current = false;
+    }
+
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    if (succeeded) {
+      setCurrentSrc(normalizedSrc);
+      setHasError(false);
+    } else {
+      setHasError(true);
+    }
+
+    setRetryCount(lastAttempt);
+    setIsLoading(false);
+  }, [enableRetry, hasError, loadImageWithRetry, normalizedSrc, retryCount]);
+
   const handleLoad = useCallback(() => {
+    if (!isMountedRef.current) {
+      return;
+    }
+
     setIsLoading(false);
     setHasError(false);
-    if (onLoadCallback) {
-      onLoadCallback();
-    }
+    setRetryCount(0);
+    onLoadCallback?.();
   }, [onLoadCallback]);
 
-  // Determine the final source to display
-  const displaySrc = hasError || !currentSrc ? fallbackUrl : currentSrc;
+  const displaySrc = useMemo(() => {
+    return hasError || !currentSrc ? fallbackUrl : currentSrc;
+  }, [currentSrc, fallbackUrl, hasError]);
 
-  // Check if fill mode is explicitly enabled via props
-  const useFill = 'fill' in rest && rest.fill === true;
+  const useFill = rest.fill === true;
 
   return (
-    <div className={`relative overflow-hidden ${useFill ? 'h-full w-full' : className}`}>
-      {/* Skeleton loader - shown while loading */}
+    <div className={`relative overflow-hidden ${useFill ? "h-full w-full" : className}`}>
       {showSkeleton && isLoading && (
-        <div
-          className={`absolute inset-0 z-10 ${skeletonClassName}`}
-          aria-hidden="true"
-        />
+        <div className={`absolute inset-0 z-10 ${skeletonClassName}`} aria-hidden="true" />
       )}
-      
-      {/* Next.js Image component */}
+
       <Image
+        {...rest}
         src={displaySrc}
         alt={alt}
         onLoad={handleLoad}
@@ -224,19 +205,23 @@ export default function OptimizedImage({
         loading={effectiveLoading}
         placeholder={effectivePlaceholder}
         fill={useFill}
-        className={useFill ? `object-cover ${className}` : className}
+        className={useFill ? `object-cover ${className}`.trim() : className}
       />
     </div>
   );
 }
 
+const OptimizedImage = memo(OptimizedImageComponent);
+OptimizedImage.displayName = "OptimizedImage";
+
+export default OptimizedImage;
+
 /**
  * Preload an image to warm up the cache
- * Useful for critical images that should load immediately
  */
 export async function preloadImage(src: string): Promise<void> {
   if (!src || typeof src !== "string") return;
-  
+
   try {
     await getCachedImageRequest(src, async () => {
       return new Promise<void>((resolve, reject) => {
@@ -247,21 +232,18 @@ export async function preloadImage(src: string): Promise<void> {
       });
     });
   } catch {
-    // Silently fail for preloads - they're best-effort
+    // Best-effort preload only.
   }
 }
 
 /**
  * Preload multiple images with concurrency control
  */
-export async function preloadImages(
-  urls: string[],
-  concurrency: number = 6
-): Promise<void> {
+export async function preloadImages(urls: string[], concurrency: number = 6): Promise<void> {
   if (!urls || urls.length === 0) return;
-  
+
   const { batchProcessImages } = await import("@/lib/network/concurrencyLimiter");
-  
+
   await batchProcessImages(
     urls.filter(Boolean),
     (url) => preloadImage(url),
