@@ -1,4 +1,4 @@
-﻿import type { NextConfig } from "next";
+import type { NextConfig } from "next";
 
 function parseExtraHosts(value: string | undefined): string[] {
   if (!value) return [];
@@ -83,20 +83,7 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=31536000; includeSubDomains; preload",
   },
-  // COEP/CORP cause issues with external resources like OpenStreetMap tiles
-  // Remove in development; keep in production only if needed for security isolation
-  ...(isDev
-    ? []
-    : [
-        {
-          key: "Cross-Origin-Embedder-Policy",
-          value: "require-corp",
-        },
-        {
-          key: "Cross-Origin-Resource-Policy",
-          value: "same-origin",
-        },
-      ]),
+  // Do not enforce COEP/CORP here: OpenStreetMap/Leaflet resources are cross-origin and can fail in production when isolated.
   {
     key: "Cross-Origin-Opener-Policy",
     value: isDev ? "same-origin" : "same-origin",
@@ -150,4 +137,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
 
