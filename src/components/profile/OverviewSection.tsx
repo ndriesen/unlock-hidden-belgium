@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, useParams } from 'next/navigation';
 import { isFollowing, toggleFollow } from '@/lib/services/follows';
 import { PublicProfileData } from '@/lib/services/publicProfiles';
+import { MessageCircleMore } from 'lucide-react';
 
 interface OverviewSectionProps {
   data: PublicProfileData;
@@ -127,21 +128,14 @@ export function OverviewSection({ data }: OverviewSectionProps) {
           <p className="text-base opacity-90 mb-1">{profile.city || 'Explorer'}</p>
           <p className="text-emerald-100 font-semibold text-sm mb-4">{profile.style}</p>
           
-          {/* Message button */}
-          {currentUser && currentUser.id !== profile.id && (
-            <button
-              onClick={() => router.push(`/chat/${profile.id}`)} // or emit event to open ChatDrawer
-              className="inline-flex items-center gap-2 bg-white/30 backdrop-blur border border-white/50 px-6 py-3 rounded-xl font-semibold hover:bg-white/40 hover:shadow-xl transition-all text-white"
-            >
-              💬 Message
-            </button>
-          )}
+
           
           {/* XP Progress - Smaller */}
           <div className="bg-white/20 backdrop-blur rounded-xl p-3 mt-4">
             <div className="flex justify-between text-xs mb-1">
               <span>Level {level}</span>
               <span>{Math.floor(profile.xpPoints)} XP</span>
+              
             </div>
             <div className="w-full bg-white/30 rounded-lg h-2 overflow-hidden">
               <div 
@@ -151,6 +145,19 @@ export function OverviewSection({ data }: OverviewSectionProps) {
             </div>
           </div>
         </div>
+
+        
+        {/* Message button */}
+        <div className="absolute bottom-6 right-3 rounded-lg overflow-hidden">
+          {currentUser && currentUser.id !== profile.id && (
+            <button 
+              onClick={() => router.push(`/chat/${profile.id}`)} // or emit event to open ChatDrawer
+              className="inline-flex items-center gap-2 bg-white/30 backdrop-blur border border-white/50 px-6 py-3 rounded-xl font-semibold hover:bg-white/40 hover:shadow-xl transition-all text-white"
+            >
+              <MessageCircleMore/>
+            </button>
+          )}
+          </div>
       </div>
 
       {/* Stats - Smaller, clickable */}
