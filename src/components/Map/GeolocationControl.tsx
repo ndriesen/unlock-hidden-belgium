@@ -16,7 +16,7 @@ function SafeGeolocationControl({ autoLocate, hotspots = [] }: GeolocationContro
   const circleRef = useRef<L.Circle | null>(null);
   const userIcon = L.icon({
     iconUrl: "/locationPointer.svg",
-    iconSize: [16, 16],
+    iconSize: [0, 0],
     iconAnchor: [0, 0],
     popupAnchor: [0, -40]
   });
@@ -51,9 +51,9 @@ function SafeGeolocationControl({ autoLocate, hotspots = [] }: GeolocationContro
       else circleRef.current = L.circle(e.latlng, {
         radius: e.accuracy ?? 50,
         color: "#b4d1ff",
-        fillColor: "#1770ff",
-        fillOpacity: 0.2,
-        weight: 5
+        fillColor: "#0759df",
+        fillOpacity: 0.3,
+        weight: 10
       }).addTo(map);
     };
 
