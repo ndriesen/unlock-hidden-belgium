@@ -16,8 +16,8 @@ function SafeGeolocationControl({ autoLocate, hotspots = [] }: GeolocationContro
   const circleRef = useRef<L.Circle | null>(null);
   const userIcon = L.icon({
     iconUrl: "/locationPointer.svg",
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
+    iconSize: [16, 16],
+    iconAnchor: [0, 0],
     popupAnchor: [0, -40]
   });
 
