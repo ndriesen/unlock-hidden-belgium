@@ -1,5 +1,1 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2250" height="2250" viewBox="0 0 2250 2250">
-<path fill-rule="evenodd" fill="rgb(85.546875%, 16.893005%, 11.401367%)" fill-opacity="1" d="M 1125 1692.195312 C 1125 1692.195312 1487.070312 1151.570312 1487.070312 919.878906 C 1487.070312 720.039062 1324.828125 557.808594 1125 557.808594 C 925.167969 557.808594 762.929688 720.039062 762.929688 919.878906 C 762.929688 1151.570312 1125 1692.195312 1125 1692.195312 "/>
-<path fill-rule="evenodd" fill="rgb(100%, 100%, 100%)" fill-opacity="1" d="M 1125 780.570312 C 1225.648438 780.570312 1307.371094 857.738281 1307.371094 952.789062 C 1307.371094 1047.828125 1225.648438 1125 1125 1125 C 1024.351562 1125 942.628906 1047.828125 942.628906 952.789062 C 942.628906 857.738281 1024.351562 780.570312 1125 780.570312 "/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-locate-icon lucide-locate"><line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/></svg>
