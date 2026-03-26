@@ -67,21 +67,7 @@ export default function MapPreviewSection({
           {/* Gradient Overlay */}
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
-          {/* Top Controls */}
-          <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
-            <div className="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-xl rounded-2xl shadow-lg">
-              {/*<MapPin className="w-5 h-5 text-emerald-500 flex-shrink-0" />/}
-              {/* <span className="font-semibold text-slate-800 text-sm">Nearby hotspots</span>*/}
-            </div>
-
-            <button
-              onClick={() => setViewMode((prev) => prev === "markers" ? "heatmap" : "markers")}
-              className="p-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-lg hover:bg-white hover:shadow-xl transition-all hover:scale-105 active:scale-95 hover-lift"
-              title={viewMode === "markers" ? "Heatmap view" : "Markers view"}
-            >
-              <Layers className="w-5 h-5 text-slate-700" />
-            </button>
-          </div>
+        
 
           {/* Bottom CTA */}
           <div className="absolute bottom-4 left-4 right-4 z-20">

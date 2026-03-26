@@ -268,60 +268,7 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
     [onSelect, preventZoom]
   );
 
-  const handleGoToCurrentLocation = () => {
-    if (!navigator.geolocation || !navigator.permissions) {
-      alert("Your browser does not support geolocation.");
-      return;
-    }
 
-    // Check de huidige permissie-status
-    navigator.permissions.query({ name: "geolocation" }).then((result) => {
-      if (result.state === "granted") {
-        // Toegang al toegestaan
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const coords: [number, number] = [
-              position.coords.latitude,
-              position.coords.longitude,
-            ];
-            mapRef.current?.flyTo(coords, 14);
-          },
-          (error) => {
-            console.error(error);
-            alert("Unable to access your location.");
-          }
-        );
-      } else if (result.state === "prompt") {
-        // Browser zal prompt tonen
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const coords: [number, number] = [
-              position.coords.latitude,
-              position.coords.longitude,
-            ];
-            mapRef.current?.flyTo(coords, 14);
-          },
-          (error) => {
-            if (error.code === error.PERMISSION_DENIED) {
-              setShowLocationPrompt(true);
-            } else {
-              alert("Unable to access your location.");
-            }
-          }
-        );
-      } else if (result.state === "denied") {
-        // Permissie geweigerd → toon instructies
-        setShowLocationPrompt(true);
-      }
-
-      // Update als permissie verandert (optioneel)
-      result.onchange = () => {
-        if (result.state === "granted") {
-          setShowLocationPrompt(false);
-        }
-      };
-    });
-  };
 
   const [platform, setPlatform] = useState<"ios" | "android" | "desktop">("desktop");
 
@@ -444,23 +391,13 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
 
 {/* Locate UI moved to GeolocationControl for functionality */}
         <FitToHotspots hotspots={hotspots} enabled={autoFit} />
+        <GeolocationControl autoLocate={autoLocate} hotspots={hotspots} />
       </MapContainer>
       
       
   
-        {/* BUTTON CONTROLS */}
+        {/* Fullscreen Toggle */}
         <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto z-50">
-
-          {/* Locate / Current Location Button */}
-          <button
-            onClick={handleGoToCurrentLocation}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg hover:bg-white transition"
-            title="Go to current location"
-          >
-            📍
-          </button>
-
-          {/* Fullscreen Toggle */}
           <button
             onClick={() => setIsFullscreen(prev => !prev)}
             className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg hover:bg-white transition"
@@ -468,7 +405,6 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
           >
             {isFullscreen ? <Minimize size={20} /> : <Fullscreen size={20} />}
           </button>
-
         </div>
 
       

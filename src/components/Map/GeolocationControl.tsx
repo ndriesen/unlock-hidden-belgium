@@ -101,7 +101,7 @@ function SafeGeolocationControl({ autoLocate, hotspots = [] }: GeolocationContro
 
   return (
     <div className="leaflet-control-container">
-      <div className="leaflet-top leaflet-right">
+      <div className="leaflet-top leaflet-left">
         <div className="leaflet-control-locate leaflet-bar leaflet-control">
           <a
             className="leaflet-control-locate-toggle"

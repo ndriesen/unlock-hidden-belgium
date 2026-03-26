@@ -598,14 +598,14 @@ export default function Home() {
           onSurpriseMe={handleSurpriseMe}
         />
         
-        <TrendingHotspots
+        {/*<TrendingHotspots
           hotspots={trendingHotspots}
           wishlistIds={wishlistIds}
           visitedIds={visitedIds}
           onWishlistToggle={handleWishlist}
           loading={!userDataLoaded}
           selectedCategory={selectedCategory}
-        />
+        />*/}
 
         <AdventuresNearYou
           hotspots={categoryMatchedHotspots}
