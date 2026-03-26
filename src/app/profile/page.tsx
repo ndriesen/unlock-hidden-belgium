@@ -16,6 +16,7 @@ import {
   fetchOwnBuddyProfile,
   upsertOwnBuddyProfile,
 } from "@/lib/services/buddies";
+import { ImagePlus } from "lucide-react";
 
 interface Hotspot {
   id: string;
@@ -495,9 +496,9 @@ export default function ProfilePage() {
 
   // Profile tabs
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â ' },
-    { id: 'preferences' as const, label: 'Buddies', icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¥' },
-    { id: 'badges' as const, label: 'Badges', icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ' },
+    { id: 'overview', label: 'Overview', icon: '📋' },
+    { id: 'preferences' as const, label: 'Buddies', icon: '👥' },
+    { id: 'badges' as const, label: 'Badges', icon: '🎖️' },
   ];
 
   return (
@@ -519,12 +520,12 @@ export default function ProfilePage() {
             )}
           </div>
           <label className="absolute -bottom-2 -right-2 bg-white p-2 rounded-full shadow-lg cursor-pointer">
-            ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
+            <ImagePlus/>
             <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
           </label>
           {/* TODO: Follow button for public profiles only (see TODO.md)
           <label className="absolute -bottom-2 -left-2 bg-white p-2 rounded-full shadow-lg cursor-pointer" onClick={handleToggleFollow}>
-            {isFollowing ? 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ' : '+'}
+            {isFollowing ? '-' : '+'}
           </label> */}
         </div>
         <div className="space-y-2">
@@ -668,7 +669,7 @@ export default function ProfilePage() {
                   {visited.slice(0, 4).map((hotspot) => (
                     <div key={hotspot.id} className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
                       <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-                        ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â
+                        📍
                       </div>
                       <div>
                         <p className="font-semibold">{hotspot.name}</p>
@@ -863,7 +864,7 @@ export default function ProfilePage() {
               </div>
               {earnedBadges.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
-                  <span className="text-4xl mb-4 block">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â </span>
+                  <span className="text-4xl mb-4 block">🎖️</span>
                   <h3 className="text-xl font-bold mb-2">No badges yet</h3>
                   <p className="text-slate-600 mb-6">Keep exploring to unlock achievements</p>
                 </div>

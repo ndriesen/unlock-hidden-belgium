@@ -207,7 +207,7 @@ export async function getPublicProfileData(userId: string): Promise<PublicProfil
   const badgesList = (badgesRes.data || []).map((b: any) => ({
     id: b.badges?.id || `demo-${Math.random()}`,
     name: b.badges?.name || 'Explorer Badge',
-    icon: b.badges?.icon || 'Ã°Å¸Ââ€ ',
+    icon: b.badges?.icon || '🧭',
     description: b.badges?.description || 'Achievement unlocked',
     awarded_at: b.awarded_at || new Date().toISOString(),
   })).filter(b => b.id !== 'demo-${Math.random()}'); // Safe access, prioritize real data
