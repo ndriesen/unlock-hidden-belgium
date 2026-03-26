@@ -144,13 +144,13 @@ export default function SidebarLayout({
       return;
     }
 
-    try {
-      const data = await fetchRecentConversations(user.id, 5);
-      setRecentConversations(data);
-    } catch (error) {
-      console.error('Failed to load recent conversations:', error);
-      setRecentConversations([]);
-    }
+      try {
+        const data = await fetchRecentConversations(user.id, 5); // show all recent convos
+        setRecentConversations(data);
+      } catch (error) {
+        console.error('Failed to load recent conversations:', error);
+        setRecentConversations([]);
+      }
   }, [user?.id]);
 
 
@@ -385,7 +385,7 @@ export default function SidebarLayout({
                           {recentConversations.length === 0 ? (
                             <div className="text-center py-8 space-y-2">
                               <p className="text-xs text-slate-500">No recent conversations</p>
-                              <p className="text-xs text-slate-400">Start chatting in <Link href="/buddies" className="font-semibold text-emerald-600 hover:underline">Buddies</Link></p>
+                              <p className="text-xs text-slate-400">Start chatting with buddies</p>
                             </div>
                           ) : (
                             recentConversations.map((conv) => 

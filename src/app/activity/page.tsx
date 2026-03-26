@@ -98,6 +98,33 @@ export default function ActivityPage() {
     );
   };
 
+  const handleMarkAllRead = async () => {
+    const unreadIds = notifications
+      .filter((item) => !item.readAt)
+      .map((item) => item.id);
+
+    await Promise.all(unreadIds.map((id) => markNotificationAsRead(id)));
+
+    setNotifications((prev) =>
+      prev.map((item) =>
+        !item.readAt
+          ? {
+              ...item,
+              readAt: new Date().toISOString(),
+            }
+          : item
+      )
+    );
+  };
+
+  // Filter out excluded types
+  const filteredNotifications = notifications.filter(
+    (n) =>
+      !n.activity.type.includes('viewed_hotspot') &&
+      !n.activity.type.includes('viewed_trip') &&
+      n.activity.type !== 'feed_item'
+  );
+
   if (!user) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
@@ -133,17 +160,28 @@ export default function ActivityPage() {
             Feed
           </button>
         </div>
+
+        {unreadCount > 0 && (
+          <div className="flex justify-end">
+            <button
+              onClick={handleMarkAllRead}
+              className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              Mark all as read
+            </button>
+          </div>
+        )}
       </section>
 
       {loading && <p className="text-sm text-slate-600">Loading activity...</p>}
 
       {!loading && activeTab === "notifications" && (
         <section className="space-y-3">
-          {notifications.length === 0 && (
+          {filteredNotifications.length === 0 && (
             <p className="text-sm text-slate-600">No notifications yet.</p>
           )}
 
-          {notifications.map((notification) => (
+          {filteredNotifications.map((notification) => (
             <article
               key={notification.id}
               className={`rounded-xl border p-3 shadow-sm ${

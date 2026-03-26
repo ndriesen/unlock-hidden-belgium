@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { getMessages, sendMessage, getOrCreateConversation, useMessagesSubscription, getPartnerProfile, type Message } from '@/lib/services/chat';
+import { MessageBubble } from '@/components/ui/message-bubble';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
@@ -59,16 +60,35 @@ export function ChatDrawer({ conversationPartnerId, onClose }: ChatDrawerProps) 
   const handleSend = useCallback(async () => {
     if (!newMessage.trim() || !conversationId || sending) return;
 
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: Message = {
+      id: tempId,
+      conversation_id: conversationId,
+      sender_id: user!.id,
+      content: newMessage.trim(),
+      created_at: new Date().toISOString(),
+      sender_name: 'You',
+      sender_avatar: ''
+    };
+
+    // Optimistic update
+    setMessages(prev => [...prev, optimisticMsg]);
+    setNewMessage('');
+    scrollToBottom();
+
     setSending(true);
     try {
-      const msg = await sendMessage(conversationId, newMessage.trim());
-      setNewMessage('');
+      const sentMsg = await sendMessage(conversationId, newMessage.trim());
+      // Replace temp message with real one (realtime will also add it, but this ensures immediate)
+      setMessages(prev => prev.map(m => m.id === tempId ? sentMsg : m));
     } catch (error) {
       addToast('Failed to send message');
+      // Remove failed optimistic message
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     } finally {
       setSending(false);
     }
-  }, [newMessage, conversationId, sending]);
+  }, [newMessage, conversationId, sending, user]);
 
   if (!conversationPartnerId || !user) return null;
 
@@ -111,7 +131,7 @@ export function ChatDrawer({ conversationPartnerId, onClose }: ChatDrawerProps) 
         </div>
 
         {/* Messages */}
-        <div className="flex-1 p-6 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
+        <div className="flex-1 p-6 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 pb-20">
           {messages.length === 0 ? (
             <div className="text-center text-slate-500 py-12 flex flex-col items-center">
               <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
@@ -121,31 +141,27 @@ export function ChatDrawer({ conversationPartnerId, onClose }: ChatDrawerProps) 
               <p className="text-sm">Start the conversation!</p>
             </div>
           ) : (
-            messages.map((msg, index) => (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.2, delay: index * 0.05 }}
-                className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`group max-w-[75%] p-4 rounded-3xl shadow-lg relative ${msg.sender_id === user?.id ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white' : 'bg-white border border-slate-200 shadow-md'}`}>
-                  <p className="text-sm leading-relaxed mb-1.5 break-words">{msg.content}</p>
-                  <p className={`text-xs opacity-75 ${msg.sender_id === user?.id ? 'text-emerald-100' : 'text-slate-500'} absolute bottom-2 right-3 group-hover:opacity-100 transition-opacity`}>
-                    {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}).toLowerCase()}
-                  </p>
-                  {msg.sender_id !== user?.id && (
-                    <div className="absolute -left-3 top-4 w-4 h-4 bg-white border-b border-r border-slate-200 rotate-45 shadow-md"></div>
-                  )}
-                  {msg.sender_id === user?.id && (
-                    <div className="absolute -right-3 top-4 w-4 h-4 bg-gradient-to-r from-emerald-500 to-emerald-600 border-b border-r rotate-45 shadow-lg"></div>
-                  )}
-                </div>
-              </motion.div>
-            ))
+            <>
+              {messages.map((msg, index) => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.2, delay: Math.min(index * 0.05, 0.3) }}
+                  className="w-full"
+                >
+                  <MessageBubble 
+                    message={msg} 
+                    isOwnMessage={msg.sender_id === user?.id} 
+                    userId={user?.id || ''} 
+                  />
+                </motion.div>
+              ))}
+            </>
           )}
           <div ref={messagesEndRef} />
         </div>
+        
 
         {/* Input */}
         <div className="p-6 pt-0 border-t border-slate-200/50 sticky bottom-0 bg-gradient-to-t from-white/90 backdrop-blur-xl">
