@@ -1,7 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { supabase } from "@/lib/Supabase/browser-client";
 import {
   getLevelFromXp,
@@ -17,6 +18,9 @@ import {
   upsertOwnBuddyProfile,
 } from "@/lib/services/buddies";
 import { ImagePlus } from "lucide-react";
+
+
+
 
 interface Hotspot {
   id: string;
@@ -48,13 +52,30 @@ interface UserBadgeRow {
 
 interface VisitHotspot {
   id: string;
+  name: string;
   province: string;
   category?: string;
   country?: string;
   is_hidden?: boolean;
 }
 
+interface RecentVisit {
+  id: string;
+  name: string;
+  province: string;
+  visited_at: string;
+}
+
+const formatDate = (dateStr: string): string => {
+  return new Date(dateStr).toLocaleDateString('nl-BE', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+};
+
 interface UserVisitRow {
+
   hotspot_id: string;
   visited_at: string;
   hotspots: VisitHotspot;
@@ -360,6 +381,7 @@ export default function ProfilePage() {
           visited_at,
           hotspots (
             id,
+            name,
             province,
             category,
             country,
@@ -382,6 +404,8 @@ export default function ProfilePage() {
 
     fetchUser();
   }, [userId]);
+
+
 
   const calculatedLevel = getLevelFromXp(xpPoints);
   const xpForNextLevel = xpRequiredForLevel(calculatedLevel);
@@ -666,24 +690,39 @@ export default function ProfilePage() {
               <div>
                 <h3 className="font-bold mb-4">Recent Discoveries</h3>
                 <div className="space-y-3">
-                  {visited.slice(0, 4).map((hotspot) => (
-                    <div key={hotspot.id} className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-                        📍
-                      </div>
-                      <div>
-                        <p className="font-semibold">{hotspot.name}</p>
-                        <p className="text-sm text-slate-600">{hotspot.province}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {visited.length === 0 && (
+                  {userVisits.length === 0 ? (
                     <p className="text-slate-500 p-8 text-center border-2 border-dashed border-slate-200 rounded-xl">
                       Start your adventure!
                     </p>
+                  ) : (
+                    userVisits
+                      .filter(v => v.hotspots)
+                      .map(v => ({
+                        id: v.hotspots!.id,
+                        name: v.hotspots!.name || 'Unknown Hotspot',
+                        province: v.hotspots!.province,
+                        visited_at: v.visited_at
+                      } as RecentVisit))
+                      .sort((a, b) => new Date(b.visited_at).getTime() - new Date(a.visited_at).getTime())
+                      .slice(0, 4)
+                      .map((visit) => (
+                        <Link key={visit.id} href={`/hotspots/${visit.id}`} className="block no-underline focus:outline-none">
+                          <div className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all group">
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shadow-md flex-shrink-0 group-hover:scale-110 transition-transform">
+                              📍
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-900 group-hover:text-emerald-600 truncate">{visit.name}</p>
+                              <p className="text-sm text-slate-600 truncate">{visit.province}</p>
+                              <p className="text-xs text-slate-500 mt-1">{formatDate(visit.visited_at)}</p>
+                            </div>
+                          </div>
+                        </Link>
+                      ))
                   )}
                 </div>
               </div>
+
             </div>
           )}
 
