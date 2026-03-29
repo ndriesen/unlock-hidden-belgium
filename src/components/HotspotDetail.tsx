@@ -8,6 +8,8 @@ import ReviewsSection from "./ReviewsSection";
 import { useAuth } from "@/context/AuthContext";
 import { fetchHotspotMedia } from "@/lib/services/hotspotMedia";
 import GalleryCarousel from "./GalleryCarousel";
+import FloatingActionMenu from "@/components/ui/FloatingActionMenu";
+import { CheckCircle, Heart, Share2, MapPin, ExternalLink, Bookmark } from "lucide-react";
 import OpeningHoursDisplay from "@/components/ui/OpeningHoursDisplay";
 
 import TripSelectorModal from "./trips/TripSelectorModal";
@@ -121,8 +123,44 @@ export default function HotspotDetail({
           isLiked={isLiked}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
-      
-
+        
+        {/* Floating Action Menu */}
+        <div className="absolute bottom-1 right-1 z-40 scale-[0.85]">
+          <FloatingActionMenu
+            actions={[
+              {
+                icon: <CheckCircle className={isVisited ? "text-emerald-600" : "text-slate-600"} />,
+                label: "Visit",
+                onClick: () => onVisit?.(hotspot.id),
+              },
+              {
+                icon: <Bookmark className={isWishlist ? "text-amber-600" : "text-slate-600"} />,
+                label: "Wishlist", 
+                onClick: () => onWishlist?.(hotspot.id),
+              },
+              {
+                icon: <Heart className={isLiked ? "text-rose-600 fill-red-500" : "text-slate-600"} />,
+                label: "Favorite",
+                onClick: () => onLike?.(hotspot.id),
+              },
+              {
+                icon: <MapPin className="text-slate-600" />,
+                label: "Route",
+                onClick: () => window.open(routeUrl, "_blank", "noopener,noreferrer"),
+              },
+              {
+                icon: <Share2 className="text-slate-600" />,
+                label: "Share",
+                onClick: shareHotspot,
+              },
+              {
+                icon: <ExternalLink className="text-slate-600" />,
+                label: "Details",
+                onClick: () => router.push(`/hotspots/${hotspot.id}`),
+              },
+            ]}
+          />
+        </div>
 
         <div className="absolute bottom-4 left-4 right-4">
           <h2 className="text-2xl font-bold text-white leading-tight">{hotspot.name}</h2>
@@ -132,58 +170,7 @@ export default function HotspotDetail({
         </div>
       </div>
 
-      {/* Social + utility actions */}
-      <div className="flex grid grid-cols-3 mt-2 left-4 right-4 gap-2 items-center">
-
-        <button
-          onClick={() => onVisit?.(hotspot.id)}
-          className={`text-sm font-bold rounded-lg border border-[0.5px] border-slate-300 ${
-            isVisited ? "text-green-600" : "text-slate-700"
-          }`}
-        >
-          <span aria-hidden="true" className="text-[16px] font-bold leading-none">✓</span> Mark visited
-        </button>
-
-        <button
-          onClick={() => onWishlist?.(hotspot.id)}
-          className={`text-sm font-bold rounded-lg border border-[0.5px] border-slate-300 ${
-            isWishlist ? "text-amber-600" : "text-slate-700"
-          }`}
-        >
-          <span aria-hidden="true" className="text-[16px] font-bold leading-none">⟟</span> Wishlist
-        </button>
-
-        <button
-          onClick={() => onLike?.(hotspot.id)}
-          className={`text-sm font-bold rounded-lg border border-[0.5px] border-slate-300 ${
-            isLiked ? "text-rose-600" : "text-slate-700"
-          }`}
-        >
-          <span aria-hidden="true" className="text-[16px] font-bold leading-none">♡</span> Favorite
-        </button>
-      </div>
-
-      {/* Action buttons */}
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        <button
-          onClick={() => window.open(routeUrl, "_blank", "noopener,noreferrer")}
-          className="rounded-lg border border-slate-200 px-2 text-sm"
-        >
-          Open route
-        </button>
-        <button
-          onClick={shareHotspot}
-          className="rounded-lg border border-slate-200 px-3 text-sm"
-        >
-          Share
-        </button>
-        <button
-          onClick={() => router.push(`/hotspots/${hotspot.id}`)}
-          className="rounded-lg border border-slate-200 px-3  text-sm"
-        >
-          More info
-        </button>
-      </div>
+      
 
       {/* Tabs */}
       <div className="px-4 pt-2">
