@@ -39,10 +39,10 @@ export default function FloatingActionMenu({ actions, state }: FloatingActionMen
       <motion.div
         initial={{ opacity: 0, x: 10 }}
         animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 10 }}
+        exit={{ opacity: 0, x: 0 }}
         transition={{ duration: 0.2 }}
         className="
-          flex items-center gap-0 mr-[-12px] px-1 py-0.5
+          flex items-center gap-0 mr-[-12px] px-1
           bg-white/50 backdrop-blur-xl
           border border-white/30
           rounded-l-full
@@ -86,7 +86,7 @@ export default function FloatingActionMenu({ actions, state }: FloatingActionMen
       toggle()
     }}
     className="
-      h-11 w-11
+      h-9 w-9
       rounded-full
       bg-white/90 hover:bg-white backdrop-blur-xl
       border border-white/40

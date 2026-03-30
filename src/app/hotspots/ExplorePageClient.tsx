@@ -600,10 +600,10 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
         hotspot={selectedHotspot}
         onClose={() => setSelectedHotspot(null)}
         onVisit={handleVisit}
-        onLike={(id) => toggleHotspotLikeInUi(hotspots.find(h => h.id === id)!)}
-        onSave={(id) => toggleHotspotSaveInUi(hotspots.find(h => h.id === id)!)}
         onWishlist={toggleWishlistInUi}
         onFavorite={toggleFavoriteInUi}
+        onLike={(id) => toggleHotspotLikeInUi(hotspots.find(h => h.id === id)!)}
+        onSave={(id) => toggleHotspotSaveInUi(hotspots.find(h => h.id === id)!)}
         onAddToTrip={() => setShowTripSelector(true)}
         isVisited={selectedMeta?.visited ?? false}
         isLiked={selectedMeta?.likedByMe ?? false}
@@ -666,7 +666,7 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
                 {visibleHotspots.map((hotspot) => (
-                  <HotspotCard
+                    <HotspotCard
                     key={hotspot.id}
                     hotspot={{
                       id: hotspot.id,
@@ -687,6 +687,7 @@ const toggleHotspotSaveInUi = useCallback(async (hotspot: ExploreHotspot) => {
                       likedByMe: hotspot.likedByMe,
                       savedByMe: hotspot.savedByMe,
                     }}
+                    onVisit={(h) => handleVisit(h.id)}
                     onLike={(h) => toggleHotspotLikeInUi(h as any)}
                     onSave={(h) => toggleHotspotSaveInUi(h as any)}
                     onWishlist={toggleWishlistInUi}

@@ -125,22 +125,22 @@ export default function HotspotDetail({
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
         
         {/* Floating Action Menu */}
-        <div className="absolute bottom-1 right-1 z-40 scale-[0.85]">
+        <div className="absolute bottom-1 right-1 z-40 scale-[0.7]">
           <FloatingActionMenu
             actions={[
               {
                 icon: <CheckCircle className={isVisited ? "text-emerald-600" : "text-slate-600"} />,
-                label: "Visit",
+                label: isVisited ? "Visited" : "Visit",
                 onClick: () => onVisit?.(hotspot.id),
               },
               {
                 icon: <Bookmark className={isWishlist ? "text-amber-600" : "text-slate-600"} />,
-                label: "Wishlist", 
+                label: isWishlist ? "Wishlisted" : "Wishlist", 
                 onClick: () => onWishlist?.(hotspot.id),
               },
               {
                 icon: <Heart className={isLiked ? "text-rose-600 fill-red-500" : "text-slate-600"} />,
-                label: "Favorite",
+                label:  isLiked ? "Liked" : "Like",
                 onClick: () => onLike?.(hotspot.id),
               },
               {

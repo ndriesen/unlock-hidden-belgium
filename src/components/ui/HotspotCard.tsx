@@ -2,10 +2,12 @@
 
 import * as React from "react"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import AnimatedButton from "@/components/ui/hover-button"
 import FloatingActionMenu from "@/components/ui/FloatingActionMenu"
-import { Clover, Heart, MapPinned, Save, SaveOff, Share } from "lucide-react"
+import { Clover, CheckCircle, Heart, Share2, MapPin, ExternalLink, Bookmark, MapPinned, Save, SaveOff, Share } from "lucide-react"
+
 
 export interface Hotspot {
   id: string
@@ -29,6 +31,7 @@ export interface Hotspot {
 
 export interface HotspotCardProps {
   hotspot: Hotspot
+  onVisit: (hotspot: Hotspot) => void;
   onLike: (hotspot: Hotspot) => void
   onSave: (hotspot: Hotspot) => void
   onWishlist: (hotspotId: string) => void
@@ -58,12 +61,20 @@ const handleShare = async (hotspot: Hotspot) => {
 
 export default function HotspotCard({
   hotspot,
+  onVisit,
   onLike,
   onSave,
   onWishlist,
   onFavorite,
   onMap,
 }: HotspotCardProps) {
+  const router = useRouter();
+  const routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${hotspot.latitude},${hotspot.longitude}`;
+  const detailUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/hotspots/${hotspot.id}`
+      : `/hotspots/${hotspot.id}`;
+
   return (
     <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg hover:shadow-2xl transition-shadow duration-300">
       <div className="relative h-40 w-full">
@@ -95,7 +106,7 @@ export default function HotspotCard({
           }`}
           aria-label={hotspot.likedByMe ? "Remove from favorites" : "Add to favorites"}
         >
-          <span aria-hidden="true" className="leading-none">{hotspot.likedByMe ? "❤️" : <Heart/>} </span>
+          <Heart className={hotspot.likedByMe ? "text-rose-600 fill-red-500 px-1.25" : "text-slate-600 px-1.25"} />
         </button>
       </div>
 
@@ -122,48 +133,45 @@ export default function HotspotCard({
         <p className="line-clamp-2 text-xs text-slate-700">{hotspot.description}</p>
 
         {/* Hover buttons */}
-        <div className="absolute top-25 right-2 mt-3 flex justify-end">
+        
+        <div className="absolute top-25 right-1 mt-4 flex justify-end z-40">
           <FloatingActionMenu
             actions={[
               {
-                icon:hotspot.likedByMe ? "❤️" : <Heart/>,
-                label: hotspot.likedByMe ? "Liked" : "Like",
-                onClick: () => onLike(hotspot),
-                className: hotspot.likedByMe
-                  ? "bg-transparent text-slate-800"
-                  : "bg-transparent text-slate-800",
+                icon: <CheckCircle className={hotspot.visited ? "text-emerald-600" : "text-slate-600"} />,
+                label: hotspot.visited ? "Visited" : "Visit",
+                onClick: () => onVisit?.(hotspot),
               },
               {
-                icon:hotspot.savedByMe ? <Save/> : <SaveOff/>,
-                label: hotspot.savedByMe ? "Saved" : "Save",
-                onClick: () => onSave(hotspot),
-                className: hotspot.savedByMe
-                  ? "bg-transparent text-slate-800"
-                  : "bg-transparent text-slate-800",
+                icon: <Bookmark className={hotspot.wishlist ? "text-amber-600" : "text-slate-600"} />,
+                label: hotspot.wishlist ? "Wishlisted" : "Wishlist", 
+                onClick: () => onWishlist?.(hotspot.id),
               },
               {
-                icon:hotspot.wishlist ? "🍀" : <Clover/>,
-                label: hotspot.wishlist ? "Wishlist" : "Wishlist",
-                onClick: () => onWishlist(hotspot.id),
-                className: hotspot.wishlist
-                  ? "bg-transparent text-slate-800"
-                  : "bg-transparent text-slate-800",
+                icon: <Heart className={hotspot.likedByMe ? "text-rose-600 fill-red-500" : "text-slate-600"} />,
+                label:  hotspot.likedByMe ? "Liked" : "Like",
+                onClick: () => onLike?.(hotspot),
               },
               {
-                icon:<MapPinned/>,
-                label: "Map",
-                onClick: () => onMap(hotspot.id),
-                className: "bg-transparent text-slate-800",
+                icon: <MapPin className="text-slate-600" />,
+                label: "Route",
+                onClick: () => window.open(routeUrl, "_blank", "noopener,noreferrer"),
               },
               {
-                icon: <Share />,
+                icon: <Share2 className="text-slate-600" />,
                 label: "Share",
                 onClick: () => handleShare(hotspot),
-                className: "bg-transparent text-slate-800",
+              },
+              {
+                icon: <ExternalLink className="text-slate-600" />,
+                label: "Details",
+                onClick: () => router.push(`/hotspots/${hotspot.id}`),
               },
             ]}
           />
         </div>
+
+        
 
 
         {/* Stats */}

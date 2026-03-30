@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
+import { Heart } from "lucide-react";
 
 
 export interface Hotspot {
@@ -224,7 +225,7 @@ export default function GalleryCarousel({
               }`}
               aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
             >
-              <span aria-hidden="true" className="text-[16px] leading-none">{isLiked ? "♥" : "♡"}</span>
+              <Heart className={isLiked ? "text-rose-600 fill-red-500 px-0.5" : "text-slate-600 px-0.5"} />
             </button>
 
               <button
