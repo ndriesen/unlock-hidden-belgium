@@ -85,6 +85,9 @@ export interface PopularTrip {
 function parseImages(images: unknown): string[] | null {
   if (!images) return null;
 
+  // Binary data (JPEG etc) - ignore
+  if (typeof images === 'object' && images !== null && !(Array.isArray(images))) return null;
+
   // If it's already an array of strings
   if (Array.isArray(images)) {
     const filtered = images.filter((item): item is string => typeof item === "string");
@@ -100,7 +103,7 @@ function parseImages(images: unknown): string[] | null {
         return filtered.length > 0 ? filtered : null;
       }
     } catch {
-      // Not a valid JSON string, return null
+      // Not a valid JSON string or binary base64, return null
       return null;
     }
   }
@@ -174,7 +177,7 @@ interface TripReactionRow {
 }
 
 function safeImage(images: string[] | null | undefined): string {
-  return images?.[0] ?? "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
+  return images?.[0] ?? '/images/placeholder-image.png';
 }
 
 function tableMissing(error: unknown): boolean {
@@ -221,7 +224,7 @@ export async function fetchExploreHotspots(userId?: string | null): Promise<Expl
 
   const rows = (hotspotData as HotspotRow[]).map((row) => ({
     ...row,
-    images: parseImages(row.images) ?? undefined,
+    images: [], // Skip binary image parsing for map
     tags: parseTags(row.tags) ?? undefined,
   }));
 

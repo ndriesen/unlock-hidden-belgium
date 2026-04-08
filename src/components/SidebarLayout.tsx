@@ -536,7 +536,7 @@ export default function SidebarLayout({
 
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur">
           <div className="grid grid-cols-4">
-            {mobileTabs.map((tab) => {
+    {mobileTabs.map((tab) => {
               const active = isActive(pathname, tab.href);
               const Icon = tab.icon;
 
@@ -553,6 +553,15 @@ export default function SidebarLayout({
                 </button>
               );
             })}
+            <button
+              onClick={() => router.push('/discover')}
+              className={`relative flex flex-col items-center justify-center gap-1 py-2 ${
+                pathname === '/discover' ? "text-emerald-700" : "text-slate-500"
+              }`}
+            >
+              <Compass className="w-4 h-4" />
+              <span className="text-[11px] font-medium">Discover</span>
+            </button>
           </div>
         </nav>
       </div>

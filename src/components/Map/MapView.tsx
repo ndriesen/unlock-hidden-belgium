@@ -1,5 +1,4 @@
-﻿﻿"use client";
-
+﻿"use client";
 
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import { MapResizeFix } from "./MapResizeFix";
@@ -10,16 +9,15 @@ import type { Map as LeafletMap } from 'leaflet';
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 import { motion, AnimatePresence } from "framer-motion";
-import { Fullscreen, Minimize } from "lucide-react";
 
 
-// Task 9: Leaflet Next.js icon fix
+
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
 import "leaflet.heat/dist/leaflet-heat.js";
@@ -27,8 +25,6 @@ import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImper
 
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { Hotspot } from "@/types/hotspot";
-
-
 
 
 interface Props {
@@ -233,8 +229,6 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
     return () => media.removeEventListener("change", listener);
   }, []);
 
-
-
   const useCanvas = hotspots.length > 1500;
   const tile = useMemo(() => mapTileConfig(mapStyle, isDark), [mapStyle, isDark]);
 
@@ -268,8 +262,6 @@ const MapView = forwardRef<MapViewHandle, Props>(function MapView({
     [onSelect, preventZoom]
   );
 
-
-
   const [platform, setPlatform] = useState<"ios" | "android" | "desktop">("desktop");
 
 useEffect(() => {
@@ -279,17 +271,13 @@ useEffect(() => {
 }, []);
 
   return (
-    <div
-  className={`
-    ${isFullscreen 
-      ? "fixed inset-0 z-[9998] bg-black w-screen h-screen"
-      : "relative w-full"
-    }
-    ${!isFullscreen && (compact ? 'h-[400px]' : 'h-screen min-h-[500px]')}
-    overflow-hidden
-  `}
-
-    >
+    <div className={`
+      ${isFullscreen 
+        ? "fixed inset-0 z-[9998] bg-black w-screen h-screen"
+        : "relative w-full h-full"
+      }
+      overflow-hidden
+    `}>
       <MapContainer
         preferCanvas={true}
         renderer={L.canvas({ padding: 0.5 })}
@@ -309,7 +297,8 @@ useEffect(() => {
           }
         }}
       >
-<MapResizeFix />        <MobileMapFix />
+        <MapResizeFix />
+        <MobileMapFix />
         <TileLayer 
           url={tile.url} 
           attribution={tile.attribution}
@@ -318,7 +307,7 @@ useEffect(() => {
           updateWhenZooming={false}
           keepBuffer={6}
           tileSize={256}
-updateWhenIdle={true}
+          updateWhenIdle={true}
           eventHandlers={{
             tileerror: (e) => {
               console.error("Tile failed to load", e);
@@ -328,13 +317,13 @@ updateWhenIdle={true}
             }
           }}
         />
-        {/* Geolocation: Functional locate control when autoLocate=true */}
-
-      
-
-{viewMode === "markers" && enableClustering && hotspotCoordinates.length > 100 && (
+        {viewMode === "markers" && enableClustering && hotspotCoordinates.length > 100 && (
           <MarkerClusterGroup
-chunkedLoading            chunkInterval={200}            chunkDelay={50}            removeOutsideVisibleBounds            maxClusterRadius={40}
+            chunkedLoading
+            chunkInterval={200} 
+            chunkDelay={50} 
+            removeOutsideVisibleBounds
+            maxClusterRadius={40}
             iconCreateFunction={(cluster: ClusterLike) => {
               const count = cluster.getChildCount();
               const size = count < 10 ? 26 : count < 50 ? 36 : 54;
@@ -342,8 +331,8 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
               return L.divIcon({
                 html: `
                   <div style="
-                    width:${size}px;
-                    height:${size}px;
+                    width: ${size}px;
+                    height: ${size}px;
                     border-radius:50%;
                     background:rgba(149, 150, 152, 0.65);
                     backdrop-filter: blur(8px);
@@ -389,28 +378,19 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
 
         {viewMode === "heatmap" && <HeatmapLayer hotspots={hotspots} />}
 
-{/* Locate UI moved to GeolocationControl for functionality */}
         <FitToHotspots hotspots={hotspots} enabled={autoFit} />
         <GeolocationControl autoLocate={autoLocate} hotspots={hotspots} />
       </MapContainer>
-      
-      
-  
-        {/* Fullscreen Toggle */}
+
         <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto z-50">
           <button
             onClick={() => setIsFullscreen(prev => !prev)}
             className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg hover:bg-white transition"
             title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           >
-            {isFullscreen ? <Minimize size={20} /> : <Fullscreen size={20} />}
+{isFullscreen ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg> : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>}
           </button>
         </div>
-
-      
-
-
-      
 
       {loading && (
         <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center text-emerald-700 font-semibold pointer-events-none">
@@ -427,7 +407,6 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
       <AnimatePresence>
         {showLocationPrompt && (
           <>
-            {/* Backdrop */}
             <motion.div
               className="fixed inset-0 z-[10010] bg-black/30"
               initial={{ opacity: 0 }}
@@ -436,27 +415,19 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
               onClick={() => setShowLocationPrompt(false)}
             />
 
-            {/* Modal */}
             <motion.div
-              className="fixed z-[10020] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-white rounded-xl shadow-xl p-6"
+              className="fixed z-[10020] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-md bg-white rounded-xl shadow-xl p-6"
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
             >
               <h3 className="text-lg font-semibold mb-4">Enable Location</h3>
-              <p className="mb-6">
+              <p className="mb-6 text-sm">
                 {platform === "ios" && (
-                  <>Go to Settings 
-                  → Safari 
-                  → Location 
-                  → Allow While Using App</>
+                  <>Go to Settings → Safari → Location → Allow While Using App</>
                 )}
                 {platform === "android" && (
-                  <>Go to Settings 
-                  → Chrome 
-                  → Site Settings 
-                  → Location 
-                  → Allow</>
+                  <>Go to Settings → Chrome → Site Settings → Location → Allow</>
                 )}
                 {platform === "desktop" && (
                   <>Please enable location access in your browser settings.</>
@@ -465,7 +436,7 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setShowLocationPrompt(false)}
-                  className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+                  className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm"
                 >
                   Cancel
                 </button>
@@ -475,7 +446,7 @@ chunkedLoading            chunkInterval={200}            chunkDelay={50}        
                       "Your browser blocked location access. Please enable it in your browser settings."
                     );
                   }}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm"
                 >
                   Enable Location
                 </button>
@@ -501,9 +472,8 @@ function ZoomAwareMarkers({
 }: ZoomAwareMarkersProps) {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
-  const [visibleCount, setVisibleCount] = useState(50); // Start with 50 markers
+  const [visibleCount, setVisibleCount] = useState(50);
 
-  // Reset visible count when hotspots change
   useEffect(() => {
     setVisibleCount(50);
   }, [hotspots]);
@@ -511,13 +481,11 @@ function ZoomAwareMarkers({
   useEffect(() => {
     const handleZoom = () => setZoom(map.getZoom());
     map.on("zoomend", handleZoom);
-
     return () => {
       map.off("zoomend", handleZoom);
     };
   }, [map]);
 
-  // Staggered marker loading - progressively show more markers
   useEffect(() => {
     if (visibleCount >= hotspots.length) return;
 
@@ -525,12 +493,9 @@ function ZoomAwareMarkers({
     const timeout = setTimeout(() => {
       setVisibleCount((prev) => Math.min(prev + 50, hotspots.length));
     }, delay);
-
     return () => clearTimeout(timeout);
   }, [visibleCount, hotspots.length]);
-  
 
-// Viewport-based marker rendering (Task 6) + progressive load
   const [bounds, setBounds] = useState<any>(map.getBounds());
 
   useEffect(() => {
@@ -541,21 +506,13 @@ function ZoomAwareMarkers({
     moveend: () => setBounds(map.getBounds()),
   });
 
-  
-
   const visibleHotspots = useMemo(() => {
-    // TEMP DISABLED bounds filter for MyHotspots debugging
-    // const filtered = hotspots.filter((hotspot) => {
-    //   const coords = getCoordinates(hotspot);
-    //   if (!coords) return false;
-    //   return bounds.contains(coords);
-    // });
     const filtered = hotspots.filter((hotspot) => {
       const coords = getCoordinates(hotspot);
       return coords !== null;
     });
     return filtered.slice(0, visibleCount);
-  }, [hotspots, visibleCount]); // removed bounds dep
+  }, [hotspots, visibleCount]);
 
   const size = zoom < 12 ? 16 : zoom < 15 ? 22 : zoom < 20 ? 26 : 30;
 
@@ -585,9 +542,9 @@ function ZoomAwareMarkers({
           className: "",
           html: `
             <div style="
-              width:${size}px;
-              height:${size}px;
-              background:${color};
+              width: ${size}px;
+              height: ${size}px;
+              background: ${color};
               border-radius:999px;
               border:2px solid white;
               box-shadow:0 8px 16px rgba(0,0,0,0.25);
@@ -623,14 +580,13 @@ function HeatmapLayer({ hotspots }: { hotspots: Hotspot[] }) {
   const heatLayerRef = useRef<any>(null);
 
   useEffect(() => {
-    // Clear existing layer
     heatLayerRef.current?.removeFrom?.(map);
 
     const points = hotspots
       .map((hotspot) => {
         const coords = getCoordinates(hotspot);
         if (!coords) return null;
-        return [coords[0], coords[1], (hotspot.visit_count || 1) / 100] as [number, number, number];
+        return [coords[0], coords[1], (hotspot.visit_count || 1) / 100];
       })
       .filter((p): p is [number, number, number] => p !== null);
 
@@ -641,7 +597,7 @@ function HeatmapLayer({ hotspots }: { hotspots: Hotspot[] }) {
       blur: 15,
       maxZoom: 10,
       gradient: { 0.4: "#00f5d4", 0.65: "#ff6b6b", 1: "#ffee00" }
-    }) as any;
+    });
 
     heatLayerRef.current?.addTo(map);
 
@@ -652,13 +608,6 @@ function HeatmapLayer({ hotspots }: { hotspots: Hotspot[] }) {
 
   return null;
 }
-
-
-
-
-
-
-
 
 
 

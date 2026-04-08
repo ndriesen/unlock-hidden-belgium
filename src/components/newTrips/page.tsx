@@ -1,69 +1,21 @@
-"use client";
+// DEPRECATED - Premium map moved to NewTripsPage.tsx
+// Basic skeleton replaced with full-featured travel map experience
 
-import { useEffect, useRef } from "react";
-import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
-
-export default function Map() {
-  const mapContainer = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-
-  useEffect(() => {
-    if (!mapContainer.current) return;
-
-    const map = new maplibregl.Map({
-      container: mapContainer.current,
-      style: "https://demotiles.maplibre.org/style.json",
-      center: [2.3522, 48.8566],
-      zoom: 2,
-      pitch: 45,
-      bearing: 0,
-    });
-
-    mapRef.current = map;
-
-    // ✅ Controls
-    map.addControl(new maplibregl.NavigationControl(), "top-right");
-
-    // ✅ Wait until map is ready
-    map.on("load", () => {
-      // 🌍 Optional globe-like fog
-     
-
-
-      // 📍 Add marker AFTER load
-      new maplibregl.Marker({ color: "#ff4d4d" })
-        .setLngLat([2.3522, 48.8566])
-        .setPopup(new maplibregl.Popup().setText("Paris"))
-        .addTo(map);
-    });
-
-    return () => {
-      map.remove(); // ✅ cleanup
-    };
-  }, []);
-
-  const focusLocation = () => {
-    if (!mapRef.current) return;
-
-    mapRef.current.flyTo({
-      center: [2.3522, 48.8566],
-      zoom: 16,
-      pitch: 60,
-      duration: 2500,
-    });
-  };
-
+export default function LegacyMap() {
   return (
-    <>
-      <div ref={mapContainer} className="w-full h-screen" />
-
-      <button
-        onClick={focusLocation}
-        className="fixed bottom-4 left-4 z-50 bg-white px-4 py-2 rounded shadow"
-      >
-        Focus Paris
-      </button>
-    </>
+    <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-indigo-900">
+      <div className="text-center text-white">
+        <h1 className="text-4xl font-bold mb-4">🚀 Premium Travel Map</h1>
+        <p className="text-xl opacity-80 mb-8">Full experience now at /newTrips</p>
+        <div className="bg-slate-800/50 p-8 rounded-2xl max-w-md mx-auto backdrop-blur-sm">
+          <p className="text-slate-300">• Dark MapLibre GL world map</p>
+          <p className="text-slate-300">• Clustered trip stops (visited/upcoming)</p>
+          <p className="text-slate-300">• Animated route lines</p>
+          <p className="text-slate-300">• Side panel with gallery & notes</p>
+          <p className="text-slate-300 mb-4">• Journey stepper & controls</p>
+        </div>
+      </div>
+    </div>
   );
 }
+

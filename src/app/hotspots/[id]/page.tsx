@@ -1,10 +1,10 @@
-﻿"use client";
+"use client";
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { Clover, Heart, MapPinned, Save, SaveOff, Share,Eye, Check, ImagePlus } from "lucide-react"
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { Clover, Heart, MapPinned, Save, SaveOff, Share, Eye, Check, CheckCheck, ImagePlus } from "lucide-react";
 import ReviewsSection from "@/components/ReviewsSection";
 import GalleryCarousel from "@/components/GalleryCarousel";
 import TripMemoriesGallery from "@/components/TripMemoriesGallery";
@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/Supabase/browser-client";
 import OpeningHoursDisplay from "@/components/ui/OpeningHoursDisplay";
 import { fetchHotspotMedia, fetchOrganizedHotspotMedia, uploadHotspotPhoto } from "@/lib/services/hotspotMedia";
-import { toggleWishlist } from "@/lib/services/gamification";
+import { toggleWishlist, markVisited } from "@/lib/services/gamification";
 import { toggleHotspotLike, toggleHotspotSave, recordHotspotView } from "@/lib/services/hotspotSocial";
 import { MediaVisibility } from "@/lib/services/media";
 import { Hotspot, getSafeDisplay } from "@/types/hotspot";
@@ -94,6 +94,8 @@ export default function HotspotDetailPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [wishlistedByMe, setWishlistedByMe] = useState(false);
+  const [visitedByMe, setVisitedByMe] = useState(false);
+  const [visitVerifiedByMe, setVisitVerifiedByMe] = useState(false);
   const [likedByMe, setLikedByMe] = useState(false);
   const [savedByMe, setSavedByMe] = useState(false);
   const [mapStyle, setMapStyle] = useState<"default" | "satellite" | "retro" | "terrain">("default");
@@ -114,6 +116,8 @@ export default function HotspotDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
   const [actionMessage, setActionMessage] = useState(""); // For like/save feedback
+
+  const activeRef = useRef(true);
 
 
   useEffect(() => {
@@ -193,9 +197,8 @@ export default function HotspotDetailPage() {
   }, [hotspotId, hotspot?.name, user?.id]);
 
   useEffect(() => {
-    let active = true;
-
     const load = async () => {
+      if (!activeRef.current) return;
       setLoading(true);
       setErrorMessage("");
       setActionMessage(""); 
@@ -208,7 +211,7 @@ export default function HotspotDetailPage() {
         .eq("id", hotspotId)
         .maybeSingle();
 
-      if (!active) return;
+      if (!activeRef.current) return;
 
       if (error || !data) {
         setErrorMessage("Could not load hotspot details.");
@@ -243,21 +246,22 @@ export default function HotspotDetailPage() {
         longitude,
       };
 
+      if (!activeRef.current) return;
       setHotspot(mappedHotspot);
       setOpeningHours(row.opening_hours ?? "Not provided");
       setCombineWith(row.combine_with ?? []);
 
-      const [media, organizedMedia, reaction, likesResult, savesResult] = await Promise.all([
+      const [hotspotMedia, organizedMedia, reaction, likesResult, savesResult] = await Promise.all([
         fetchHotspotMedia({ hotspotId: row.id, userId: user?.id ?? null, limit: 16 }),
         fetchOrganizedHotspotMedia({ hotspotId: row.id, userId: user?.id ?? null, limit: 50 }),
         user?.id
           ? supabase
               .from("user_hotspots")
-              .select("wishlist")
+              .select("wishlist, visited, verification_status")
               .eq("user_id", user.id)
               .eq("hotspot_id", row.id)
               .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+          : Promise.resolve({ data: null, error: null } as any),
         user?.id
           ? supabase
               .from("hotspot_likes")
@@ -265,7 +269,7 @@ export default function HotspotDetailPage() {
               .eq("user_id", user.id)
               .eq("hotspot_id", row.id)
               .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+          : Promise.resolve({ data: null, error: null } as any),
         user?.id
           ? supabase
               .from("hotspot_saves")
@@ -273,23 +277,12 @@ export default function HotspotDetailPage() {
               .eq("user_id", user.id)
               .eq("hotspot_id", row.id)
               .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+          : Promise.resolve({ data: null, error: null } as any),
       ]);
 
-      if (!active) return;
+      if (!activeRef.current) return;
 
-      // Build carousel: personal photos first, then community, then inspiration (database images)
-      const personalUrls = organizedMedia.personal.map(p => p.signedUrl);
-      const communityUrls = organizedMedia.community.map(c => c.signedUrl);
-      const baseImages = parseImages(row.images); // Database filler images
-
-      // Priority order: personal -> community -> inspiration
-      const priorityUrls = [...personalUrls, ...communityUrls, ...baseImages];
-      const dedup = Array.from(new Set([...priorityUrls]));
-
-
-
-      // Set organized media
+      // Set organized media safely now that it's fetched
       setPersonalPhotos(organizedMedia.personal);
       setCommunityPhotos(organizedMedia.community);
 
@@ -297,6 +290,8 @@ export default function HotspotDetailPage() {
         console.error("Failed to load wishlist/favorite state:", reaction.error);
       }
 
+      setVisitedByMe(Boolean(reaction?.data?.visited));
+      setVisitVerifiedByMe(reaction?.data?.verification_status === "verified");
       setWishlistedByMe(Boolean(reaction?.data?.wishlist));
       setLikedByMe(Boolean(likesResult?.data));
       setSavedByMe(Boolean(savesResult?.data));
@@ -306,7 +301,7 @@ export default function HotspotDetailPage() {
     void load();
 
     return () => {
-      active = false;
+      activeRef.current = false;
     };
   }, [hotspotId, user?.id]);
 
@@ -392,50 +387,62 @@ export default function HotspotDetailPage() {
     }
   }, [user, hotspot]);
 
-  const handleMarkVisited = useCallback(async () => {
+    const handleMarkVisited = useCallback(async () => {
     if (!user || !hotspot) {
       setActionMessage("Login required.");
       return;
     }
 
     try {
+      const visitResult = await markVisited(user.id, hotspot.id);
+      const feedback: string[] = [];
+
+      if (visitResult.alreadyVisited) {
+        feedback.push("Already marked as visited.");
+      } else if (typeof visitResult.xpGained === "number") {
+        feedback.push(`Marked as visited (+${visitResult.xpGained} XP).`);
+      } else {
+        feedback.push("Marked as visited.");
+      }
+
+      const wasVisited = visitedByMe;
+      setVisitedByMe(true);
+      if (!wasVisited) {
+        setHotspot((prev) =>
+          prev
+            ? {
+                ...prev,
+                visit_count: (prev.visit_count ?? 0) + 1,
+              }
+            : prev
+        );
+      }
+
       const verification = await verifyVisitWithCurrentLocation(user.id, hotspot.id);
-
-      if (verification.reason === 'location_unavailable') {
-        setActionMessage("Enable location services to verify GPS");
-        return;
+      if (verification.success && verification.status === "verified") {
+        setVisitVerifiedByMe(true);
+        if (typeof verification.xpGained === "number") {
+          feedback.push(`GPS verified (${verification.distance_meters.toFixed(0)}m, +${verification.xpGained} XP).`);
+        } else {
+          feedback.push(`GPS verified (${verification.distance_meters.toFixed(0)}m).`);
+        }
+      } else if (verification.status === "failed") {
+        feedback.push(`Visited without GPS verification (too far: ${verification.distance_meters.toFixed(0)}m).`);
+      } else if (verification.reason === "location_unavailable") {
+        feedback.push("Visited without GPS verification (location unavailable). Single check saved.");
+      } else if (verification.reason === "poor_accuracy") {
+        feedback.push("Visited without GPS verification (accuracy > 50m). Single check saved.");
+      } else {
+        feedback.push("Visited, but GPS verification failed. Single check saved.");
       }
 
-      if (verification.reason === 'poor_accuracy') {
-        setActionMessage("Poor GPS accuracy. Wait for better signal (<=50m)");
-        return;
-      }
-
-      if (!verification.success) {
-        setActionMessage("Could not verify visit.");
-        return;
-      }
-
-      if (verification.status === 'failed') {
-        setActionMessage(`Too far: ${verification.distance_meters.toFixed(0)}m (need <=100m)`);
-        return;
-      }
-
-      setHotspot((prev) =>
-        prev
-          ? {
-              ...prev,
-              visit_count: (prev.visit_count ?? 0) + 1,
-            }
-          : prev
-      );
-      setActionMessage(`Visit verified at ${verification.distance_meters.toFixed(0)}m. XP granted.`);
+      setActionMessage(feedback.join(" "));
     } catch (error) {
       console.error("Visit mark failed:", error);
       setActionMessage("Could not mark visited.");
     }
-  }, [user, hotspot]);
-  const handleUpload = async () => {
+  }, [user, hotspot, visitedByMe]);
+const handleUpload = async () => {
     if (!user || !hotspot) {
       setUploadMessage("Login required.");
       return;
@@ -468,14 +475,15 @@ export default function HotspotDetailPage() {
     setUploadFile(null);
     setUploadCaption(""); 
 
-const organizedMedia = await fetchOrganizedHotspotMedia({
-  hotspotId: hotspot.id,
-  userId: user.id,
-  limit: 50,
-});
+    // Refresh media
+    const organizedMedia = await fetchOrganizedHotspotMedia({
+      hotspotId: hotspot.id,
+      userId: user.id,
+      limit: 50,
+    });
 
-setPersonalPhotos(organizedMedia.personal);
-setCommunityPhotos(organizedMedia.community);
+    setPersonalPhotos(organizedMedia.personal);
+    setCommunityPhotos(organizedMedia.community);
   };
 
   if (loading) {
@@ -525,7 +533,7 @@ setCommunityPhotos(organizedMedia.community);
           <FloatingActionMenu
             actions={[
               {
-                icon: likedByMe ? "??" : <Heart/>,
+                icon: likedByMe ? <Heart fill="#c50000" size={10} className="inline-block"/> : <Heart/>,
                 label: likedByMe ? "Liked" : "Like",
                 onClick: handleToggleLike,
                 className: likedByMe
@@ -541,7 +549,7 @@ setCommunityPhotos(organizedMedia.community);
                   : "bg-transparent text-slate-800",
               },
               {
-                icon: wishlistedByMe ? "??" : <Clover/>,
+                icon: wishlistedByMe ? <Clover fill="#00a000" size={10} className="inline-block"/> : <Clover/>,
                 label:  wishlistedByMe ? "Wishlist" : "Wishlist",
                 onClick: handleToggleWishlist,
                 className: wishlistedByMe
@@ -571,7 +579,7 @@ setCommunityPhotos(organizedMedia.community);
         {/* Stats */}
         <div className="flex justify-center items-center gap-3 text-sm text-slate-500 mb-4">
           <span className="flex items-center gap-1">
-            <span>?? {hotspot.province}</span>
+            <span>{hotspot.province}</span>
           </span>
           <span className="w-px h-5 bg-slate-300" />
           <span className="flex items-center gap-1">
@@ -614,15 +622,22 @@ setCommunityPhotos(organizedMedia.community);
           )}
 
 
-          <button
+                    <button
             onClick={handleMarkVisited}
             className={`w-full rounded-lg py-2.5 text-sm font-semibold ${
-              wishlistedByMe 
-                ? "bg-emerald-600 text-white hover:bg-emerald-700" 
-                : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" 
+              visitedByMe && visitVerifiedByMe
+                ? "bg-emerald-600 text-white hover:bg-emerald-700 cursor-not-allowed opacity-75"
+                : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
             }`}
+            disabled={visitedByMe && visitVerifiedByMe}
           >
-            ? Mark as visited (+XP)
+            {visitedByMe && visitVerifiedByMe ? (
+              <><CheckCheck className="mr-1 inline" /> Visited!</>
+            ) : visitedByMe ? (
+              <><Check className="mr-1 inline" /> Visited (single check) - Verify GPS</>
+            ) : (
+              <><Check className="mr-1 inline" /> Mark as visited (+XP)</>
+            )}
           </button>
 
           
@@ -727,5 +742,9 @@ setCommunityPhotos(organizedMedia.community);
     </div>
   );
 }
+
+
+
+
 
 

@@ -1116,7 +1116,7 @@ export default function TripDetailPage() {
           state = {true}
           actions={[
             {
-              icon: localLikedByMe ? "❤️" : <Heart/>,
+              icon: <Heart className={localLikedByMe ? "text-rose-600 fill-red-500" : "text-slate-600"} />,
               label: localLikedByMe ? "Liked" : "Like",
               onClick: handleLike,
               className: localLikedByMe
@@ -1150,17 +1150,7 @@ export default function TripDetailPage() {
       </div>
       
       {/*
-      <TripFloatingActions
-        likesCount={trip.likesCount}
-        savesCount={trip.savesCount}
-        likedByMe={trip.likedByMe}
-        savedByMe={trip.savedByMe}
-        onLike={handleLike}
-        onSave={handleSave}
-        onShare={handleShare}
-        onOpenMaps={handleOpenMaps}
-        disabled={updatingReactions}
-      /> */}
+
       
       {shareFeedback ? (
         <div className="pointer-events-none fixed left-1/2 top-24 z-50 -translate-x-1/2 rounded-full bg-slate-900/90 px-4 py-2 text-sm font-medium text-white shadow-lg">

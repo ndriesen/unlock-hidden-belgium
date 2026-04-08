@@ -60,8 +60,9 @@ export default function FloatingHotspotList({
                   savesCount: hotspot.saves_count || 0,
                   viewsCount: hotspot.views_count || 0,
                 }}
-                onLike={() => {}}
-                onSave={() => {}}
+                onVisit={() => hotspot}
+                onLike={() => hotspot}
+                onSave={() => hotspot}
                 onWishlist={() => hotspot.id}
                 onFavorite={() => hotspot.id}
                 onMap={() => hotspot.id}

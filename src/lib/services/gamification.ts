@@ -1,4 +1,4 @@
-﻿import { supabase } from "@/lib/Supabase/browser-client";
+import { supabase } from "@/lib/Supabase/browser-client";
 import { evaluateBadges } from "./badgeEngine";
 import { addXp } from "./xpEngine";
 import { recordActivity } from "./activity";
@@ -41,16 +41,16 @@ export async function awardXP(
   context: { hotspotId?: string, entityId?: string, photoPath?: string } = {}
 ): Promise<GamificationResult | { success: false; reason: string; }> {
   // Add new triggers like addReview etc. call awardXP internally
-  // 1. Anti-abuse checks
-    if (actionKey === 'visit_hotspot_xp' && context.hotspotId) {
-    const { data } = await supabase
+  // 1. Anti-abuse checks (idempotent per hotspot via flags)
+  if (actionKey === 'visit_hotspot_xp' && context.hotspotId) {
+    const { data: status } = await supabase
       .from('user_hotspots')
-      .select('visited_at')
+      .select('visit_xp_awarded')
       .eq('user_id', userId)
       .eq('hotspot_id', context.hotspotId)
-      .gte('visited_at', new Date(Date.now() - 24*60*60*1000).toISOString())
       .single();
-    if (data) {
+
+    if (status?.visit_xp_awarded) {
       return { success: false, reason: "already_visited" };
     }
   }
@@ -60,18 +60,8 @@ export async function awardXP(
   const dailyCap = dailyCapRule.data?.rule_value || 100;
   // Note: Full daily sum requires RPC, skip for v1
 
-  // Anti-abuse for verification XP: flag + 1min cooldown
+  // Anti-abuse for verification XP: once per hotspot
   if (actionKey === 'verify_hotspot_xp' && context.hotspotId) {
-    const recentAttempt = await supabase
-      .from('verification_attempts')
-      .select('created_at')
-      .eq('user_id', userId)
-      .eq('hotspot_id', context.hotspotId)
-      .gte('created_at', new Date(Date.now() - 60*1000).toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-    
     const { data: status } = await supabase
       .from('user_hotspots')
       .select('verification_xp_awarded')
@@ -79,8 +69,8 @@ export async function awardXP(
       .eq('hotspot_id', context.hotspotId)
       .single();
     
-    if (status?.verification_xp_awarded || recentAttempt.data) {
-      return { success: false, reason: status?.verification_xp_awarded ? "already_verified" : "cooldown_active" };
+    if (status?.verification_xp_awarded) {
+      return { success: false, reason: "already_verified" };
     }
   }
 
@@ -119,7 +109,7 @@ export async function awardXP(
     leveledUp: xpResult.leveledUp || false,
     newLevel,
     badges,
-    message: `+${xpAmount} XP — ${actionKey.replace(/_xp$/, '').replace(/_/, ' ').toUpperCase()}!`
+    message: `+${xpAmount} XP - ${actionKey.replace(/_xp$/, '').replace(/_/, ' ').toUpperCase()}!`
   };
 }
 
@@ -179,3 +169,5 @@ export async function toggleWishlist(userId: string, hotspotId: string) {
 
   return newValue;
 }
+
+

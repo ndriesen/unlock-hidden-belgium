@@ -67,6 +67,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({
   viewMode,
   searchQuery,
   mapStyle = "default",
+  autoFit = false,
   preventZoom = false,
   visitedIds,
   wishlistIds,
@@ -150,6 +151,7 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({
       favoriteIds={favoriteIds}
       viewMode={viewMode}
       mapStyle={mapStyle}
+      autoFit={autoFit}
       preventZoom={preventZoom}
       onSelect={onSelect}
       onVisit={onVisit ?? undefined}
@@ -159,3 +161,4 @@ const MapContainer = forwardRef<MapContainerHandle, MapContainerProps>(({
 });
 
 export default MapContainer;
+

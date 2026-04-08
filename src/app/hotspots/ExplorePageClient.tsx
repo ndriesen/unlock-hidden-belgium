@@ -28,7 +28,7 @@ import { queryKeys } from '@/lib/react-query/queryKeys';
 import { fetchInfluencerMentions, InfluencerMention } from "@/lib/services/influencers";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { createSignedMediaUrl } from "@/lib/services/media";
-import { toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
+import { toggleWishlist, toggleFavorite, markVisited } from "@/lib/services/gamification";
 import { Hotspot } from "@/types/hotspot";
 import HotspotPanel from "@/components/HotspotPanel";
 import AddHotspotModal from "@/components/MyHotspots/AddHotspotModal";
@@ -367,50 +367,48 @@ export default function ExplorePage() {
     [user?.id, queryClient]
   );
 
-  const handleVisit = useCallback(
+    const handleVisit = useCallback(
     async (hotspotId: string) => {
       if (!user?.id) {
         addToast("Login required.");
         return;
       }
 
-      const alreadyVisited = hotspots.find((hotspot) => hotspot.id === hotspotId)?.visited;
-      if (alreadyVisited) {
-        addToast("Already marked as visited.");
-        return;
-      }
-
-      queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
       try {
+        const visitResult = await markVisited(user.id, hotspotId);
+
+        if (visitResult.alreadyVisited) {
+          addToast("Already marked as visited.");
+        } else if (typeof visitResult.xpGained === "number") {
+          addToast(`Marked as visited (+${visitResult.xpGained} XP).`);
+        } else {
+          addToast("Marked as visited.");
+        }
+
         const verification = await verifyVisitWithCurrentLocation(user.id, hotspotId);
-
-        if (verification.reason === 'location_unavailable') {
-          addToast("Enable location services to verify GPS");
-          return;
+        if (verification.success && verification.status === "verified") {
+          if (typeof verification.xpGained === "number") {
+            addToast(`GPS verified at ${verification.distance_meters.toFixed(0)}m (+${verification.xpGained} XP).`);
+          } else {
+            addToast(`GPS verified at ${verification.distance_meters.toFixed(0)}m.`);
+          }
+        } else if (verification.status === "failed") {
+          addToast(`Visited without GPS verification (too far: ${verification.distance_meters.toFixed(0)}m).`);
+        } else if (verification.reason === "location_unavailable") {
+          addToast("Visited saved with single check (location unavailable).", "info");
+        } else if (verification.reason === "poor_accuracy") {
+          addToast("Visited saved with single check (GPS accuracy > 50m).", "info");
+        } else {
+          addToast("Visited saved, but GPS verification failed.", "info");
         }
 
-        if (verification.reason === 'poor_accuracy') {
-          addToast("Poor GPS accuracy. Wait for better signal (<=50m)");
-          return;
-        }
-
-        if (!verification.success) {
-          addToast("Could not verify visit.");
-          return;
-        }
-
-        if (verification.status === 'failed') {
-          addToast(`Too far: ${verification.distance_meters.toFixed(0)}m (need <=100m)`);
-          return;
-        }
-
-        addToast(`Visit verified at ${verification.distance_meters.toFixed(0)}m.`);
+        queryClient.invalidateQueries({ queryKey: queryKeys.allHotspots() });
       } catch (error) {
         console.error("Visit update failed:", error);
         addToast("Could not mark visited.");
       }
     },
-    [hotspots, user?.id, queryClient]
+    [user?.id, queryClient, addToast]
   );
 const toggleTripLikeInUi = useCallback(async (item: PopularTrip) => {
   if (!user?.id) {
@@ -890,6 +888,7 @@ src={tripCoverUrls[trip.id] || trip.coverImage || "https://images.unsplash.com/p
     </div>
   );
 }
+
 
 
 

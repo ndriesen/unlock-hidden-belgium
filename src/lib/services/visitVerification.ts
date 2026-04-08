@@ -76,14 +76,15 @@ export async function markAsVisited(
   // Upsert visit flag
   const { error } = await supabase
     .from('user_hotspots')
-    .upsert({
-      user_id: userId,
-      hotspot_id: hotspotId,
-      visited: true,
-      visited_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
-    .eq('hotspot_id', hotspotId);
+    .upsert(
+      {
+        user_id: userId,
+        hotspot_id: hotspotId,
+        visited: true,
+        visited_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,hotspot_id' }
+    );
 
   if (error) throw error;
 
@@ -278,3 +279,4 @@ export async function verifyVisitWithCurrentLocation(
 
   return result;
 }
+

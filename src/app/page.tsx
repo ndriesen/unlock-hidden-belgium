@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import HotspotPanel from "@/components/HotspotPanel";
 import HotspotSheet from "@/components/HotspotSheet";
 import Toast from "@/components/Toast";
-import { toggleWishlist, toggleFavorite } from "@/lib/services/gamification";
+import { toggleWishlist, toggleFavorite, markVisited } from "@/lib/services/gamification";
 import { evaluateBadges } from "@/lib/services/badgeEngine";
 import { verifyVisitWithCurrentLocation } from "@/lib/services/visitVerification";
 import { useSearch } from "@/context/SearchContext";
@@ -404,7 +404,7 @@ export default function Home() {
     void loadUserHotspots();
   }, [loading, user]);
 
-  const handleVisit = useCallback(
+    const handleVisit = useCallback(
     async (hotspotId: string) => {
       if (!user) {
         showToast("Login required.");
@@ -416,25 +416,10 @@ export default function Home() {
       }
 
       try {
-        const verification = await verifyVisitWithCurrentLocation(user.id, hotspotId);
+        const visitResult = await markVisited(user.id, hotspotId);
 
-        if (verification.reason === 'location_unavailable') {
-          showToast("Enable location services to verify GPS");
-          return;
-        }
-
-        if (verification.reason === 'poor_accuracy') {
-          showToast("Poor GPS accuracy. Wait for better signal (<=50m)");
-          return;
-        }
-
-        if (!verification.success) {
-          showToast("Could not verify visit.");
-          return;
-        }
-
-        if (verification.status === 'failed') {
-          showToast(`Too far: ${verification.distance_meters.toFixed(0)}m (need <=100m)`);
+        if (visitResult.alreadyVisited) {
+          showToast("Already marked as visited.");
           return;
         }
 
@@ -446,7 +431,29 @@ export default function Home() {
 
         const unlockedBadges = await evaluateBadges(user.id);
 
-        showToast(`Visit verified at ${verification.distance_meters.toFixed(0)}m. XP granted.`);
+        if (typeof visitResult.xpGained === "number") {
+          showToast(`Marked as visited (+${visitResult.xpGained} XP).`);
+        } else {
+          showToast("Marked as visited.");
+        }
+
+        const verification = await verifyVisitWithCurrentLocation(user.id, hotspotId);
+        if (verification.success && verification.status === "verified") {
+          if (typeof verification.xpGained === "number") {
+            showToast(`GPS verified at ${verification.distance_meters.toFixed(0)}m (+${verification.xpGained} XP).`);
+          } else {
+            showToast(`GPS verified at ${verification.distance_meters.toFixed(0)}m.`);
+          }
+        } else if (verification.status === "failed") {
+          showToast(`Visited without GPS verification (too far: ${verification.distance_meters.toFixed(0)}m).`);
+        } else if (verification.reason === "location_unavailable") {
+          showToast("Visited saved with single check (location unavailable).");
+        } else if (verification.reason === "poor_accuracy") {
+          showToast("Visited saved with single check (GPS accuracy > 50m).");
+        } else {
+          showToast("Visited saved, but GPS verification failed.");
+        }
+
         if (unlockedBadges.length > 0) {
           setBadgeCelebration(true);
           showToast(`Badge unlocked: ${unlockedBadges[0].name}`);
@@ -462,7 +469,7 @@ export default function Home() {
           showToast("Achievement unlocked: Adventurer.");
         }
       } catch (error) {
-        console.error("Failed to verify visit:", error);
+        console.error("Failed to mark visit:", error);
         showToast("Could not save visit.");
       }
     },
@@ -752,6 +759,7 @@ export default function Home() {
 
   return renderLoggedInHomepage();
 }
+
 
 
 
