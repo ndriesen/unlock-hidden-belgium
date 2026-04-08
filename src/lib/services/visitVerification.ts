@@ -14,18 +14,18 @@ export interface VerifyVisitInput {
 
 export interface VerifyVisitWithCurrentLocationResult {
   success: boolean;
-  status: 'verified' | 'failed' | 'error';
+  status: "verified" | "failed" | "error";
   distance_meters: number;
   attempt_id?: string;
   xpGained?: number;
   wasFirstVerification: boolean;
-  reason?: 'location_unavailable' | 'poor_accuracy' | 'verification_error';
+  reason?: "location_unavailable" | "poor_accuracy" | "verification_error";
 }
 
 export interface UserHotspotStatus {
   visited: boolean;
   visited_at?: string | null;
-  verification_status: 'none' | 'pending' | 'verified' | 'failed';
+  verification_status: "none" | "pending" | "verified" | "failed";
   verified_at?: string | null;
   visit_xp_awarded: boolean;
   verification_xp_awarded: boolean;
@@ -40,7 +40,7 @@ export async function getUserHotspotStatus(
   hotspotId: string
 ): Promise<UserHotspotStatus | null> {
   const { data, error } = await supabase
-    .from('user_hotspots')
+    .from("user_hotspots")
     .select(`
       visited,
       visited_at,
@@ -50,11 +50,11 @@ export async function getUserHotspotStatus(
       verification_xp_awarded,
       distance_to_hotspot
     `)
-    .eq('user_id', userId)
-    .eq('hotspot_id', hotspotId)
+    .eq("user_id", userId)
+    .eq("hotspot_id", hotspotId)
     .single();
 
-  if (error && error.code !== 'PGRST116') return null; // Not found is ok
+  if (error && error.code !== "PGRST116") return null; // Not found is ok
   return data as UserHotspotStatus;
 }
 
@@ -65,50 +65,65 @@ export async function markAsVisited(
   userId: string,
   hotspotId: string
 ): Promise<{ xpGained?: number; alreadyVisited: boolean }> {
-  // Check existing status first
   const status = await getUserHotspotStatus(userId, hotspotId);
-  const isNewVisit = !status?.visited || !status.visit_xp_awarded;
+  const hasVisited = Boolean(status?.visited);
+  const shouldAwardVisitXp = !Boolean(status?.visit_xp_awarded);
 
-  if (!isNewVisit) {
+  if (hasVisited && !shouldAwardVisitXp) {
     return { alreadyVisited: true };
   }
 
-  // Upsert visit flag
-  const { error } = await supabase
-    .from('user_hotspots')
-    .upsert(
-      {
-        user_id: userId,
-        hotspot_id: hotspotId,
-        visited: true,
-        visited_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,hotspot_id' }
-    );
+  if (!hasVisited) {
+    const { error: upsertError } = await supabase
+      .from("user_hotspots")
+      .upsert(
+        {
+          user_id: userId,
+          hotspot_id: hotspotId,
+          visited: true,
+          visited_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,hotspot_id" }
+      );
 
-  if (error) throw error;
+    if (upsertError) throw upsertError;
+  }
 
-  // Award XP only for new visits (idempotent)
-  if (isNewVisit) {
-    const xpResult = await awardXP(userId, 'visit_hotspot_xp', { hotspotId });
-    if ('success' in xpResult && !xpResult.success) {
-      console.warn('Visit XP skipped:', xpResult.reason);
+  let xpGained: number | undefined;
+
+  if (shouldAwardVisitXp) {
+    const xpResult = await awardXP(userId, "visit_hotspot_xp", { hotspotId });
+
+    if ("success" in xpResult && !xpResult.success) {
+      console.warn("Visit XP skipped:", xpResult.reason);
+      // TypeScript narrowing doesn't work with 'in' operator, but runtime logic is safe
     } else {
-      // Mark XP as awarded
-      await supabase
-        .from('user_hotspots')
+      const { error: xpFlagError } = await supabase
+        .from("user_hotspots")
         .update({ visit_xp_awarded: true })
-        .eq('user_id', userId)
-        .eq('hotspot_id', hotspotId);
+        .eq("user_id", userId)
+        .eq("hotspot_id", hotspotId);
 
-      await trackHotspotVisit(userId, hotspotId);
-      await evaluateBadges(userId);
+      if (xpFlagError) {
+        console.error("Failed to persist visit XP flag:", xpFlagError);
+      }
 
-      return { xpGained: (xpResult as any).xpGained, alreadyVisited: false };
+      xpGained = (xpResult as any).xpGained;
     }
   }
 
-  return { alreadyVisited: false };
+  if (!hasVisited) {
+    await trackHotspotVisit(userId, hotspotId);
+  }
+
+  if (!hasVisited || typeof xpGained === "number") {
+    await evaluateBadges(userId);
+  }
+
+  return {
+    alreadyVisited: false,
+    ...(typeof xpGained === "number" ? { xpGained } : {}),
+  };
 }
 
 /**
@@ -122,80 +137,83 @@ export async function verifyVisit({
   hotspotId,
   latitude,
   longitude,
-  accuracy
+  accuracy,
 }: VerifyVisitInput): Promise<{
   success: boolean;
-  status: 'verified' | 'failed' | 'error';
+  status: "verified" | "failed" | "error";
   distance_meters: number;
   attempt_id?: string;
   xpGained?: number;
   wasFirstVerification: boolean;
 }> {
   try {
-    const { data, error } = await supabase.rpc('verify_visit_data', {
+    const { data, error } = await supabase.rpc("verify_visit_data", {
       p_user_id: userId,
       p_hotspot_id: hotspotId,
       p_lat: latitude,
       p_lng: longitude,
-      p_accuracy: accuracy
+      p_accuracy: accuracy,
     });
 
     if (error) {
-      console.error('verify_visit_data RPC error:', error);
+      console.error("verify_visit_data RPC error:", error);
       return {
         success: false,
-        status: 'error',
+        status: "error",
         distance_meters: 0,
-        wasFirstVerification: false
+        wasFirstVerification: false,
       };
     }
 
     const result = (data ?? null) as {
       success?: boolean;
-      status?: 'verified' | 'failed';
+      status?: "verified" | "failed";
       distance_meters?: number;
       attempt_id?: string;
       was_first_verification?: boolean;
     } | null;
 
-    if (!result?.success || (result.status !== 'verified' && result.status !== 'failed')) {
+    if (!result?.success || (result.status !== "verified" && result.status !== "failed")) {
       return {
         success: false,
-        status: 'error',
+        status: "error",
         distance_meters: 0,
-        wasFirstVerification: false
+        wasFirstVerification: false,
       };
     }
 
-    // Auto-mark as visited only after a successful verification
-    if (result.status === 'verified') {
-      const visitStatus = await getUserHotspotStatus(userId, hotspotId);
-      if (!visitStatus?.visited) {
-        await markAsVisited(userId, hotspotId);
-      }
+    // Always run idempotent mark-as-visited after a successful verification.
+    if (result.status === "verified") {
+      await markAsVisited(userId, hotspotId);
     }
 
     // Award verification XP (once only)
-    if (result.was_first_verification && result.status === 'verified') {
+    if (result.was_first_verification && result.status === "verified") {
       const statusAfterVisit = await getUserHotspotStatus(userId, hotspotId);
       if (!statusAfterVisit?.verification_xp_awarded) {
-        const xpResult = await awardXP(userId, 'verify_hotspot_xp', { hotspotId });
-        if (!('success' in xpResult) || xpResult.success) {
-          await supabase
-            .from('user_hotspots')
+        const xpResult = await awardXP(userId, "verify_hotspot_xp", { hotspotId });
+        if ("success" in xpResult && !xpResult.success) {
+          console.warn("Verification XP skipped:", xpResult.reason);
+          // TypeScript narrowing doesn't work with 'in' operator, but runtime logic is safe
+        } else {
+          const { error: verificationFlagError } = await supabase
+            .from("user_hotspots")
             .update({ verification_xp_awarded: true })
-            .eq('user_id', userId)
-            .eq('hotspot_id', hotspotId);
+            .eq("user_id", userId)
+            .eq("hotspot_id", hotspotId);
 
-          await trackHotspotVisit(userId, hotspotId);
+          if (verificationFlagError) {
+            console.error("Failed to persist verification XP flag:", verificationFlagError);
+          }
+
           await evaluateBadges(userId);
 
           return {
             success: true,
-            status: 'verified',
+            status: "verified",
             distance_meters: result.distance_meters ?? 0,
-            xpGained: (xpResult as any)?.xpGained,
-            wasFirstVerification: true
+            xpGained: (xpResult as any).xpGained,
+            wasFirstVerification: true,
           };
         }
       }
@@ -206,31 +224,31 @@ export async function verifyVisit({
       status: result.status,
       distance_meters: result.distance_meters ?? 0,
       attempt_id: result.attempt_id,
-      wasFirstVerification: result.was_first_verification || false
+      wasFirstVerification: result.was_first_verification || false,
     };
   } catch (error) {
-    console.error('Verification failed:', error);
+    console.error("Verification failed:", error);
     return {
       success: false,
-      status: 'error',
+      status: "error",
       distance_meters: 0,
-      wasFirstVerification: false
+      wasFirstVerification: false,
     };
   }
 }
 
 function getCurrentPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      reject(new Error('Geolocation not supported'));
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      reject(new Error("Geolocation not supported"));
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      resolve,
-      reject,
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    });
   });
 }
 
@@ -242,23 +260,23 @@ export async function verifyVisitWithCurrentLocation(
   try {
     position = await getCurrentPosition();
   } catch (error) {
-    console.warn('Location unavailable for verification:', error);
+    console.warn("Location unavailable for verification:", error);
     return {
       success: false,
-      status: 'error',
+      status: "error",
       distance_meters: 0,
       wasFirstVerification: false,
-      reason: 'location_unavailable'
+      reason: "location_unavailable",
     };
   }
 
   if (position.coords.accuracy > 50) {
     return {
       success: false,
-      status: 'error',
+      status: "error",
       distance_meters: 0,
       wasFirstVerification: false,
-      reason: 'poor_accuracy'
+      reason: "poor_accuracy",
     };
   }
 
@@ -267,16 +285,15 @@ export async function verifyVisitWithCurrentLocation(
     hotspotId,
     latitude: position.coords.latitude,
     longitude: position.coords.longitude,
-    accuracy: position.coords.accuracy
+    accuracy: position.coords.accuracy,
   });
 
   if (!result.success) {
     return {
       ...result,
-      reason: 'verification_error'
+      reason: "verification_error",
     };
   }
 
   return result;
 }
-

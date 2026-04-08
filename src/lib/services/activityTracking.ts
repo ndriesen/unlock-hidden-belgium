@@ -4,7 +4,7 @@ import { ACTIVITY_TYPES } from "@/lib/constants/ranking";
 /**
  * Types of activities that can be tracked
  */
-export type ActivityType = 
+export type ActivityType =
   | typeof ACTIVITY_TYPES.VIEW_HOTSPOT
   | typeof ACTIVITY_TYPES.OPEN_HOTSPOT
   | typeof ACTIVITY_TYPES.SAVE_HOTSPOT
@@ -16,7 +16,7 @@ export type ActivityType =
 /**
  * Entity types that can be tracked
  */
-export type EntityType = 'hotspot' | 'list' | 'user' | 'collection' | 'trip';
+export type EntityType = "hotspot" | "list" | "user" | "collection" | "trip";
 
 /**
  * Activity record to insert
@@ -29,6 +29,79 @@ export interface ActivityRecord {
   metadata?: Record<string, unknown>;
 }
 
+function getErrorField(error: unknown, field: string): unknown {
+  if (typeof error !== "object" || error === null) return undefined;
+
+  try {
+    return Reflect.get(error as object, field);
+  } catch {
+    return undefined;
+  }
+}
+
+function isDuplicateInsertError(error: unknown): boolean {
+  return getErrorField(error, "code") === "23505";
+}
+
+function isLegacyHotspotTriggerError(error: unknown): boolean {
+  const code = getErrorField(error, "code");
+  const message = getErrorField(error, "message");
+  if (code !== "42703" || typeof message !== "string") {
+    return false;
+  }
+
+  return message.includes('record "new" has no field "hotspot_id"')
+    || message.includes('record "old" has no field "hotspot_id"');
+}
+
+function serializeTrackingError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const serialized: Record<string, unknown> = {};
+    const preferredFields = ["name", "message", "code", "details", "hint", "status", "statusCode"];
+
+    preferredFields.forEach((field) => {
+      const value = getErrorField(error, field);
+      if (value !== undefined) {
+        serialized[field] = value;
+      }
+    });
+
+    if (Object.keys(serialized).length > 0) {
+      return serialized;
+    }
+
+    try {
+      const fallback = JSON.parse(JSON.stringify(error)) as Record<string, unknown>;
+      if (Object.keys(fallback).length > 0) {
+        return fallback;
+      }
+    } catch {
+      // Fallback handled below.
+    }
+
+    const ownPropertyNames = Object.getOwnPropertyNames(error);
+    if (ownPropertyNames.length > 0) {
+      const byOwnProps: Record<string, unknown> = {};
+      ownPropertyNames.forEach((prop) => {
+        byOwnProps[prop] = getErrorField(error, prop);
+      });
+      return byOwnProps;
+    }
+
+    return { value: String(error) };
+  }
+
+  return { value: String(error) };
+}
+
 /**
  * Track a user activity
  * This will:
@@ -37,7 +110,7 @@ export interface ActivityRecord {
  */
 export async function trackActivity(activity: ActivityRecord): Promise<void> {
   const { error } = await supabase
-    .from('user_activity')
+    .from("user_activity")
     .insert({
       user_id: activity.userId,
       action_type: activity.actionType,
@@ -47,7 +120,22 @@ export async function trackActivity(activity: ActivityRecord): Promise<void> {
     });
 
   if (error) {
-    console.error('Error tracking activity:', error);
+    // Duplicate keys are expected for idempotent actions and should not surface as runtime errors.
+    if (isDuplicateInsertError(error)) {
+      return;
+    }
+
+    // Compatibility: some DBs still have a legacy trigger referencing NEW/OLD.hotspot_id.
+    if (isLegacyHotspotTriggerError(error)) {
+      return;
+    }
+
+    console.error("Error tracking activity:", {
+      actionType: activity.actionType,
+      entityType: activity.entityType,
+      entityId: activity.entityId ?? null,
+      error: serializeTrackingError(error),
+    });
     // Don't throw - activity tracking should not break the main flow
   }
 }
@@ -59,7 +147,7 @@ export async function trackHotspotView(userId: string, hotspotId: string): Promi
   await trackActivity({
     userId,
     actionType: ACTIVITY_TYPES.VIEW_HOTSPOT,
-    entityType: 'hotspot',
+    entityType: "hotspot",
     entityId: hotspotId,
     metadata: { timestamp: new Date().toISOString() },
   });
@@ -72,7 +160,7 @@ export async function trackHotspotOpen(userId: string, hotspotId: string): Promi
   await trackActivity({
     userId,
     actionType: ACTIVITY_TYPES.OPEN_HOTSPOT,
-    entityType: 'hotspot',
+    entityType: "hotspot",
     entityId: hotspotId,
     metadata: { timestamp: new Date().toISOString() },
   });
@@ -85,7 +173,7 @@ export async function trackHotspotSave(userId: string, hotspotId: string): Promi
   await trackActivity({
     userId,
     actionType: ACTIVITY_TYPES.SAVE_HOTSPOT,
-    entityType: 'hotspot',
+    entityType: "hotspot",
     entityId: hotspotId,
     metadata: { timestamp: new Date().toISOString() },
   });
@@ -98,7 +186,7 @@ export async function trackHotspotUnsave(userId: string, hotspotId: string): Pro
   await trackActivity({
     userId,
     actionType: ACTIVITY_TYPES.UNSAVE_HOTSPOT,
-    entityType: 'hotspot',
+    entityType: "hotspot",
     entityId: hotspotId,
     metadata: { timestamp: new Date().toISOString() },
   });
@@ -108,16 +196,16 @@ export async function trackHotspotUnsave(userId: string, hotspotId: string): Pro
  * Track adding a hotspot to a trip
  */
 export async function trackAddHotspotToTrip(
-  userId: string, 
-  hotspotId: string, 
+  userId: string,
+  hotspotId: string,
   tripId: string
 ): Promise<void> {
   await trackActivity({
     userId,
     actionType: ACTIVITY_TYPES.ADD_HOTSPOT_TO_TRIP,
-    entityType: 'hotspot',
+    entityType: "hotspot",
     entityId: hotspotId,
-    metadata: { 
+    metadata: {
       timestamp: new Date().toISOString(),
       trip_id: tripId,
     },
@@ -131,7 +219,7 @@ export async function trackHotspotVisit(userId: string, hotspotId: string): Prom
   await trackActivity({
     userId,
     actionType: ACTIVITY_TYPES.VISIT_HOTSPOT,
-    entityType: 'hotspot',
+    entityType: "hotspot",
     entityId: hotspotId,
     metadata: { timestamp: new Date().toISOString() },
   });
@@ -144,7 +232,7 @@ export async function trackHotspotCreated(userId: string, hotspotId: string): Pr
   await trackActivity({
     userId,
     actionType: ACTIVITY_TYPES.CREATE_HOTSPOT,
-    entityType: 'hotspot',
+    entityType: "hotspot",
     entityId: hotspotId,
     metadata: { timestamp: new Date().toISOString() },
   });
@@ -154,7 +242,7 @@ export async function trackHotspotCreated(userId: string, hotspotId: string): Pr
  * Get recent activities for a user
  */
 export async function getUserActivities(
-  userId: string, 
+  userId: string,
   limit: number = 50
 ): Promise<{
   id: string;
@@ -164,14 +252,14 @@ export async function getUserActivities(
   created_at: string;
 }[]> {
   const { data, error } = await supabase
-    .from('user_activity')
-    .select('id, action_type, entity_type, entity_id, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+    .from("user_activity")
+    .select("id, action_type, entity_type, entity_id, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) {
-    console.error('Error fetching user activities:', error);
+    console.error("Error fetching user activities:", error);
     throw error;
   }
 
@@ -183,20 +271,19 @@ export async function getUserActivities(
  */
 export async function getUserActivityCounts(userId: string): Promise<Record<string, number>> {
   const { data, error } = await supabase
-    .from('user_activity')
-    .select('action_type')
-    .eq('user_id', userId);
+    .from("user_activity")
+    .select("action_type")
+    .eq("user_id", userId);
 
   if (error) {
-    console.error('Error fetching activity counts:', error);
+    console.error("Error fetching activity counts:", error);
     throw error;
   }
 
   const counts: Record<string, number> = {};
-  data?.forEach(row => {
+  data?.forEach((row) => {
     counts[row.action_type] = (counts[row.action_type] || 0) + 1;
   });
 
   return counts;
 }
-

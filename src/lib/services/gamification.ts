@@ -3,13 +3,17 @@ import { evaluateBadges } from "./badgeEngine";
 import { addXp } from "./xpEngine";
 import { recordActivity } from "./activity";
 
+interface BadgeResult {
+  id: string | number;
+}
+
 interface GamificationResult {
   xpGained: number;
   oldXp: number;
   newXp: number;
   leveledUp: boolean;
   newLevel: number;
-  badges: any[];
+  badges: BadgeResult[];
   message: string;
 }
 
@@ -36,18 +40,18 @@ async function upsertBooleanFlag(
 export type { GamificationResult };
 
 export async function awardXP(
-  userId: string, 
-  actionKey: string, 
-  context: { hotspotId?: string, entityId?: string, photoPath?: string } = {}
-): Promise<GamificationResult | { success: false; reason: string; }> {
+  userId: string,
+  actionKey: string,
+  context: { hotspotId?: string; entityId?: string; photoPath?: string } = {}
+): Promise<GamificationResult | { success: false; reason: string }> {
   // Add new triggers like addReview etc. call awardXP internally
   // 1. Anti-abuse checks (idempotent per hotspot via flags)
-  if (actionKey === 'visit_hotspot_xp' && context.hotspotId) {
+  if (actionKey === "visit_hotspot_xp" && context.hotspotId) {
     const { data: status } = await supabase
-      .from('user_hotspots')
-      .select('visit_xp_awarded')
-      .eq('user_id', userId)
-      .eq('hotspot_id', context.hotspotId)
+      .from("user_hotspots")
+      .select("visit_xp_awarded")
+      .eq("user_id", userId)
+      .eq("hotspot_id", context.hotspotId)
       .single();
 
     if (status?.visit_xp_awarded) {
@@ -55,20 +59,15 @@ export async function awardXP(
     }
   }
 
-// Daily cap - simplified, full impl in user_activity logs
-  const dailyCapRule = await supabase.from('app_rules').select('rule_value').eq('rule_key', 'xp_daily_cap').single();
-  const dailyCap = dailyCapRule.data?.rule_value || 100;
-  // Note: Full daily sum requires RPC, skip for v1
-
   // Anti-abuse for verification XP: once per hotspot
-  if (actionKey === 'verify_hotspot_xp' && context.hotspotId) {
+  if (actionKey === "verify_hotspot_xp" && context.hotspotId) {
     const { data: status } = await supabase
-      .from('user_hotspots')
-      .select('verification_xp_awarded')
-      .eq('user_id', userId)
-      .eq('hotspot_id', context.hotspotId)
+      .from("user_hotspots")
+      .select("verification_xp_awarded")
+      .eq("user_id", userId)
+      .eq("hotspot_id", context.hotspotId)
       .single();
-    
+
     if (status?.verification_xp_awarded) {
       return { success: false, reason: "already_verified" };
     }
@@ -76,28 +75,28 @@ export async function awardXP(
 
   // 2. Get XP amount
   const { data: rule } = await supabase
-    .from('app_rules')
-    .select('rule_value')
-    .eq('rule_key', actionKey)
+    .from("app_rules")
+    .select("rule_value")
+    .eq("rule_key", actionKey)
     .single();
 
   const xpAmount = rule?.rule_value || 0;
-  if (xpAmount === 0) throw new Error('No XP for this action');
+  if (xpAmount === 0) throw new Error("No XP for this action");
 
   // 3. Award XP
   const xpResult = await addXp(userId, Number(xpAmount));
-  if (!xpResult) throw new Error('XP update failed');
+  if (!xpResult) throw new Error("XP update failed");
 
   // 4. Check badges
-  const badges = await evaluateBadges(userId);
+  const badges = (await evaluateBadges(userId)) as BadgeResult[];
 
   // 5. Record activity
   await recordActivity({
     actorId: userId,
-    activityType: 'xp_earned',
-    entityType: 'xp',
+    activityType: "xp_earned",
+    entityType: "xp",
     message: `+${xpAmount} XP for ${actionKey}`,
-    metadata: { actionKey, xpGained: Number(xpAmount), badges: badges.map((b: any) => b.id) },
+    metadata: { actionKey, xpGained: Number(xpAmount), badges: badges.map((b) => b.id) },
   });
 
   const newLevel = xpResult.newLevel;
@@ -109,15 +108,13 @@ export async function awardXP(
     leveledUp: xpResult.leveledUp || false,
     newLevel,
     badges,
-    message: `+${xpAmount} XP - ${actionKey.replace(/_xp$/, '').replace(/_/, ' ').toUpperCase()}!`
+    message: `+${xpAmount} XP - ${actionKey.replace(/_xp$/, "").replace(/_/, " ").toUpperCase()}!`,
   };
 }
 
 import { markAsVisited } from "./visitVerification";
 export async function markVisited(userId: string, hotspotId: string) {
-  const result = await markAsVisited(userId, hotspotId);
-  await evaluateBadges(userId);
-  return result;
+  return markAsVisited(userId, hotspotId);
 }
 
 export async function toggleFavorite(userId: string, hotspotId: string) {
@@ -136,9 +133,9 @@ export async function toggleFavorite(userId: string, hotspotId: string) {
   await upsertBooleanFlag(userId, hotspotId, "favorite", newValue);
 
   if (newValue) {
-    const result = await awardXP(userId, 'xp_mark_wishlist', { hotspotId });
-    if ('success' in result && result.success === false) {
-      console.warn('XP award skipped:', result.reason);
+    const result = await awardXP(userId, "xp_mark_wishlist", { hotspotId });
+    if ("success" in result && result.success === false) {
+      console.warn("XP award skipped:", result.reason);
     }
   }
 
@@ -161,13 +158,11 @@ export async function toggleWishlist(userId: string, hotspotId: string) {
   await upsertBooleanFlag(userId, hotspotId, "wishlist", newValue);
 
   if (newValue) {
-    const result = await awardXP(userId, 'xp_mark_wishlist', { hotspotId });
-    if ('success' in result && result.success === false) {
-      console.warn('XP award skipped:', result.reason);
+    const result = await awardXP(userId, "xp_mark_wishlist", { hotspotId });
+    if ("success" in result && result.success === false) {
+      console.warn("XP award skipped:", result.reason);
     }
   }
 
   return newValue;
 }
-
-
