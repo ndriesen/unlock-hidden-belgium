@@ -1,18 +1,18 @@
-﻿"use client";
+"use client";
 
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   Bell,
+  Compass,
   Crown,
   Flag,
   Flame,
+  Heart,
   Home,
   Map,
-  Heart,
   Route,
-  User,
   Users,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -76,6 +76,7 @@ export default function Sidebar({ collapsed, onNavigate }: SidebarProps) {
   const navLinks: NavLink[] = [
     { name: "Home", href: "/", icon: Home },
     { name: "Explore", href: "/hotspots", icon: Map },
+    { name: "Discovery", href: "/discover", icon: Compass },
     { name: "My Hotspots", href: "/hotspots/my", icon: Heart },
     { name: "Trips", href: "/trips", icon: Route },
     { name: "Buddies", href: "/buddies", icon: Users },
@@ -148,4 +149,3 @@ export default function Sidebar({ collapsed, onNavigate }: SidebarProps) {
     </aside>
   );
 }
-

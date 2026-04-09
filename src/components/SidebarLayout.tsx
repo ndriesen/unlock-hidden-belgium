@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Bell, Compass, Home, Menu, Route, Shield, User, X } from "lucide-react";
+import { Bell, Compass, Home, Menu, Route, Shield, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/Supabase/browser-client";
 import { useAuth } from "@/context/AuthContext";
@@ -215,7 +215,6 @@ export default function SidebarLayout({
     { href: "/", label: "Home", icon: Home },
     { href: "/hotspots", label: "Explore", icon: Compass },
     { href: "/trips", label: "Trips", icon: Route },
-    { href: "/profile", label: "Profile", icon: User },
   ];
 
   return (
@@ -568,6 +567,7 @@ export default function SidebarLayout({
     </div>
   );
 }
+
 
 
 

@@ -1,28 +1,38 @@
 "use client";
 
-import { useState } from 'react';
-import PremiumHiddenGemsMap from '@/components/maps/PremiumHiddenGemsMap';
-import HotspotBottomSheet from '@/components/ui/HotspotBottomSheet';
-import { useHiddenGems } from '@/hooks/useHiddenGems';
-import { useAuth } from '@/context/AuthContext';
-import type { ExploreHotspot } from '@/lib/services/explore';
-import { Funnel, Plus, MapPin, Search } from 'lucide-react';
-import { AnimatedGlassButton } from '@/components/ui/glass-button-hover';
+import dynamic from "next/dynamic";
+import { useState } from "react";
+import HotspotBottomSheet from "@/components/ui/HotspotBottomSheet";
+import { useHiddenGems } from "@/hooks/useHiddenGems";
+import { useAuth } from "@/context/AuthContext";
+import type { ExploreHotspot } from "@/lib/services/explore";
+import { Funnel, Plus, Search } from "lucide-react";
+import { AnimatedGlassButton } from "@/components/ui/glass-button-hover";
+
+const DiscoverGlobeMap = dynamic(() => import("@/components/maps/PremiumHiddenGemsMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-screen w-full items-center justify-center bg-gradient-to-br from-slate-50 via-white to-brand-navy/10 text-slate-600">
+      Loading discovery globe...
+    </div>
+  ),
+});
 
 export default function DiscoverPage() {
   const { user } = useAuth();
-  const { hiddenGems, loading } = useHiddenGems(user?.id);
+  const { hiddenGems } = useHiddenGems(user?.id);
   const [selectedGem, setSelectedGem] = useState<ExploreHotspot | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchQuery = "";
 
-  const filteredGems = hiddenGems.filter(gem => 
-    gem.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    gem.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    gem.province.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredGems = hiddenGems.filter(
+    (gem) =>
+      gem.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      gem.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      gem.province.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const currentIndex = filteredGems.findIndex(g => g.id === selectedGem?.id);
+  const currentIndex = filteredGems.findIndex((g) => g.id === selectedGem?.id);
   const totalGems = filteredGems.length;
 
   return (
@@ -32,7 +42,9 @@ export default function DiscoverPage() {
         <AnimatedGlassButton
           icon={<Search className="w-5 h-5" />}
           label="Search"
-          onClick={() => {/* Search modal */}}
+          onClick={() => {
+            /* Search modal */
+          }}
           size="sm"
         />
         <AnimatedGlassButton
@@ -45,10 +57,7 @@ export default function DiscoverPage() {
 
       {/* Map */}
       <div className="h-screen w-full">
-        <PremiumHiddenGemsMap 
-          onGemSelect={setSelectedGem}
-          initialView={{ center: [4.5, 50.8], zoom: 8 }}
-        />
+        <DiscoverGlobeMap onGemSelect={setSelectedGem} initialView={{ center: [4.5, 50.8], zoom: 8 }} />
       </div>
 
       {/* FAB Add Hotspot */}
@@ -58,7 +67,9 @@ export default function DiscoverPage() {
         label="Add Gem"
         contentClassName="bg-teal-600/90 text-white font-bold"
         size="lg"
-        onClick={() => {/* Add modal */}}
+        onClick={() => {
+          /* Add modal */
+        }}
       />
 
       {/* Bottom Sheet */}
